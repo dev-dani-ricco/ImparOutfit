@@ -145,3 +145,10 @@ vite.config.ts.timestamp-*
 # Expo / React Native específico
 .expo/
 web-build/
+
+# Artefatos locais da demo
+frontend/.expo-demo-check/
+frontend/src/contexts/AuthContext - Copia.js
+
+# O frontend usa npm/package-lock.json
+frontend/yarn.lock
