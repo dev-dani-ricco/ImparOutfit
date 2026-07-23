@@ -1,0 +1,13 @@
+openapi: 3.0.3
+info: {title: IMPAROutfit API, version: 1.0.0}
+servers: [{url: http://localhost:4000/api}]
+paths:
+  /auth/register: {post: {summary: Cadastro com seleção PERSON ou STORE, responses: {'201': {description: Criado}}}}
+  /auth/login: {post: {summary: Login JWT, responses: {'200': {description: Token}}}}
+  /stores: {get: {summary: Lista lojistas/marcas, responses: {'200': {description: OK}}}}
+  /stores/me: {get: {summary: Painel da loja autenticada, responses: {'200': {description: Métricas}}}, put: {summary: Atualiza perfil comercial, responses: {'200': {description: OK}}}}
+  /stores/items: {post: {summary: Lojista cria peça de catálogo em lote de fotos, responses: {'201': {description: Peça criada}}}}
+  /items: {get: {summary: Lista catálogo ou guarda-roupa, responses: {'200': {description: OK}}}, post: {summary: Usuário comum cria peça pessoal, responses: {'201': {description: Criada}}}}
+  /items/{id}/copy-to-wardrobe: {post: {summary: Copia peça de vitrine para guarda-roupa mantendo origem, parameters: [{name: id, in: path, required: true, schema: {type: string}}], responses: {'201': {description: Copiada}}}}
+  /feed: {get: {summary: Feed mesclado de looks, lançamentos e vitrines, responses: {'200': {description: OK}}}}
+  /showcases: {get: {summary: Lista vitrines temáticas}, post: {summary: Lojista cria vitrine temática}}

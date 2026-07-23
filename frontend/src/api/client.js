@@ -1,0 +1,3 @@
+import Constants from 'expo-constants';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:4000/api';
+export async function api(path,{token,method='GET',body,headers={}}={}){ const res=await fetch(`${API_URL}${path}`,{method,headers:{Accept:'application/json',...(body instanceof FormData?{}:{'Content-Type':'application/json'}),...(token?{Authorization:`Bearer ${token}`}:{ }),...headers},body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined}); if(!res.ok) throw new Error((await res.json().catch(()=>({error:'Erro'}))).error); return res.status===204?null:res.json(); }
