@@ -1,73 +1,72 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Card from '../components/Card';
+import FeedPost from '../components/FeedPost';
 import SectionHeader from '../components/SectionHeader';
+import { useDemo } from '../contexts/DemoContext';
 import { demoFeed } from '../demo/data';
 import { colors } from '../theme/colors';
 
-export default function FeedScreen() {
-  const [saved, setSaved] = useState({});
-  const savedCount = Object.values(saved).filter(Boolean).length;
+export default function FeedScreen({ navigation }) {
+  const { favorites, likes } = useDemo();
+  const favoriteCount = Object.values(favorites).filter(Boolean).length;
+  const likeCount = Object.values(likes).filter(Boolean).length;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      stickyHeaderIndices={[0]}
+    >
+      <View style={styles.stickyBar}>
+        <View>
+          <Text style={styles.stickyEyebrow}>VOCÊ ESTÁ NO</Text>
+          <Text style={styles.stickyTitle}>FEED</Text>
+        </View>
+        <Pressable style={styles.favoriteShortcut} onPress={() => navigation.navigate('Favoritas')}>
+          <Text style={styles.favoriteCount}>{favoriteCount}</Text>
+          <Text style={styles.favoriteLabel}>◇ FAVORITAS</Text>
+        </Pressable>
+      </View>
       <SectionHeader
         step="01  •  DESCOBRIR"
         eyebrow="FEED PERSONALIZADO"
         title="Vista sua presença."
-        description="Explore peças, looks e vitrines selecionados para você."
+        description="Seu ponto de partida continua exatamente onde você deixou."
         stats={[
           { value: demoFeed.length, label: 'publicações' },
-          { value: savedCount, label: 'salvas agora' },
+          { value: likeCount, label: 'curtidas agora' },
+          { value: favoriteCount, label: 'favoritas' },
         ]}
       />
-      {demoFeed.map((item) => {
-        const isSaved = Boolean(saved[item.id]);
-        const totalSaves = item.saves + (isSaved ? 1 : 0);
-
-        return (
-          <Card
-            key={item.id}
-            image={item.image}
-            subtitle={`${item.label} • ${item.author}`}
-            title={item.title}
-            description={item.description}
-          >
-            <View style={styles.metrics}>
-              <View>
-                <Text style={styles.metricValue}>{item.likes.toLocaleString('pt-BR')}</Text>
-                <Text style={styles.metricLabel}>CURTIDAS</Text>
-              </View>
-              <View>
-                <Text style={[styles.metricValue, isSaved && styles.changed]}>
-                  {totalSaves.toLocaleString('pt-BR')}
-                </Text>
-                <Text style={styles.metricLabel}>SALVAMENTOS</Text>
-              </View>
-            </View>
-            <Pressable
-              style={[styles.button, isSaved && styles.active]}
-              onPress={() => setSaved((current) => ({ ...current, [item.id]: !current[item.id] }))}
-            >
-              <Text style={styles.buttonText}>
-                {isSaved ? '✓ SALVO — TOQUE PARA REMOVER' : '+1  SALVAR PUBLICAÇÃO'}
-              </Text>
-            </Pressable>
-          </Card>
-        );
-      })}
+      {demoFeed.map((item) => <FeedPost key={item.id} item={item} />)}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingTop: 22, paddingBottom: 32 },
-  metrics: { flexDirection: 'row', gap: 32, marginTop: 16, marginBottom: 14 },
-  metricValue: { color: colors.text, fontSize: 22, fontWeight: '800' },
-  changed: { color: colors.accent },
-  metricLabel: { color: colors.muted, fontSize: 8, fontWeight: '700', letterSpacing: 1.2 },
-  button: { backgroundColor: colors.primary, padding: 14, alignItems: 'center' },
-  active: { backgroundColor: colors.accent },
-  buttonText: { color: colors.bg, fontWeight: '800', fontSize: 9, letterSpacing: 1.2 },
+  content: { paddingBottom: 32 },
+  stickyBar: {
+    backgroundColor: colors.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 20,
+    elevation: 8,
+  },
+  stickyEyebrow: { color: colors.muted, fontSize: 7, fontWeight: '700', letterSpacing: 1.4 },
+  stickyTitle: { color: colors.text, fontSize: 18, fontWeight: '900', letterSpacing: 2 },
+  favoriteShortcut: {
+    backgroundColor: colors.accent,
+    minWidth: 94,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    alignItems: 'center',
+  },
+  favoriteCount: { color: colors.bg, fontSize: 18, fontWeight: '900' },
+  favoriteLabel: { color: colors.bg, fontSize: 7, fontWeight: '800', letterSpacing: 1 },
 });
