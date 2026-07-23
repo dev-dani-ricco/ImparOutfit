@@ -37,8 +37,28 @@ curl http://127.0.0.1:4000/health
 ```
 
 O PostgreSQL e o Redis ficam apenas na rede privada do Docker. A API é
-publicada somente no endereço local `127.0.0.1:4000` para ser exposta depois
-por um proxy HTTPS ou Cloudflare Tunnel.
+publicada somente no endereço local `127.0.0.1:4000`. O serviço `tunnel`
+estabelece uma conexão de saída com a Cloudflare e publica a API por HTTPS,
+sem abrir portas de entrada no roteador.
+
+## Cloudflare Tunnel
+
+Crie um túnel remotamente gerenciado no painel Cloudflare. Na rota pública,
+associe o subdomínio desejado ao serviço:
+
+```text
+http://127.0.0.1:4000
+```
+
+Copie apenas o token do comando de instalação para
+`CLOUDFLARE_TUNNEL_TOKEN` no arquivo `.env.server`. Não coloque o token em
+comandos, logs ou arquivos versionados.
+
+Depois de iniciar a composição, verifique a conexão:
+
+```bash
+docker compose --env-file .env.server -f compose.server.yml logs tunnel
+```
 
 ## Operação
 
