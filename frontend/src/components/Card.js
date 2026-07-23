@@ -1,0 +1,2 @@
+import React from 'react'; import { View,Text,StyleSheet } from 'react-native'; import { colors } from '../theme/colors';
+export default function Card({title,subtitle,children}){ return <View style={s.card}>{title&&<Text style={s.title}>{title}</Text>}{subtitle&&<Text style={s.sub}>{subtitle}</Text>}{children}</View>; } const s=StyleSheet.create({card:{backgroundColor:colors.card,borderRadius:18,padding:16,margin:10,shadowColor:'#000',shadowOpacity:.08,shadowRadius:10,elevation:2},title:{fontSize:18,fontWeight:'700',color:colors.text},sub:{color:colors.muted,marginTop:4}});

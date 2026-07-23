@@ -1,0 +1,1 @@
+{"expo":{"name":"IMPAROutfit","slug":"imparoutfit","version":"1.0.0","orientation":"portrait","ios":{"bundleIdentifier":"com.imparoutfit.app"},"android":{"package":"com.imparoutfit.app"},"extra":{"apiUrl":"http://localhost:4000/api"}}}
