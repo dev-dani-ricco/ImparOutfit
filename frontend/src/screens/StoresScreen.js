@@ -1,5 +1,65 @@
-import React,{useState} from 'react';
-import {Pressable,ScrollView,StyleSheet,Text,View} from 'react-native';
-import Card from '../components/Card'; import {demoStores} from '../demo/data'; import {colors} from '../theme/colors';
-export default function StoresScreen(){const [following,setFollowing]=useState({});return <ScrollView style={s.screen} contentContainerStyle={s.content}><Text style={s.eyebrow}>CURADORIA IMPAR</Text><Text style={s.heading}>Lojas para descobrir</Text><Text style={s.intro}>Marcas independentes, selecionadas por presença e identidade.</Text>{demoStores.map(store=><Card key={store.id} image={store.image} subtitle={`${store.category} · ${store.location}`} title={store.store_name}><View style={s.row}><Text style={s.info}>{(store.followers/1000).toFixed(1).replace('.',',')} mil seguidores</Text><Pressable style={[s.button,following[store.id]&&s.active]} onPress={()=>setFollowing(c=>({...c,[store.id]:!c[store.id]}))}><Text style={s.buttonText}>{following[store.id]?'SEGUINDO':'SEGUIR →'}</Text></Pressable></View></Card>)}</ScrollView>}
-const s=StyleSheet.create({screen:{flex:1,backgroundColor:colors.bg},content:{paddingTop:24,paddingBottom:30},eyebrow:{marginHorizontal:18,color:colors.accent,fontWeight:'600',letterSpacing:2.4,fontSize:10},heading:{marginHorizontal:18,marginTop:6,fontSize:34,fontFamily:'serif',color:colors.text},intro:{marginHorizontal:18,marginTop:8,marginBottom:24,color:colors.muted,fontSize:16,lineHeight:23},row:{marginTop:16,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},info:{color:colors.muted},button:{backgroundColor:colors.primary,paddingHorizontal:17,paddingVertical:11},active:{backgroundColor:colors.accent},buttonText:{color:colors.bg,fontWeight:'700',fontSize:10,letterSpacing:1.2}});
+import React, { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import Card from '../components/Card';
+import SectionHeader from '../components/SectionHeader';
+import { demoStores } from '../demo/data';
+import { colors } from '../theme/colors';
+
+export default function StoresScreen() {
+  const [following, setFollowing] = useState({});
+  const followingCount = Object.values(following).filter(Boolean).length;
+
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <SectionHeader
+        step="02  •  CONECTAR"
+        eyebrow="LOJAS SELECIONADAS"
+        title="Marcas para descobrir."
+        description="Acompanhe lojas independentes com identidade e propósito."
+        stats={[
+          { value: demoStores.length, label: 'lojas' },
+          { value: followingCount, label: 'seguindo agora' },
+        ]}
+      />
+      {demoStores.map((store) => {
+        const isFollowing = Boolean(following[store.id]);
+        const followers = store.followers + (isFollowing ? 1 : 0);
+
+        return (
+          <Card
+            key={store.id}
+            image={store.image}
+            subtitle={`${store.category} • ${store.location}`}
+            title={store.store_name}
+          >
+            <Text style={[styles.number, isFollowing && styles.changed]}>
+              {followers.toLocaleString('pt-BR')}
+            </Text>
+            <Text style={styles.label}>SEGUIDORES</Text>
+            <Pressable
+              style={[styles.button, isFollowing && styles.active]}
+              onPress={() =>
+                setFollowing((current) => ({ ...current, [store.id]: !current[store.id] }))
+              }
+            >
+              <Text style={styles.buttonText}>
+                {isFollowing ? '✓ SEGUINDO — CONTAGEM +1' : '+1  SEGUIR ESTA LOJA'}
+              </Text>
+            </Pressable>
+          </Card>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingTop: 22, paddingBottom: 32 },
+  number: { color: colors.text, fontSize: 25, fontWeight: '800', marginTop: 16 },
+  changed: { color: colors.accent },
+  label: { color: colors.muted, fontSize: 8, fontWeight: '700', letterSpacing: 1.3 },
+  button: { backgroundColor: colors.primary, padding: 14, alignItems: 'center', marginTop: 14 },
+  active: { backgroundColor: colors.accent },
+  buttonText: { color: colors.bg, fontWeight: '800', fontSize: 9, letterSpacing: 1.2 },
+});
