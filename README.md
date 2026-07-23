@@ -3,7 +3,7 @@
 Aplicativo mobile de guarda-roupa inteligente com marketplace social para vitrines de lojistas e marcas.
 
 ## Estrutura
-- `backend/`: API REST Node.js + Express, JWT, RBAC, PostgreSQL, Redis e Cloudinary.
+- `backend/`: API REST Node.js + Express, JWT, RBAC, PostgreSQL, Redis opcional em desenvolvimento e Cloudinary.
 - `frontend/`: React Native + Expo com telas de cadastro, login, feed, lojas, armário, painel lojista e vitrines.
 - `docs/`: OpenAPI e documentação de arquitetura/escala.
 
@@ -15,6 +15,7 @@ Aplicativo mobile de guarda-roupa inteligente com marketplace social para vitrin
 ```bash
 cd backend
 cp .env.example .env
+# Para subir sem Redis local no desenvolvimento, mantenha REDIS_REQUIRED=false.
 npm install
 psql "$DATABASE_URL" -f sql/001_schema.sql
 npm run dev
