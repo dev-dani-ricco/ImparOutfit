@@ -1,31 +1,38 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import FeedPost from '../components/FeedPost';
+import SponsoredAdCard from '../components/SponsoredAdCard';
 import { useDemo } from '../contexts/DemoContext';
-import { demoFeed } from '../demo/data';
+import { demoFeed, featuredAd } from '../demo/data';
 import { colors } from '../theme/colors';
 
-export default function FavoritesScreen() {
-  const { favorites } = useDemo();
-  const items = demoFeed.filter((item) => favorites[item.id]);
+export default function FavoritesScreen({ navigation }) {
+  const { favorites, commercialSaves } = useDemo();
+  const items = demoFeed.filter((item) => item.authorType === 'STORE' && favorites[item.id]);
+  const hasFavoriteAd = Boolean(favorites[featuredAd.id]);
+  const totalFavorites = items.length + (hasFavoriteAd ? 1 : 0);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.eyebrow}>SUA CURADORIA</Text>
       <Text style={styles.title}>Publicações favoritas</Text>
       <Text style={styles.description}>
-        Ao voltar, o Feed continuará na mesma posição e com as mesmas interações.
+        Sua seleção reúne apenas publicações e campanhas feitas pelas lojas.
       </Text>
+      {Object.values(commercialSaves).map(item=><Pressable key={item.id} style={styles.counter} onPress={()=>navigation.navigate('Referência comercial',{itemId:item.id})}><Text style={styles.description}>{item.name} • Referência comercial</Text></Pressable>)}
       <View style={styles.counter}>
-        <Text style={styles.counterValue}>{items.length}</Text>
+        <Text style={styles.counterValue}>{totalFavorites}</Text>
         <Text style={styles.counterLabel}>PUBLICAÇÕES FAVORITAS</Text>
       </View>
-      {items.length ? (
-        items.map((item) => <FeedPost key={item.id} item={item} />)
+      {totalFavorites ? (
+        <>
+          {items.map((item) => <FeedPost key={item.id} item={item} />)}
+          {hasFavoriteAd ? <SponsoredAdCard onOpen={() => navigation.navigate('Campanha patrocinada')} /> : null}
+        </>
       ) : (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>◇</Text>
-          <Text style={styles.emptyTitle}>Sua seleção começa no Feed.</Text>
+          <Text style={styles.emptyTitle}>Sua seleção começa no Feed das lojas.</Text>
           <Text style={styles.emptyCopy}>Toque em “Adicionar às favoritas” em uma publicação.</Text>
         </View>
       )}

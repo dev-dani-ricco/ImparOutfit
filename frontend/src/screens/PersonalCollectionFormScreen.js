@@ -4,7 +4,8 @@ import { useDemo } from '../contexts/DemoContext';
 import { colors } from '../theme/colors';
 
 export default function PersonalCollectionFormScreen({ navigation }) {
-  const { wardrobe, addPersonalCollection } = useDemo();
+  const { wardrobe, commercialSaves, addPersonalCollection } = useDemo();
+  const choices=[...wardrobe,...Object.values(commercialSaves)];
   const [title, setTitle] = useState('');
   const [occasion, setOccasion] = useState('');
   const [selected, setSelected] = useState({});
@@ -17,7 +18,7 @@ export default function PersonalCollectionFormScreen({ navigation }) {
 
   function save() {
     if (!canSave) return;
-    const cover = wardrobe.find((item) => item.id === selectedIds[0])?.image;
+    const cover = choices.find((item) => item.id === selectedIds[0])?.image;
     addPersonalCollection({
       title,
       occasion: occasion || 'Uso pessoal',
@@ -30,9 +31,9 @@ export default function PersonalCollectionFormScreen({ navigation }) {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.eyebrow}>COLEÇÃO PARTICULAR</Text>
-      <Text style={styles.title}>Combine seu armário.</Text>
+      <Text style={styles.title}>Combine peças e referências.</Text>
       <Text style={styles.description}>
-        Agrupe peças do seu acervo para reencontrar combinações completas.
+        Combine suas peças e previews comerciais. Salvar o look preserva a relação de cada item.
       </Text>
       <Text style={styles.label}>NOME DA COLEÇÃO *</Text>
       <TextInput
@@ -54,7 +55,7 @@ export default function PersonalCollectionFormScreen({ navigation }) {
         <Text style={styles.selectionTitle}>SELECIONE AO MENOS 2 PEÇAS</Text>
         <Text style={styles.selectionCount}>{selectedIds.length} SELECIONADAS</Text>
       </View>
-      {wardrobe.map((item) => {
+      {choices.map((item) => {
         const active = Boolean(selected[item.id]);
         return (
           <Pressable key={item.id} style={[styles.item, active && styles.itemActive]} onPress={() => toggle(item.id)}>
@@ -62,7 +63,7 @@ export default function PersonalCollectionFormScreen({ navigation }) {
             <View style={styles.copy}>
               <Text style={[styles.category, active && styles.activeText]}>{item.category} • {item.subcategory}</Text>
               <Text style={[styles.name, active && styles.activeText]}>{item.name}</Text>
-              <Text style={[styles.format, active && styles.activeText]}>2D ✓ • 3D ✓</Text>
+              <Text style={[styles.format, active && styles.activeText]}>{item.kind==='OWNED_ITEM'?'PEÇA POSSUÍDA':'PRÉVIA COMERCIAL'}</Text>
             </View>
             <Text style={[styles.check, active && styles.activeText]}>{active ? '✓' : '○'}</Text>
           </Pressable>

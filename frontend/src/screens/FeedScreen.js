@@ -2,13 +2,16 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import FeedPost from '../components/FeedPost';
 import SectionHeader from '../components/SectionHeader';
+import SponsoredAdCard from '../components/SponsoredAdCard';
 import { useDemo } from '../contexts/DemoContext';
-import { demoFeed } from '../demo/data';
+import { demoFeed, featuredAd } from '../demo/data';
 import { colors } from '../theme/colors';
 
 export default function FeedScreen({ navigation }) {
-  const { favorites, likes } = useDemo();
-  const favoriteCount = Object.values(favorites).filter(Boolean).length;
+  const { campaignState, favorites, likes } = useDemo();
+  const storePosts = demoFeed.filter((item) => item.authorType === 'STORE');
+  const favoriteCount = storePosts.filter((item) => favorites[item.id]).length
+    + (favorites[featuredAd.id] ? 1 : 0);
   const likeCount = Object.values(likes).filter(Boolean).length;
 
   return (
@@ -19,8 +22,8 @@ export default function FeedScreen({ navigation }) {
     >
       <View style={styles.stickyBar}>
         <View>
-          <Text style={styles.stickyEyebrow}>VOCÊ ESTÁ NO</Text>
-          <Text style={styles.stickyTitle}>FEED</Text>
+          <Text style={styles.stickyEyebrow}>PUBLICADO PELAS</Text>
+          <Text style={styles.stickyTitle}>LOJAS</Text>
         </View>
         <Pressable style={styles.favoriteShortcut} onPress={() => navigation.navigate('Favoritas')}>
           <Text style={styles.favoriteCount}>{favoriteCount}</Text>
@@ -28,17 +31,24 @@ export default function FeedScreen({ navigation }) {
         </Pressable>
       </View>
       <SectionHeader
-        step="01  •  DESCOBRIR"
-        eyebrow="FEED PERSONALIZADO"
-        title="Vista sua presença."
-        description="Seu ponto de partida continua exatamente onde você deixou."
+        step="04  •  ACOMPANHAR"
+        eyebrow="FEED EXCLUSIVO DAS LOJAS"
+        title="Novidades das marcas."
+        description="Somente lojas publicam aqui: lançamentos, vitrines e campanhas para clientes."
         stats={[
-          { value: demoFeed.length, label: 'publicações' },
+          { value: storePosts.length, label: 'publicações de lojas' },
           { value: likeCount, label: 'curtidas agora' },
           { value: favoriteCount, label: 'favoritas' },
         ]}
       />
-      {demoFeed.map((item) => <FeedPost key={item.id} item={item} />)}
+      {storePosts.map((item, index) => (
+        <React.Fragment key={item.id}>
+          <FeedPost item={item} />
+          {index === 0 && campaignState.status === 'active' ? (
+            <SponsoredAdCard onOpen={() => navigation.navigate('Campanha patrocinada')} />
+          ) : null}
+        </React.Fragment>
+      ))}
     </ScrollView>
   );
 }

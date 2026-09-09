@@ -40,12 +40,12 @@ export default function Model3DPreview({ image, model, compact = false }) {
         ]}
       />
       <View style={styles.badge}>
-        <Text style={styles.badgeText}>3D ✓</Text>
+        <Text style={styles.badgeText}>PRÉVIA</Text>
       </View>
       {!compact ? (
         <View style={styles.instruction}>
-          <Text style={styles.instructionText}>TOQUE PARA GIRAR 360°</Text>
-          <Text style={styles.modelId}>{model?.angles || 0} ÂNGULOS • MODELO VALIDADO</Text>
+          <Text style={styles.instructionText}>TOQUE PARA ANIMAR A FOTO</Text>
+          <Text style={styles.modelId}>{model?.angles || 0} FOTOS • RECONSTRUÇÃO PENDENTE</Text>
         </View>
       ) : null}
     </Pressable>

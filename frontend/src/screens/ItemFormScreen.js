@@ -10,6 +10,8 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import Model3DPreview from '../components/Model3DPreview';
+import { useAuth } from '../contexts/AuthContext';
 import { useDemo } from '../contexts/DemoContext';
 import { demoImages, wardrobeCategories } from '../demo/data';
 import { colors } from '../theme/colors';
@@ -21,15 +23,20 @@ const requiredAngles = [
   { id: 'left', label: 'Lado esquerdo' },
 ];
 
-export default function ItemFormScreen({ navigation }) {
-  const { addWardrobeItem } = useDemo();
-  const [form, setForm] = useState({ name: '', subcategory: '', color: '', size: '' });
+export default function ItemFormScreen({ navigation, route }) {
+  const { user, activeContext }=useAuth();
+  const [ownershipAttested,setOwnershipAttested]=useState(false);
+  const { addStoreItem, addWardrobeItem, wardrobeCapacity } = useDemo();
+  const isStore = Boolean(route.params?.store);
+  const [form, setForm] = useState({ name: '', subcategory: '', color: '', size: '', price: '' });
   const [category, setCategory] = useState(null);
   const [image, setImage] = useState(null);
   const [angleCaptures, setAngleCaptures] = useState({});
+  const [demoCapture, setDemoCapture] = useState(false);
 
   const completedAngles = Object.keys(angleCaptures).length;
-  const canSave = Boolean(form.name && category && image && completedAngles === requiredAngles.length);
+  const canSave = Boolean(form.name && category && image && (isStore || ownershipAttested));
+  const wardrobeIsFull = !isStore && wardrobeCapacity.isFull;
 
   function update(key, value) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -49,7 +56,7 @@ export default function ItemFormScreen({ navigation }) {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Câmera necessária', 'Autorize a câmera para registrar os ângulos do scan 3D.');
+        Alert.alert('Câmera necessária', 'Autorize a câmera para registrar os ângulos da peça.');
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
@@ -69,7 +76,8 @@ export default function ItemFormScreen({ navigation }) {
   }
 
   function activateDemoCapture() {
-    setImage((current) => current || demoImages.bomber);
+    setDemoCapture(true);
+    setImage((current) => current || (isStore ? demoImages.blazerAreia : demoImages.bomber));
     setAngleCaptures({
       front: 'demo-front',
       right: 'demo-right',
@@ -77,17 +85,19 @@ export default function ItemFormScreen({ navigation }) {
       left: 'demo-left',
     });
     setForm((current) => ({
-      name: current.name || 'Nova peça escaneada',
-      subcategory: current.subcategory || 'Jaqueta',
-      color: current.color || 'Lilás',
+      ...current,
+      name: current.name || (isStore ? 'Blazer Aurora Demo' : 'Nova peça escaneada'),
+      subcategory: current.subcategory || (isStore ? 'Blazer' : 'Jaqueta'),
+      color: current.color || (isStore ? 'Areia' : 'Lilás'),
       size: current.size || 'M',
+      price: current.price || '489',
     }));
     setCategory((current) => current || wardrobeCategories[0]);
   }
 
   function save() {
     if (!canSave) return;
-    addWardrobeItem({
+    const item = {
       name: form.name,
       categoryId: category.id,
       category: category.label,
@@ -96,24 +106,61 @@ export default function ItemFormScreen({ navigation }) {
       size: form.size || 'Não informado',
       source: 'Meu armário',
       image,
+      ownershipAttested,
+      ownershipSource:demoCapture?'DEMO_CATALOG':'REAL_CAPTURE',
       model3d: {
         id: `scan-${Date.now()}`,
-        status: 'ready',
+        status: 'CAPTURED_IMAGES',
         angles: completedAngles,
         captures: angleCaptures,
         reconstruction: 'demo-preview',
       },
-    });
-    navigation.goBack();
+    };
+
+    if (isStore) {
+      const created = addStoreItem(user?.contexts?.find(c=>c.organization_id===activeContext)?.store_id, {
+        ...item,
+        price: `R$ ${form.price || '489'}`,
+      });
+      Alert.alert('Peça publicada', `${form.name} já aparece na vitrine da marca.`);
+      navigation.replace('Peça publicada', { storeItemId: created.id });
+    } else {
+      const result = addWardrobeItem(item);
+      if (!result.ok) {
+        Alert.alert(
+          'Armário cheio',
+          `Seu plano ${result.capacity.plan.name} comporta até ${result.capacity.limit} peças.`,
+          [
+            { text: 'Agora não', style: 'cancel' },
+            { text: 'Ver planos', onPress: () => navigation.replace('Planos do armário') },
+          ]
+        );
+        return;
+      }
+      navigation.replace('Peça 2D e 3D', { itemId: result.item.id });
+    }
   }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.eyebrow}>CADASTRO OBRIGATÓRIO • 2D + 3D</Text>
-      <Text style={styles.title}>Digitalize uma peça.</Text>
+      <Text style={styles.eyebrow}>{isStore ? 'PUBLICAÇÃO DE CATÁLOGO' : 'CATALOGAÇÃO DE PEÇA POSSUÍDA'}</Text>
+      <Text style={styles.title}>{isStore ? 'Publique uma peça.' : 'Digitalize uma peça.'}</Text>
       <Text style={styles.description}>
-        A peça só entra no armário quando a foto 2D e os quatro ângulos do scan estiverem completos.
+        {isStore
+          ? 'Publique uma foto e os dados do produto. A prévia comercial não cria posse.'
+          : 'Catalogue uma peça que você possui. Fotos adicionais preparam uma futura reconstrução 3D.'}
       </Text>
+      {!isStore && <Pressable style={styles.limitCard} onPress={()=>setOwnershipAttested(v=>!v)}><Text style={styles.limitCopy}>{ownershipAttested?'☑':'☐'} Confirmo que estou catalogando uma peça que possuo (ou uma peça fictícia na demonstração).</Text></Pressable>}
+      {wardrobeIsFull ? (
+        <View style={styles.limitCard}>
+          <Text style={styles.limitTag}>LIMITE ATINGIDO</Text>
+          <Text style={styles.limitTitle}>{wardrobeCapacity.used}/{wardrobeCapacity.limit} peças cadastradas</Text>
+          <Text style={styles.limitCopy}>Aumente a capacidade antes de digitalizar uma nova peça.</Text>
+          <Pressable style={styles.limitButton} onPress={() => navigation.replace('Planos do armário')}>
+            <Text style={styles.limitButtonText}>VER PLANOS DE CAPACIDADE →</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <Step number="01" title="Foto principal 2D" complete={Boolean(image)}>
         <Pressable style={styles.captureBox} onPress={selectPhoto2D}>
@@ -159,6 +206,15 @@ export default function ItemFormScreen({ navigation }) {
             <Field label="TAMANHO" value={form.size} onChangeText={(value) => update('size', value)} />
           </View>
         </View>
+        {isStore ? (
+          <Field
+            label="PREÇO (R$)"
+            value={form.price}
+            onChangeText={(value) => update('price', value)}
+            keyboardType="decimal-pad"
+            placeholder="489"
+          />
+        ) : null}
       </Step>
 
       <Step number="04" title="Captura para modelo 3D" complete={completedAngles === 4}>
@@ -189,21 +245,32 @@ export default function ItemFormScreen({ navigation }) {
         <Pressable style={styles.demoButton} onPress={activateDemoCapture}>
           <Text style={styles.demoButtonText}>▶ PREENCHER SCAN PARA A DEMONSTRAÇÃO</Text>
         </Pressable>
+        {demoCapture && image && completedAngles === 4 ? (
+          <View style={styles.demoPreview}>
+            <Text style={styles.demoPreviewTag}>PRÉVIA VISUAL • FOTO ANIMADA</Text>
+            <Model3DPreview image={image} model={{ angles: 4, status: 'ready' }} compact />
+            <Text style={styles.demoPreviewCopy}>As fotos estão registradas. Reconstrução de malha 3D ainda não disponível.</Text>
+          </View>
+        ) : null}
       </Step>
 
       <View style={styles.validation}>
         <Validation label="Foto 2D" complete={Boolean(image)} />
         <Validation label="Categoria" complete={Boolean(category)} />
         <Validation label="Nome" complete={Boolean(form.name)} />
-        <Validation label="Scan 3D" complete={completedAngles === 4} />
+        <Validation label="Fotos adicionais" complete={completedAngles === 4} />
       </View>
       <Pressable
-        disabled={!canSave}
-        style={[styles.saveButton, !canSave && styles.saveDisabled]}
+        disabled={!canSave || wardrobeIsFull}
+        style={[styles.saveButton, (!canSave || wardrobeIsFull) && styles.saveDisabled]}
         onPress={save}
       >
         <Text style={styles.saveText}>
-          {canSave ? 'SALVAR PEÇA 2D + 3D →' : 'COMPLETE OS ITENS OBRIGATÓRIOS'}
+          {wardrobeIsFull
+            ? 'LIMITE DO ARMÁRIO ATINGIDO'
+            : canSave
+            ? isStore ? 'PUBLICAR NA VITRINE →' : 'CATALOGAR PEÇA POSSUÍDA →'
+            : 'COMPLETE OS ITENS OBRIGATÓRIOS'}
         </Text>
       </Pressable>
     </ScrollView>
@@ -255,6 +322,12 @@ const styles = StyleSheet.create({
   eyebrow: { color: colors.accent, fontSize: 9, fontWeight: '900', letterSpacing: 2 },
   title: { color: colors.text, fontFamily: 'serif', fontSize: 35, marginTop: 7 },
   description: { color: colors.muted, lineHeight: 21, marginTop: 9, marginBottom: 22 },
+  limitCard: { backgroundColor: colors.surface, borderLeftWidth: 4, borderLeftColor: colors.accent, padding: 15, marginBottom: 24 },
+  limitTag: { color: colors.accent, fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
+  limitTitle: { color: colors.text, fontFamily: 'serif', fontSize: 21, marginTop: 4 },
+  limitCopy: { color: colors.muted, fontSize: 10, lineHeight: 16, marginTop: 4 },
+  limitButton: { backgroundColor: colors.accent, padding: 11, alignItems: 'center', marginTop: 12 },
+  limitButtonText: { color: colors.bg, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
   step: { borderTopWidth: 1, borderColor: colors.line, paddingTop: 15, marginBottom: 28 },
   stepHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   stepNumber: { color: colors.bg, backgroundColor: colors.primary, padding: 7, fontSize: 9, fontWeight: '900' },
@@ -289,6 +362,9 @@ const styles = StyleSheet.create({
   progressText: { color: colors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1, textAlign: 'right', marginTop: 5 },
   demoButton: { borderWidth: 1, borderColor: colors.gold, padding: 12, alignItems: 'center', marginTop: 13 },
   demoButtonText: { color: colors.gold, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  demoPreview: { marginTop: 14, borderWidth: 1, borderColor: colors.gold, backgroundColor: colors.surface, padding: 9 },
+  demoPreviewTag: { color: colors.gold, fontSize: 7, fontWeight: '900', letterSpacing: 1, marginBottom: 8 },
+  demoPreviewCopy: { color: colors.muted, fontSize: 9, lineHeight: 14, marginTop: 8 },
   validation: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.surface, padding: 14 },
   validationItem: { alignItems: 'center' },
   validationIcon: { color: colors.muted, fontSize: 18 },

@@ -1,59 +1,60 @@
+import ApiFoundationScreen from '../screens/ApiFoundationScreen';
 import React from 'react';
-import { Text } from 'react-native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
-import LoginScreen from '../screens/LoginScreen';
-import RegisterScreen from '../screens/RegisterScreen';
-import FeedScreen from '../screens/FeedScreen';
 import FavoritesScreen from '../screens/FavoritesScreen';
-import WardrobeScreen from '../screens/WardrobeScreen';
-import WardrobeItemScreen from '../screens/WardrobeItemScreen';
-import PersonalCollectionFormScreen from '../screens/PersonalCollectionFormScreen';
-import StoresScreen from '../screens/StoresScreen';
-import StoreDetailScreen from '../screens/StoreDetailScreen';
+import FeedScreen from '../screens/FeedScreen';
+import DaniRicoScreen from '../screens/DaniRicoScreen';
 import ItemFormScreen from '../screens/ItemFormScreen';
-import ShowcasesScreen from '../screens/ShowcasesScreen';
+import LoginScreen from '../screens/LoginScreen';
+import PersonalCollectionFormScreen from '../screens/PersonalCollectionFormScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import RegisterScreen from '../screens/RegisterScreen';
+import ShowcasesScreen from '../screens/ShowcasesScreen';
+import StoreDashboardScreen from '../screens/StoreDashboardScreen';
+import StoreCampaignScreen from '../screens/StoreCampaignScreen';
+import StoreDetailScreen from '../screens/StoreDetailScreen';
+import StoresScreen from '../screens/StoresScreen';
+import WardrobeItemScreen from '../screens/WardrobeItemScreen';
+import WardrobePlansScreen from '../screens/WardrobePlansScreen';
+import WardrobeScreen from '../screens/WardrobeScreen';
 
 const RootStack = createNativeStackNavigator();
 const FeedStackNav = createNativeStackNavigator();
 const StoreStackNav = createNativeStackNavigator();
 const WardrobeStackNav = createNativeStackNavigator();
-const HighlightStackNav = createNativeStackNavigator();
+const DaniStackNav = createNativeStackNavigator();
 const ProfileStackNav = createNativeStackNavigator();
+const BrandStackNav = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const icons = {
   Feed: '✦',
   Lojas: '⌂',
   Armário: '◇',
-  Coleções: '▣',
+  'Dani Rico': '✎',
   Perfil: '○',
 };
 
 const stackOptions = {
   headerStyle: { backgroundColor: colors.bg },
   headerTintColor: colors.text,
-  headerTitleStyle: { fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
+  headerTitleStyle: { fontSize: 11, fontWeight: '800', letterSpacing: 1.3 },
   headerShadowVisible: false,
   contentStyle: { backgroundColor: colors.bg },
 };
 
 function FeedStack() {
   return (
-    <FeedStackNav.Navigator screenOptions={stackOptions}>
-      <FeedStackNav.Screen
-        name="Feed principal"
-        component={FeedScreen}
-        options={{ title: 'IMPAR OUTFIT  •  DEMO' }}
-      />
-      <FeedStackNav.Screen
-        name="Favoritas"
-        component={FavoritesScreen}
-        options={{ title: 'PUBLICAÇÕES FAVORITAS' }}
-      />
+    <FeedStackNav.Navigator initialRouteName="Feed principal" screenOptions={stackOptions}>
+      <FeedStackNav.Screen name="Referência comercial" component={WardrobeItemScreen} />
+      <FeedStackNav.Screen name="Feed principal" component={FeedScreen} options={{ title: 'IMPAR OUTFIT  •  FEED DAS LOJAS' }} />
+      <FeedStackNav.Screen name="Favoritas" component={FavoritesScreen} options={{ title: 'PUBLICAÇÕES FAVORITAS' }} />
+      <FeedStackNav.Screen name="Campanha patrocinada" component={ShowcasesScreen} options={{ title: 'CONTEÚDO PATROCINADO • AD' }} />
+      <FeedStackNav.Screen name="Loja do anúncio" component={StoreDetailScreen} options={{ title: 'VITRINE DA MARCA' }} />
     </FeedStackNav.Navigator>
   );
 }
@@ -61,11 +62,7 @@ function FeedStack() {
 function StoreStack() {
   return (
     <StoreStackNav.Navigator screenOptions={stackOptions}>
-      <StoreStackNav.Screen
-        name="Lista de lojas"
-        component={StoresScreen}
-        options={{ title: 'IMPAR OUTFIT  •  LOJAS' }}
-      />
+      <StoreStackNav.Screen name="Lista de lojas" component={StoresScreen} options={{ title: 'IMPAR OUTFIT  •  MARCAS' }} />
       <StoreStackNav.Screen name="Loja" component={StoreDetailScreen} options={{ title: 'PERFIL DA MARCA' }} />
     </StoreStackNav.Navigator>
   );
@@ -74,45 +71,36 @@ function StoreStack() {
 function WardrobeStack() {
   return (
     <WardrobeStackNav.Navigator screenOptions={stackOptions}>
-      <WardrobeStackNav.Screen
-        name="Meu armário"
-        component={WardrobeScreen}
-        options={{ title: 'IMPAR OUTFIT  •  ARMÁRIO' }}
-      />
+      <WardrobeStackNav.Screen name="Meu armário" component={WardrobeScreen} options={{ title: 'IMPAR OUTFIT  •  ARMÁRIO' }} />
       <WardrobeStackNav.Screen name="Nova peça" component={ItemFormScreen} options={{ title: 'CADASTRO 2D + 3D' }} />
+      <WardrobeStackNav.Screen name="Planos do armário" component={WardrobePlansScreen} options={{ title: 'CAPACIDADE E PLANOS' }} />
       <WardrobeStackNav.Screen name="Peça 2D e 3D" component={WardrobeItemScreen} options={{ title: 'ITEM DIGITAL' }} />
       <WardrobeStackNav.Screen name="Nova coleção" component={PersonalCollectionFormScreen} options={{ title: 'COLEÇÃO PARTICULAR' }} />
     </WardrobeStackNav.Navigator>
   );
 }
 
-function HighlightStack() {
+function DaniStack() {
   return (
-    <HighlightStackNav.Navigator screenOptions={stackOptions}>
-      <HighlightStackNav.Screen
-        name="Campanhas"
-        component={ShowcasesScreen}
-        options={{ title: 'IMPAR OUTFIT  •  PATROCINADO' }}
-      />
-    </HighlightStackNav.Navigator>
+    <DaniStackNav.Navigator screenOptions={stackOptions}>
+      <DaniStackNav.Screen name="Painel da Dani" component={DaniRicoScreen} options={{ title: 'IMPAR OUTFIT  •  DANI RICO' }} />
+      <DaniStackNav.Screen name="Peça recomendada" component={WardrobeItemScreen} options={{ title: 'INDICAÇÃO DEMONSTRATIVA' }} />
+    </DaniStackNav.Navigator>
   );
 }
 
 function ProfileStack() {
   return (
     <ProfileStackNav.Navigator screenOptions={stackOptions}>
-      <ProfileStackNav.Screen
-        name="Meu perfil"
-        component={ProfileScreen}
-        options={{ title: 'IMPAR OUTFIT  •  PERFIL' }}
-      />
+      <ProfileStackNav.Screen name="Meu perfil" component={ProfileScreen} options={{ headerShown: false }} />
     </ProfileStackNav.Navigator>
   );
 }
 
-function MainTabs() {
+function PersonExperience() {
   return (
     <Tab.Navigator
+      initialRouteName="Perfil"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarHideOnKeyboard: true,
@@ -120,37 +108,64 @@ function MainTabs() {
         tabBarInactiveTintColor: colors.muted,
         tabBarActiveBackgroundColor: colors.accent,
         tabBarInactiveBackgroundColor: colors.bg,
-        tabBarStyle: {
-          height: 72,
-          backgroundColor: colors.bg,
-          borderTopWidth: 1,
-          borderTopColor: colors.line,
-        },
+        tabBarStyle: { height: 72, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
         tabBarItemStyle: { paddingTop: 7, paddingBottom: 7 },
         tabBarLabelStyle: { fontSize: 8, fontWeight: '900', letterSpacing: 0.4 },
         tabBarIcon: ({ color, focused }) => (
-          <Text style={{ color, fontSize: focused ? 21 : 17, fontWeight: '900' }}>
-            {icons[route.name]}
-          </Text>
+          <Text style={{ color, fontSize: focused ? 21 : 17, fontWeight: '900' }}>{icons[route.name]}</Text>
         ),
       })}
     >
-      <Tab.Screen name="Feed" component={FeedStack} />
-      <Tab.Screen name="Lojas" component={StoreStack} />
-      <Tab.Screen name="Armário" component={WardrobeStack} />
-      <Tab.Screen name="Coleções" component={HighlightStack} />
       <Tab.Screen name="Perfil" component={ProfileStack} />
+      <Tab.Screen name="Armário" component={WardrobeStack} />
+      <Tab.Screen name="Lojas" component={StoreStack} />
+      <Tab.Screen name="Feed" component={FeedStack} />
+      <Tab.Screen name="Dani Rico" component={DaniStack} />
     </Tab.Navigator>
   );
 }
 
+function BrandExperience() {
+  return (
+    <BrandStackNav.Navigator screenOptions={stackOptions}>
+      <BrandStackNav.Screen name="Painel da marca" component={StoreDashboardScreen} options={{ headerShown: false }} />
+      <BrandStackNav.Screen name="Nova peça" component={ItemFormScreen} initialParams={{ store: true }} options={{ title: 'PUBLICAR NO CATÁLOGO' }} />
+      <BrandStackNav.Screen name="Peça publicada" component={WardrobeItemScreen} options={{ title: 'PEÇA PUBLICADA • PRÉVIA' }} />
+      <BrandStackNav.Screen
+        name="Prévia da vitrine"
+        component={StoreDetailScreen}
+        initialParams={{ storeId: 'store-aurora', preview: true }}
+        options={{ title: 'COMO A CLIENTE VÊ' }}
+      />
+      <BrandStackNav.Screen name="Campanhas" component={StoreCampaignScreen} options={{ title: 'MÍDIA E ANÚNCIOS • AD' }} />
+    </BrandStackNav.Navigator>
+  );
+}
+
+function Splash() {
+  return (
+    <View style={styles.splash}>
+      <Text style={styles.splashBrand}>IMPAR</Text>
+      <Text style={styles.splashSignature}>Outfit</Text>
+      <ActivityIndicator color={colors.accent} style={styles.spinner} />
+    </View>
+  );
+}
+
 export default function RootNavigator() {
-  const { token } = useAuth();
+  const { isReady, token, user, activeContext, demoMode } = useAuth();
+
+  if (!isReady) return <Splash />;
+  if(token && !demoMode)return <ApiFoundationScreen />;
 
   return (
     <RootStack.Navigator screenOptions={stackOptions}>
       {token ? (
-        <RootStack.Screen name="IMPAROutfit" component={MainTabs} options={{ headerShown: false }} />
+        <RootStack.Screen
+          name="IMPAROutfit"
+          component={activeContext !== 'personal' && user?.contexts?.some(c=>c.organization_id===activeContext) ? BrandExperience : PersonExperience}
+          options={{ headerShown: false }}
+        />
       ) : (
         <>
           <RootStack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
@@ -160,3 +175,10 @@ export default function RootNavigator() {
     </RootStack.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  splash: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  splashBrand: { color: colors.text, fontSize: 27, fontWeight: '800', letterSpacing: 8 },
+  splashSignature: { color: colors.accent, fontFamily: 'serif', fontStyle: 'italic', fontSize: 25, marginTop: 2 },
+  spinner: { marginTop: 25 },
+});

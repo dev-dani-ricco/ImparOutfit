@@ -5,9 +5,15 @@ import { useDemo } from '../contexts/DemoContext';
 import { colors } from '../theme/colors';
 
 export default function WardrobeItemScreen({ route }) {
-  const { wardrobe } = useDemo();
+  const { stores, wardrobe, commercialSaves } = useDemo();
   const [mode, setMode] = useState('2d');
-  const item = wardrobe.find((piece) => piece.id === route.params?.itemId) || wardrobe[0];
+  const publishedItem = stores
+    .flatMap((store) => store.items)
+    .find((piece) => piece.id === route.params?.storeItemId);
+  const item = publishedItem
+    || wardrobe.find((piece) => piece.id === route.params?.itemId)
+    || Object.values(commercialSaves).find(piece=>piece.id===route.params?.itemId || piece.legacyWardrobeId===route.params?.itemId);
+  if(!item)return <View style={styles.content}><Text>Peça não encontrada.</Text></View>;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -18,7 +24,7 @@ export default function WardrobeItemScreen({ route }) {
           <Text style={[styles.switchText, mode === '2d' && styles.activeText]}>FOTO 2D</Text>
         </Pressable>
         <Pressable style={[styles.switchButton, mode === '3d' && styles.active]} onPress={() => setMode('3d')}>
-          <Text style={[styles.switchText, mode === '3d' && styles.activeText]}>MODELO 3D • 360°</Text>
+          <Text style={[styles.switchText, mode === '3d' && styles.activeText]}>PRÉVIA VISUAL</Text>
         </Pressable>
       </View>
       {mode === '2d' ? (
@@ -34,12 +40,13 @@ export default function WardrobeItemScreen({ route }) {
         <Data label="Tipo" value={item.subcategory} />
         <Data label="Cor" value={item.color} />
         <Data label="Tamanho" value={item.size} />
-        <Data label="Origem" value={item.source} />
+        <Data label="Relação" value={publishedItem || item.kind!=='OWNED_ITEM' ? 'Referência comercial' : 'Peça catalogada como possuída'} />
+        <Data label="Origem" value={item.source || 'Ateliê Aurora'} />
         <Data label="Ativo 3D" value={`${item.model3d?.angles || 0} ângulos registrados`} />
       </View>
       <View style={styles.required}>
         <Text style={styles.requiredTitle}>PADRÃO DO ARMÁRIO INTELIGENTE</Text>
-        <Text style={styles.requiredText}>Foto 2D validada ✓  •  Modelo 3D obrigatório ✓</Text>
+        <Text style={styles.requiredText}>Captura e prévia visual. Reconstrução 3D ainda não disponível.</Text>
       </View>
     </ScrollView>
   );

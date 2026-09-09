@@ -6,7 +6,7 @@ import { useDemo } from '../contexts/DemoContext';
 import { sponsoredCollections } from '../demo/data';
 import { colors } from '../theme/colors';
 
-export default function ShowcasesScreen() {
+export default function ShowcasesScreen({ navigation }) {
   const { favorites, toggleFavorite } = useDemo();
   const favoriteCount = sponsoredCollections.filter((item) => favorites[item.id]).length;
 
@@ -50,14 +50,23 @@ export default function ShowcasesScreen() {
                 <Text style={styles.label}>AVALIAÇÃO</Text>
               </View>
             </View>
-            <Pressable
-              style={[styles.button, isFavorite && styles.active]}
-              onPress={() => toggleFavorite(item.id)}
-            >
-              <Text style={[styles.buttonText, isFavorite && styles.activeText]}>
-                {isFavorite ? '♥ DESTAQUE FAVORITO' : '♡ FAVORITAR DESTAQUE'}
-              </Text>
-            </Pressable>
+            <View style={styles.actions}>
+              <Pressable
+                style={styles.openButton}
+                onPress={() => navigation.navigate('Loja do anúncio', { storeId: item.storeId })}
+              >
+                <Text style={styles.openButtonText}>ABRIR VITRINE →</Text>
+              </Pressable>
+              <Pressable
+                accessibilityLabel={isFavorite ? 'Remover destaque dos favoritos' : 'Favoritar destaque'}
+                style={[styles.button, isFavorite && styles.active]}
+                onPress={() => toggleFavorite(item.id)}
+              >
+                <Text style={[styles.buttonText, isFavorite && styles.activeText]}>
+                  {isFavorite ? '◆' : '◇'}
+                </Text>
+              </Pressable>
+            </View>
           </Card>
         );
       })}
@@ -76,8 +85,11 @@ const styles = StyleSheet.create({
   metrics: { flexDirection: 'row', gap: 36, marginTop: 16, marginBottom: 14 },
   number: { color: colors.text, fontSize: 23, fontWeight: '900' },
   label: { color: colors.muted, fontSize: 7, fontWeight: '800', letterSpacing: 1.1 },
-  button: { borderWidth: 1, borderColor: colors.accent, padding: 13, alignItems: 'center' },
+  actions: { flexDirection: 'row', gap: 8 },
+  openButton: { flex: 1, backgroundColor: colors.accent, padding: 13, alignItems: 'center' },
+  openButtonText: { color: colors.bg, fontWeight: '900', fontSize: 8, letterSpacing: 1 },
+  button: { width: 48, borderWidth: 1, borderColor: colors.accent, padding: 10, alignItems: 'center', justifyContent: 'center' },
   active: { backgroundColor: colors.accent },
-  buttonText: { color: colors.accent, fontWeight: '900', fontSize: 9, letterSpacing: 1.1 },
+  buttonText: { color: colors.accent, fontWeight: '900', fontSize: 20 },
   activeText: { color: colors.bg },
 });

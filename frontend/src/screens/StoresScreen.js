@@ -2,11 +2,10 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import SectionHeader from '../components/SectionHeader';
 import { useDemo } from '../contexts/DemoContext';
-import { demoStores } from '../demo/data';
 import { colors } from '../theme/colors';
 
 export default function StoresScreen({ navigation }) {
-  const { following, toggleFollowing } = useDemo();
+  const { following, stores, toggleFollowing } = useDemo();
   const followingCount = Object.values(following).filter(Boolean).length;
 
   return (
@@ -17,11 +16,11 @@ export default function StoresScreen({ navigation }) {
         title="Conheça quem publica."
         description="Entre no perfil de cada marca para explorar seus itens e lançamentos."
         stats={[
-          { value: demoStores.length, label: 'lojas' },
+          { value: stores.length, label: 'lojas' },
           { value: followingCount, label: 'seguindo' },
         ]}
       />
-      {demoStores.map((store) => {
+      {stores.map((store) => {
         const isFollowing = Boolean(following[store.id]);
         return (
           <View key={store.id} style={styles.storeCard}>
