@@ -1,13 +1,4430 @@
 openapi: 3.0.3
-info: {title: IMPAROutfit API, version: 1.0.0}
-servers: [{url: http://localhost:4000/api}]
+info:
+  title: UNIVERSO ÍMPAR — Fundação contextual
+  version: 2.0.0
+  description: CICLO 1. Authentication identifica Account/Person; Authorization
+    consulta Membership/Capability/Grant e recurso. JWT HS256, issuer
+    universo-impar, audience universo-impar-app, duração 1 hora, versão
+    revogável. Tokens legados exigem novo login. Upload JPEG/PNG/WebP até 5 MiB
+    cada, quatro arquivos, 20 MP; reencode privado. Commercial Product ≠ Owned
+    Wardrobe Item.
+servers:
+  - url: /api
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+      required:
+        - error
+    Person:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - display_name
+    Identifier:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        person_id:
+          type: string
+          format: uuid
+        kind:
+          enum:
+            - EMAIL
+            - PHONE
+            - EXTERNAL
+          type: string
+        value:
+          type: string
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        person_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - DISABLED
+        token_version:
+          type: integer
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        created_by_person_id:
+          type: string
+          format: uuid
+    Membership:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        person_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - REVOKED
+        capabilities:
+          type: array
+          items:
+            type: string
+    Capability:
+      type: object
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+    Grant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        membership_id:
+          type: string
+          format: uuid
+        capability_code:
+          type: string
+        resource_id:
+          type: string
+          format: uuid
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+    Context:
+      type: object
+      properties:
+        membership_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        store_id:
+          type: string
+          format: uuid
+        store_name:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+    Identity:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        person_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        profile_type:
+          type: string
+          deprecated: true
+          description: Dica legada de apresentação. Não autoriza recursos.
+        wardrobe_plan:
+          type: string
+        contexts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Context"
+      required:
+        - id
+        - person_id
+        - contexts
+    Session:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/Identity"
+      required:
+        - token
+        - user
+    Registration:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 10
+          maxLength: 72
+          description: Máximo de 72 bytes UTF-8.
+        profileType:
+          type: string
+          enum:
+            - PERSON
+            - STORE
+          default: PERSON
+          deprecated: true
+          description: Onboarding legado. Todos são Person; STORE cria organização e
+            membership. Não é papel global.
+        store:
+          type: object
+          properties:
+            storeName:
+              type: string
+            cnpj:
+              type: string
+            description:
+              type: string
+            socialLinks:
+              type: object
+          required:
+            - storeName
+      required:
+        - name
+        - email
+        - password
+    Store:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        store_name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        banner_url:
+          type: string
+          nullable: true
+        logo_url:
+          type: string
+          nullable: true
+        social_links:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+    StoreDashboard:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        store_name:
+          type: string
+        pieces:
+          type: integer
+        followers:
+          type: integer
+        saves:
+          type: integer
+    StoreRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - PENDING
+            - APPROVED
+            - REJECTED
+        created_at:
+          type: string
+          format: date-time
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        store_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        category:
+          type: string
+        color:
+          type: string
+          nullable: true
+        sizes:
+          type: array
+          items:
+            type: string
+        price:
+          type: string
+          nullable: true
+          description: Numeric PostgreSQL serializado como string.
+        purchase_link:
+          type: string
+          nullable: true
+        kind:
+          type: string
+          enum:
+            - COMMERCIAL_PREVIEW
+        image_urls:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - store_id
+        - kind
+    ProductInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 160
+        category:
+          type: string
+          maxLength: 80
+        color:
+          type: string
+        sizes:
+          type: string
+          description: Tamanhos separados por vírgula.
+        price:
+          type: number
+          minimum: 0
+        purchaseLink:
+          type: string
+          format: uri
+          description: Somente HTTPS.
+      required:
+        - name
+        - category
+    OwnershipEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        person_id:
+          type: string
+          format: uuid
+        source:
+          type: string
+          enum:
+            - MANUAL_CATALOG
+            - REAL_CAPTURE
+            - VERIFIED_PURCHASE
+            - VALIDATED_IMPORT
+        recorded_by_person_id:
+          type: string
+          format: uuid
+        attested_at:
+          type: string
+          format: date-time
+        evidence_media_id:
+          type: string
+          format: uuid
+          nullable: true
+    WardrobeInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 160
+        category:
+          type: string
+          maxLength: 80
+        color:
+          type: string
+        sizes:
+          type: string
+        ownershipSource:
+          type: string
+          enum:
+            - MANUAL_CATALOG
+            - REAL_CAPTURE
+        ownershipAttested:
+          type: boolean
+          enum:
+            - true
+          description: Declaração explícita de catalogação de peça possuída. REAL_CAPTURE
+            exige foto.
+      required:
+        - name
+        - category
+        - ownershipSource
+        - ownershipAttested
+    WardrobeItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        person_id:
+          type: string
+          format: uuid
+        ownership_event_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+            - OWNED_ITEM
+        name:
+          type: string
+        category:
+          type: string
+        color:
+          type: string
+          nullable: true
+        sizes:
+          type: array
+          items:
+            type: string
+        image_urls:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - person_id
+        - ownership_event_id
+        - kind
+    CommercialSavedItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+            - COMMERCIAL_PREVIEW
+            - SPONSORED_PREVIEW
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - product_id
+        - kind
+    SaveInput:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+            - COMMERCIAL_PREVIEW
+            - SPONSORED_PREVIEW
+          default: COMMERCIAL_PREVIEW
+    LookItem:
+      oneOf:
+        - type: object
+          properties:
+            kind:
+              type: string
+              enum:
+                - OWNED_ITEM
+            wardrobeItemId:
+              type: string
+              format: uuid
+          required:
+            - kind
+            - wardrobeItemId
+        - type: object
+          properties:
+            kind:
+              type: string
+              enum:
+                - COMMERCIAL_PREVIEW
+                - SPONSORED_PREVIEW
+            productId:
+              type: string
+              format: uuid
+          required:
+            - kind
+            - productId
+    LookInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LookItem"
+          minItems: 1
+          maxItems: 30
+      required:
+        - title
+        - items
+    LookVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LookItem"
+    Look:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        person_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/LookVersion"
+    LookCreated:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        versionId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LookItem"
+    Profile:
+      type: object
+      properties:
+        personId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+        profilePhotoUrl:
+          type: string
+          nullable: true
+          description: Rota privada /api/media/{id}. Exige Authorization no fetch.
+        age:
+          type: integer
+          nullable: true
+        profession:
+          type: string
+          nullable: true
+        bodyShape:
+          type: string
+          nullable: true
+        hairStyle:
+          type: string
+          nullable: true
+        mannequinTop:
+          type: string
+          nullable: true
+        mannequinBottom:
+          type: string
+          nullable: true
+        bust:
+          type: string
+          nullable: true
+        waist:
+          type: string
+          nullable: true
+        hips:
+          type: string
+          nullable: true
+        height:
+          type: string
+          nullable: true
+        avatarConfig:
+          type: object
+    ProfileInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        age:
+          type: integer
+          minimum: 13
+          maximum: 120
+          nullable: true
+        profession:
+          type: string
+          maxLength: 160
+          nullable: true
+        bodyShape:
+          type: string
+          nullable: true
+          enum:
+            - Ampulheta
+            - Triângulo
+            - Triângulo invertido
+            - Retângulo
+            - Oval
+            - null
+        hairStyle:
+          type: string
+          nullable: true
+          enum:
+            - Curto
+            - Longo
+            - Cacheado
+            - Coque
+            - null
+        mannequinTop:
+          type: string
+          nullable: true
+        mannequinBottom:
+          type: string
+          nullable: true
+        bust:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 300
+        waist:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 300
+        hips:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 300
+        height:
+          type: number
+          nullable: true
+          minimum: 80
+          maximum: 250
+    Capacity:
+      type: object
+      properties:
+        plan:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            limit:
+              type: integer
+        used:
+          type: integer
+        limit:
+          type: integer
+        available:
+          type: integer
+        isFull:
+          type: boolean
+        percentage:
+          type: integer
+        plans:
+          type: array
+          items:
+            type: object
+    ShowcaseInput:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 160
+        description:
+          type: string
+          nullable: true
+        itemIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 100
+          uniqueItems: true
+        startsAt:
+          type: string
+          format: date-time
+          nullable: true
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - title
+    Showcase:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        store_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        item_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    MediaAccess:
+      type: object
+      properties:
+        url:
+          type: string
+        requiresAuthorization:
+          type: boolean
+        expiresIn:
+          type: integer
+          nullable: true
+      required:
+        - url
+        - requiresAuthorization
 paths:
-  /auth/register: {post: {summary: Cadastro com seleção PERSON ou STORE, responses: {'201': {description: Criado}}}}
-  /auth/login: {post: {summary: Login JWT, responses: {'200': {description: Token}}}}
-  /stores: {get: {summary: Lista lojistas/marcas, responses: {'200': {description: OK}}}}
-  /stores/me: {get: {summary: Painel da loja autenticada, responses: {'200': {description: Métricas}}}, put: {summary: Atualiza perfil comercial, responses: {'200': {description: OK}}}}
-  /stores/items: {post: {summary: Lojista cria peça de catálogo em lote de fotos, responses: {'201': {description: Peça criada}}}}
-  /items: {get: {summary: Lista catálogo ou guarda-roupa, responses: {'200': {description: OK}}}, post: {summary: Usuário comum cria peça pessoal, responses: {'201': {description: Criada}}}}
-  /items/{id}/copy-to-wardrobe: {post: {summary: Copia peça de vitrine para guarda-roupa mantendo origem, parameters: [{name: id, in: path, required: true, schema: {type: string}}], responses: {'201': {description: Copiada}}}}
-  /feed: {get: {summary: Feed mesclado de looks, lançamentos e vitrines, responses: {'200': {description: OK}}}}
-  /showcases: {get: {summary: Lista vitrines temáticas}, post: {summary: Lojista cria vitrine temática}}
+  /auth/register:
+    post:
+      summary: Registrar Person/Account e contexto comercial opcional
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: post__auth_register
+      security: []
+      parameters: []
+      responses:
+        "201":
+          description: Registrar Person/Account e contexto comercial opcional
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Registration"
+  /auth/login:
+    post:
+      summary: Autenticar conta ativa
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: post__auth_login
+      security: []
+      parameters: []
+      responses:
+        "200":
+          description: Autenticar conta ativa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+              required:
+                - email
+                - password
+  /auth/me:
+    get:
+      summary: Identidade e contextos atuais
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__auth_me
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "200":
+          description: Identidade e contextos atuais
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Identity"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /auth/logout:
+    post:
+      summary: Revogar todas as sessões atuais desta conta
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: post__auth_logout
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "204":
+          description: Concluído, sem corpo.
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /stores:
+    get:
+      summary: Lojas públicas sem identificadores pessoais
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__stores
+      security: []
+      parameters: []
+      responses:
+        "200":
+          description: Lojas públicas sem identificadores pessoais
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Store"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /stores/{id}:
+    get:
+      summary: DTO público da loja
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__stores_id_
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: DTO público da loja
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Store"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /stores/me:
+    get:
+      summary: Contexto comercial autorizado
+      description: Exige capability store.read em membership ativa.
+      operationId: get__stores_me
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Organization-Id
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Contexto da organização. Obrigatório quando houver mais de uma
+            membership, exceto rotas com storeId.
+      responses:
+        "200":
+          description: Contexto comercial autorizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreDashboard"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-capability: store.read
+    put:
+      summary: Editar loja do contexto
+      description: Exige capability store.update em membership ativa.
+      operationId: put__stores_me
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Organization-Id
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Contexto da organização. Obrigatório quando houver mais de uma
+            membership, exceto rotas com storeId.
+      responses:
+        "200":
+          description: Editar loja do contexto
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Store"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-capability: store.update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                storeName:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+  /stores/engagement/saves:
+    get:
+      summary: Saves agregados por produto, sem identificação de clientes
+      description: Exige capability analytics.read em membership ativa.
+      operationId: get__stores_engagement_saves
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Organization-Id
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Contexto da organização. Obrigatório quando houver mais de uma
+            membership, exceto rotas com storeId.
+      responses:
+        "200":
+          description: Saves agregados por produto, sem identificação de clientes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    product_id:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                    saves:
+                      type: integer
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-capability: analytics.read
+  /stores/items:
+    post:
+      summary: Criar produto comercial e mídia de catálogo
+      description: Exige capability catalog.write em membership ativa.
+      operationId: post__stores_items
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Organization-Id
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Contexto da organização. Obrigatório quando houver mais de uma
+            membership, exceto rotas com storeId.
+      responses:
+        "201":
+          description: Criar produto comercial e mídia de catálogo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "415":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-capability: catalog.write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 160
+                category:
+                  type: string
+                  maxLength: 80
+                color:
+                  type: string
+                sizes:
+                  type: string
+                  description: Tamanhos separados por vírgula.
+                price:
+                  type: number
+                  minimum: 0
+                purchaseLink:
+                  type: string
+                  format: uri
+                  description: Somente HTTPS.
+                photos:
+                  type: array
+                  maxItems: 4
+                  items:
+                    type: string
+                    format: binary
+              required:
+                - name
+                - category
+  /store-requests:
+    post:
+      summary: Solicitar contexto comercial; não concede permissões
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: post__store_requests
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "202":
+          description: Solicitar contexto comercial; não concede permissões
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreRequest"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+              required:
+                - name
+  /stores/{storeId}/memberships:
+    get:
+      summary: Listar membros do contexto
+      description: Exige capability members.manage em membership ativa.
+      operationId: get__stores_storeId_memberships
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: storeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Organization-Id
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Contexto da organização. Obrigatório quando houver mais de uma
+            membership, exceto rotas com storeId.
+      responses:
+        "200":
+          description: Listar membros do contexto
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Membership"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-capability: members.manage
+    post:
+      summary: Conceder/substituir bundle de capacidades
+      description: Substitui grants, preserva auditoria e impede remover a última
+        capacidade de gerir membros. Nomes resolvem pelo catálogo de
+        capabilities.
+      operationId: post__stores_storeId_memberships
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: storeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Organization-Id
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Contexto da organização. Obrigatório quando houver mais de uma
+            membership, exceto rotas com storeId.
+      responses:
+        "201":
+          description: Conceder/substituir bundle de capacidades
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  membershipId:
+                    type: string
+                    format: uuid
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-capability: members.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                personId:
+                  type: string
+                  format: uuid
+                bundle:
+                  type: string
+                  enum:
+                    - OWNER
+                    - ADMIN
+                    - MANAGER
+                    - CATALOG_EDITOR
+                    - MARKETING
+                    - VIEWER
+              required:
+                - personId
+                - bundle
+  /stores/{storeId}/memberships/{membershipId}:
+    delete:
+      summary: Revogar membership deste contexto
+      description: Exige capability members.manage em membership ativa.
+      operationId: delete__stores_storeId_memberships_membershipId_
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: storeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: membershipId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Organization-Id
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Contexto da organização. Obrigatório quando houver mais de uma
+            membership, exceto rotas com storeId.
+      responses:
+        "204":
+          description: Concluído, sem corpo.
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-capability: members.manage
+  /products:
+    get:
+      summary: Catálogo comercial publicado
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__products
+      security: []
+      parameters:
+        - name: storeId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Catálogo comercial publicado
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /products/{id}/media/{mediaId}:
+    get:
+      summary: Mídia comercial publicada ligada ao produto
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__products_id_media_mediaId_
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: mediaId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Mídia comercial publicada ligada ao produto
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /products/{id}/save:
+    post:
+      summary: Salvar referência sem criar ownership
+      description: Idempotente por pessoa/produto. Não cria wardrobe_item, evento de
+        ownership, compra ou custo. SPONSORED_PREVIEW é classificação de
+        referência, não comprovação de veiculação.
+      operationId: post__products_id_save
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "201":
+          description: Salvar referência sem criar ownership
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommercialSavedItem"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveInput"
+    delete:
+      summary: Remover referência comercial pessoal
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: delete__products_id_save
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Concluído, sem corpo.
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /commercial-saves:
+    get:
+      summary: Referências da pessoa autenticada
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__commercial_saves
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "200":
+          description: Referências da pessoa autenticada
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CommercialSavedItem"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /items:
+    get:
+      summary: Alias legado para catálogo ou armário pessoal
+      description: mine=true/1 retorna somente OWNED_ITEM da pessoa. Sem mine retorna
+        catálogo; storeId filtra somente produtos comerciais.
+      operationId: get__items
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: mine
+          in: query
+          schema:
+            type: boolean
+        - name: storeId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Alias legado para catálogo ou armário pessoal
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: "#/components/schemas/Product"
+                  - type: array
+                    items:
+                      $ref: "#/components/schemas/WardrobeItem"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      deprecated: true
+    post:
+      summary: Alias de catalogação explícita; corpo legado incompatível é recusado
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: post__items
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "201":
+          description: Alias de catalogação explícita; corpo legado incompatível é recusado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WardrobeItem"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "415":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      deprecated: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WardrobeInput"
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 160
+                category:
+                  type: string
+                  maxLength: 80
+                color:
+                  type: string
+                sizes:
+                  type: string
+                ownershipSource:
+                  type: string
+                  enum:
+                    - MANUAL_CATALOG
+                    - REAL_CAPTURE
+                ownershipAttested:
+                  type: boolean
+                  enum:
+                    - true
+                  description: Declaração explícita de catalogação de peça possuída. REAL_CAPTURE
+                    exige foto.
+                photos:
+                  type: array
+                  maxItems: 4
+                  items:
+                    type: string
+                    format: binary
+              required:
+                - name
+                - category
+                - ownershipSource
+                - ownershipAttested
+  /items/{id}/copy-to-wardrobe:
+    post:
+      summary: Cópia automática removida
+      description: Sempre 410 após autenticação, sem escrita. Migrar para POST
+        /products/{id}/save. Nunca assume aquisição.
+      operationId: post__items_id_copy_to_wardrobe
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Endpoint removido com resposta explícita.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      deprecated: true
+  /wardrobe/items:
+    get:
+      summary: Peças possuídas da pessoa autenticada
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__wardrobe_items
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "200":
+          description: Peças possuídas da pessoa autenticada
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WardrobeItem"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Catalogar peça possuída com evento de ownership
+      description: MANUAL_CATALOG e REAL_CAPTURE são declarações explícitas de
+        catalogação; REAL_CAPTURE exige foto validada. Não aceita productId,
+        fonte de compra ou importação ainda não integrada.
+      operationId: post__wardrobe_items
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "201":
+          description: Catalogar peça possuída com evento de ownership
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WardrobeItem"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "415":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WardrobeInput"
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 160
+                category:
+                  type: string
+                  maxLength: 80
+                color:
+                  type: string
+                sizes:
+                  type: string
+                ownershipSource:
+                  type: string
+                  enum:
+                    - MANUAL_CATALOG
+                    - REAL_CAPTURE
+                ownershipAttested:
+                  type: boolean
+                  enum:
+                    - true
+                  description: Declaração explícita de catalogação de peça possuída. REAL_CAPTURE
+                    exige foto.
+                photos:
+                  type: array
+                  maxItems: 4
+                  items:
+                    type: string
+                    format: binary
+              required:
+                - name
+                - category
+                - ownershipSource
+                - ownershipAttested
+  /wardrobe/items/{id}:
+    get:
+      summary: Ler peça da própria pessoa; outra pessoa recebe 404
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__wardrobe_items_id_
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Ler peça da própria pessoa; outra pessoa recebe 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WardrobeItem"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /wardrobe/legacy-reviews:
+    get:
+      summary: Inventário privado do legado sem prova de posse
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__wardrobe_legacy_reviews
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "200":
+          description: Inventário privado do legado sem prova de posse
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    legacy_item_id:
+                      type: string
+                      format: uuid
+                    reason:
+                      type: string
+                      enum:
+                        - COMMERCIAL_COPY
+                        - UNVERIFIED_CATALOG
+                    status:
+                      type: string
+                    name:
+                      type: string
+                    category:
+                      type: string
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /wardrobe/capacity:
+    get:
+      summary: Capacidade calculada somente sobre OWNED_ITEM
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__wardrobe_capacity
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "200":
+          description: Capacidade calculada somente sobre OWNED_ITEM
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Capacity"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /wardrobe/upgrade-requests:
+    post:
+      summary: Solicitar upgrade, sem cobrança ou aprovação automática
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: post__wardrobe_upgrade_requests
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "202":
+          description: Solicitar upgrade, sem cobrança ou aprovação automática
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                planId:
+                  type: string
+                  enum:
+                    - PLUS
+                    - PREMIUM
+              required:
+                - planId
+  /profile:
+    get:
+      summary: Perfil pessoal e referência privada de mídia
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__profile
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "200":
+          description: Perfil pessoal e referência privada de mídia
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: Atualizar perfil; null limpa campos pessoais nullable
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: put__profile
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "200":
+          description: Atualizar perfil; null limpa campos pessoais nullable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileInput"
+  /profile/photo:
+    post:
+      summary: Foto privada, validada e sem EXIF
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: post__profile_photo
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "200":
+          description: Foto privada, validada e sem EXIF
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profilePhotoUrl:
+                    type: string
+                  updatedAt:
+                    type: string
+                    format: date-time
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "415":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              properties:
+                photo:
+                  type: string
+                  format: binary
+              required:
+                - photo
+  /media/{id}:
+    get:
+      summary: Leitura autorizada sem URL pública de arquivo pessoal
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__media_id_
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Leitura autorizada sem URL pública de arquivo pessoal
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /media/{id}/access:
+    post:
+      summary: Resolver acesso privado ou URL curta de futuro adapter
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: post__media_id_access
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Resolver acesso privado ou URL curta de futuro adapter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaAccess"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /looks:
+    get:
+      summary: Listar Looks privados
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__looks
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "200":
+          description: Listar Looks privados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Look"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Criar Look com relações de posse e preview explícitas
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: post__looks
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "201":
+          description: Criar Look com relações de posse e preview explícitas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookCreated"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LookInput"
+  /looks/{id}:
+    get:
+      summary: Look privado e suas versões imutáveis
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__looks_id_
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Look privado e suas versões imutáveis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Look"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /looks/{id}/versions:
+    post:
+      summary: Adicionar versão preservando as anteriores
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: post__looks_id_versions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "201":
+          description: Adicionar versão preservando as anteriores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookCreated"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LookInput"
+  /stores/{id}/follow:
+    post:
+      summary: Seguir loja comercial
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: post__stores_id_follow
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Concluído, sem corpo.
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: Deixar de seguir loja
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: delete__stores_id_follow
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Concluído, sem corpo.
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /users/{id}/follow:
+    post:
+      summary: Customer social follow descontinuado
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: post__users_id_follow
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Endpoint removido com resposta explícita.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      deprecated: true
+  /feed:
+    get:
+      summary: Feed de produtos/vitrines de lojas seguidas
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__feed
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        "200":
+          description: Feed de produtos/vitrines de lojas seguidas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /showcases:
+    get:
+      summary: Vitrines com referências restritas à mesma loja
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: get__showcases
+      security: []
+      parameters:
+        - name: storeId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Vitrines com referências restritas à mesma loja
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Showcase"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Publicar vitrine do contexto autorizado
+      description: Exige capability marketing.write em membership ativa.
+      operationId: post__showcases
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Organization-Id
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Contexto da organização. Obrigatório quando houver mais de uma
+            membership, exceto rotas com storeId.
+      responses:
+        "201":
+          description: Publicar vitrine do contexto autorizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Showcase"
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-capability: marketing.write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShowcaseInput"
+  /showcases/{id}/comments:
+    post:
+      summary: Comentários sociais descontinuados
+      description: Autorização por pessoa/recurso quando privado.
+      operationId: post__showcases_id_comments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "400":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Endpoint removido com resposta explícita.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
+            capacidade/contexto negado; 404: recurso ausente ou privado de outra
+            pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      deprecated: true

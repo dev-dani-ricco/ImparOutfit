@@ -10,7 +10,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-imparoutfit}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/sql/001_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -45,11 +44,12 @@ services:
       REDIS_URL: redis://redis:6379
       REDIS_REQUIRED: "true"
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET em .env.server}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
-      CORS_ORIGIN: ${CORS_ORIGIN:-*}
-      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
-      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
-      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8081}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+      MEDIA_ROOT: /app/private/media
+    volumes:
+      - personal_media:/app/private/media
+    command: ["sh", "-c", "npm run migrate && npm start"]
     ports:
       - "127.0.0.1:4000:4000"
     depends_on:
@@ -63,6 +63,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  personal_media:
 
 networks:
   private:

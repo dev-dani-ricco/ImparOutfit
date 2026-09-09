@@ -12,6 +12,7 @@ export const redis = redisUrl
       socket: {
         reconnectStrategy: (retries) => {
           if (!redisRequired) return false;
+          if (retries >= 5) return new Error('Required Redis unavailable');
           return Math.min(retries * 100, 3000);
         },
       },
@@ -19,16 +20,17 @@ export const redis = redisUrl
   : null;
 
 if (redis) {
-  redis.on('error', (err) => {
+  redis.on('error', () => {
     const message = redisRequired
-      ? `Redis error: ${err.message}`
-      : `Redis unavailable; continuing without cache (${err.message})`;
+      ? 'Required Redis connection failed'
+      : 'Redis unavailable; continuing without cache';
     console.warn(message);
   });
 }
 
 export async function connectRedis() {
   if (!redis) {
+    if (redisRequired) throw new Error('REDIS_URL required');
     console.warn('REDIS_URL not set; cache disabled.');
     return null;
   }
@@ -41,7 +43,7 @@ export async function connectRedis() {
     return redis;
   } catch (err) {
     if (redisRequired) throw err;
-    console.warn(`Redis unavailable; cache disabled (${err.message})`);
+    console.warn('Redis unavailable; cache disabled');
     return null;
   }
 }
