@@ -3024,7 +3024,9 @@ paths:
   /wardrobe/capacity:
     get:
       summary: Capacidade calculada somente sobre OWNED_ITEM
-      description: Autorização por pessoa/recurso quando privado.
+      description: Limite resolvido de Plan → Entitlement → Capability/Limit; null
+        significa nenhum limite de quantidade configurado nesta POC. Previews
+        não consomem capacidade.
       operationId: get__wardrobe_capacity
       security:
         - bearerAuth: []
@@ -3094,75 +3096,17 @@ paths:
                 $ref: "#/components/schemas/Error"
   /wardrobe/upgrade-requests:
     post:
-      summary: Solicitar upgrade, sem cobrança ou aprovação automática
+      summary: Upgrade legado descontinuado; entitlement separado de billing
       description: Autorização por pessoa/recurso quando privado.
       operationId: post__wardrobe_upgrade_requests
       security:
         - bearerAuth: []
       parameters: []
       responses:
-        "202":
-          description: Solicitar upgrade, sem cobrança ou aprovação automática
-          content:
-            application/json:
-              schema:
-                type: object
-        "400":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
         "401":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "403":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "404":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "409":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "429":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
+          description: Autenticação necessária
+        "410":
+          description: "ENTITLEMENT_MIGRATION: nenhuma oferta de upgrade ativa"
       requestBody:
         required: true
         content:
@@ -3177,6 +3121,7 @@ paths:
                     - PREMIUM
               required:
                 - planId
+      deprecated: true
   /profile:
     get:
       summary: Perfil pessoal e referência privada de mídia

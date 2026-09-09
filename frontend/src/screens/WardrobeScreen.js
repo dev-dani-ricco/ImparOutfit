@@ -57,7 +57,7 @@ export default function WardrobeScreen({ navigation }) {
           <View>
             <Text style={styles.capacityEyebrow}>PLANO {wardrobeCapacity.plan.name.toUpperCase()}</Text>
             <Text style={styles.capacityTitle}>
-              {wardrobeCapacity.used} de {wardrobeCapacity.limit} peças
+              {wardrobeCapacity.used} peças catalogadas
             </Text>
           </View>
           <Text style={styles.capacityPercent}>{wardrobeCapacity.percentage}%</Text>
@@ -69,7 +69,7 @@ export default function WardrobeScreen({ navigation }) {
           <Text style={styles.capacityCopy}>
             {wardrobeCapacity.isFull
               ? 'Limite atingido. Aumente a capacidade para cadastrar novas peças.'
-              : `${wardrobeCapacity.available} espaços disponíveis no armário.`}
+              : 'Sem limite de quantidade configurado nesta POC.'}
           </Text>
           <Pressable onPress={() => navigation.navigate('Planos do armário')}>
             <Text style={styles.capacityLink}>VER PLANOS →</Text>

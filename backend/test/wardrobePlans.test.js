@@ -1,26 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  DEFAULT_WARDROBE_PLAN_ID,
-  getWardrobePlan,
-  listWardrobePlans,
-} from '../src/config/wardrobePlans.js';
-import { plansForClient } from '../src/services/wardrobePlanService.js';
-
-test('plano gratuito é o padrão e comporta 50 peças', () => {
-  const plan = getWardrobePlan('UNKNOWN');
-  assert.equal(plan.id, DEFAULT_WARDROBE_PLAN_ID);
-  assert.equal(plan.limit, 50);
+import {capacityFromPolicy} from '../src/services/wardrobePlanService.js';
+test('POC unconfigured policy imposes no legacy quantity',()=>{
+ assert.equal(capacityFromPolicy(1000,null).isFull,false);
+ assert.equal(capacityFromPolicy(1000,null).available,null);
 });
-
-test('capacidades aumentam em cada upgrade', () => {
-  const plans = listWardrobePlans();
-  assert.deepEqual(plans.map((plan) => plan.limit), [50, 150, 500]);
-});
-
-test('não permite selecionar plano abaixo do consumo atual', () => {
-  const plans = plansForClient('PREMIUM', 151);
-  assert.equal(plans.find((plan) => plan.id === 'FREE').selectable, false);
-  assert.equal(plans.find((plan) => plan.id === 'PLUS').selectable, false);
-  assert.equal(plans.find((plan) => plan.id === 'PREMIUM').selectable, true);
+test('configured entitlement supports arbitrary capacity including zero',()=>{
+ assert.equal(capacityFromPolicy(3,3).isFull,true);
+ assert.equal(capacityFromPolicy(2,3).available,1);
+ assert.equal(capacityFromPolicy(0,0).isFull,true);
 });

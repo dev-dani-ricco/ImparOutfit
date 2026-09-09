@@ -39,6 +39,7 @@ export async function register(req,res) {
     account=(await client.query('INSERT INTO accounts(id,person_id) VALUES($1,$2) RETURNING *',[user.id,person.id])).rows[0];
     await client.query("INSERT INTO identifiers(person_id,kind,value) VALUES($1,'EMAIL',$2)",[person.id,value.email]);
     await client.query('INSERT INTO customer_profiles(user_id) VALUES($1)',[user.id]);
+    await client.query("INSERT INTO person_entitlements(person_id,plan_id,source) SELECT $1,id,'INITIAL_ACCESS' FROM plans WHERE is_default",[person.id]);
     if(value.store) {
       // Legacy self-service onboarding retained. Every registrant is also a person/customer.
       const org=(await client.query('INSERT INTO organizations(name,created_by_person_id) VALUES($1,$2) RETURNING id',[value.store.storeName,person.id])).rows[0];

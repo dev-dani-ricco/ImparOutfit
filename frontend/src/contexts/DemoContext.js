@@ -157,7 +157,7 @@ function PersonDemoProvider({children,personId,user,demoMode}) {
 
   function changeWardrobePlan(nextPlanId) {
     const nextPlan = getWardrobePlan(nextPlanId);
-    if (wardrobe.length > nextPlan.limit) {
+    if (nextPlan.limit !== null && wardrobe.length > nextPlan.limit) {
       return { ok: false, reason: 'USAGE_ABOVE_PLAN_LIMIT', plan: nextPlan };
     }
 

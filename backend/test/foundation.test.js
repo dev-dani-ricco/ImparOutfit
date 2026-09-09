@@ -34,11 +34,23 @@ before(async()=>{
 });
 after(async()=>{await db?.close();await pool.end();await rm(process.env.MEDIA_ROOT,{recursive:true,force:true});});
 
-test('migrations apply cleanly, rerun deterministically and safely roll back indexes',async()=>{
-  assert.equal((await migrate(db)).length,6);
-  assert.equal((await migrate(db,{down:true})).length,5);
+test('migrations apply cleanly, rerun deterministically and refuse unsafe rollback',async()=>{
+  const count=(await readdir(new URL('../sql/',import.meta.url))).filter(n=>/^\d{3}_.*\.sql$/.test(n)&&!n.endsWith('.down.sql')).length;
+  assert.equal((await migrate(db)).length,count);
   await assert.rejects(()=>migrate(db,{down:true}),/No safe down/);
-  assert.equal((await migrate(db)).length,6);
+  assert.equal((await migrate(db)).length,count);
+});
+test('entitlements remove legacy 50 cap and enforce database-configured limits',async()=>{
+  await db.exec('BEGIN');
+  try {
+    for(let i=0;i<51;i++) {
+      const e=(await db.query("INSERT INTO ownership_events(person_id,source,recorded_by_person_id,attested_at) VALUES($1,'MANUAL_CATALOG',$1,now()) RETURNING id",[A.user.person_id])).rows[0];
+      await db.query("INSERT INTO wardrobe_items(person_id,ownership_event_id,name,category) VALUES($1,$2,'Synthetic','tops')",[A.user.person_id,e.id]);
+    }
+    assert.equal((await auth('get','/wardrobe/capacity',A)).body.limit,null);
+    await db.query("UPDATE plan_limits SET limit_value=3 WHERE plan_id='FREE'");
+    await auth('post','/wardrobe/items',A).send({name:'Denied',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(409);
+  } finally {await db.exec('ROLLBACK');}
 });
 test('B: person/customer and store membership coexist; account claim contains no global role authority',async()=>{
   assert.ok(storeA.user.person_id);
@@ -172,4 +184,3 @@ test('last administrator cannot be revoked and corrupted migration ledger is ref
   await assert.rejects(()=>migrate(db),/checksum mismatch/);
   await db.query("UPDATE schema_migrations SET checksum=$1 WHERE version='006_lookup_indexes.sql'",[prior]);
 });
-
