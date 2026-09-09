@@ -75,7 +75,7 @@ function PersonDemoProvider({children,personId,user,demoMode}) {
         setPersonalCollections(state.personalCollections || seedCollections);
         setProfile({ ...seedProfile, ...(state.profile || {}) });
         setStores(state.stores?.length ? state.stores : cloneStores());
-        setDaniState({ ...initialDaniState, ...(state.daniState || {}) });
+        setDaniState(initialDaniState); // Do not restore retired editorial content.
         setCampaignState({ ...initialCampaignState, ...(state.campaignState || {}) });
       } catch (error) {
         console.warn('Não foi possível restaurar a demonstração.', error);
@@ -183,33 +183,6 @@ function PersonDemoProvider({children,personId,user,demoMode}) {
     return created;
   }
 
-  function toggleDaniLesson(id) {
-    setDaniState((current) => ({
-      ...current,
-      completedLessons: {
-        ...current.completedLessons,
-        [id]: !current.completedLessons[id],
-      },
-    }));
-  }
-
-  function requestDaniReview() {
-    setDaniState((current) => ({
-      ...current,
-      lookReview: {
-        status: 'reviewed',
-        requestedAt: new Date().toISOString(),
-        title: 'Equilíbrio de presença',
-        summary: 'A base neutra alonga a silhueta e a terceira peça lilás cria um ponto de identidade sem pesar o conjunto.',
-        suggestion: 'Para uma reunião, mantenha a bolsa estruturada. À noite, troque por um acessório dourado e revele mais contraste.',
-      },
-    }));
-  }
-
-  function toggleDaniSession() {
-    setDaniState((current) => ({ ...current, sessionBooked: !current.sessionBooked }));
-  }
-
   function updateCampaign(patch) {
     setCampaignState((current) => ({ ...current, ...patch }));
   }
@@ -260,9 +233,9 @@ function PersonDemoProvider({children,personId,user,demoMode}) {
       changeWardrobePlan,
       addStoreItem,
       addPersonalCollection,
-      toggleDaniLesson,
-      requestDaniReview,
-      toggleDaniSession,
+
+
+
       updateCampaign,
       toggleCampaignStatus,
       setProfile,

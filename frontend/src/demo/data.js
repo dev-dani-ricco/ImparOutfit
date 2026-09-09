@@ -312,57 +312,6 @@ export const initialProfile = {
   height: '168',
 };
 
-export const daniLessons = [
-  {
-    id: 'dani-class-color',
-    number: '01',
-    title: 'Cor com intenção',
-    description: 'Como repetir cores do seu armário sem deixar os looks previsíveis.',
-    duration: '12 min',
-    level: 'Essencial',
-  },
-  {
-    id: 'dani-class-proportion',
-    number: '02',
-    title: 'Proporção e terceira peça',
-    description: 'Comprimentos, volumes e pontos de atenção que organizam a silhueta.',
-    duration: '18 min',
-    level: 'Prática guiada',
-  },
-  {
-    id: 'dani-class-capsule',
-    number: '03',
-    title: 'Cápsula de sete dias',
-    description: 'Um método simples para multiplicar combinações com menos peças.',
-    duration: '21 min',
-    level: 'Aplicação',
-  },
-];
-
-export const daniRecommendations = [
-  {
-    id: 'dani-rec-bomber',
-    itemId: 'wardrobe-bomber',
-    title: 'Seu ponto de identidade',
-    note: 'Use a bomber lilás sobre uma base clara para criar presença sem endurecer o look.',
-    occasion: 'Trabalho criativo',
-  },
-  {
-    id: 'dani-rec-skirt',
-    itemId: 'wardrobe-saia-verde',
-    title: 'Textura para a noite',
-    note: 'O acetinado verde funciona como protagonista com partes de cima opacas e acessórios mínimos.',
-    occasion: 'Jantar e evento',
-  },
-  {
-    id: 'dani-rec-loafer',
-    itemId: 'wardrobe-loafer-caramelo',
-    title: 'Conforto bem resolvido',
-    note: 'O loafer aquece os neutros do armário e sustenta uma rotina longa com acabamento elegante.',
-    occasion: 'Agenda urbana',
-  },
-];
-
 export const featuredAd = {
   id: 'showcase-essential',
   storeId: 'store-aurora',

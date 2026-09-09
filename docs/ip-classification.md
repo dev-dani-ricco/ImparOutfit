@@ -30,3 +30,16 @@ escopo dos scanners, não de uma garantia absoluta. Não houve OCR/perícia de a
 de direitos externa. Arquivos existentes foram preservados e incorporados apenas à branch local
 para reproduzir a Showcase; nenhum push, distribuição de bundle ou apagamento de histórico.
 As classificações provisórias exigem decisão da titular antes de nova publicação.
+
+## Contenção no CICLO 2
+
+Os blocos editoriais associados à Dani foram removidos de `frontend/src/demo/data.js`;
+o parecer estático foi removido de `frontend/src/contexts/DemoContext.js`. A hidratação
+não restaura pareceres anteriormente persistidos. `DaniRicoScreen.js` agora contém
+somente interface pública e referência de serviço indisponível; não gera parecer,
+aula ou reserva. Navegação e Showcase preservadas. Nenhuma metodologia foi transferida
+para outro arquivo público. Conteúdo histórico permanece no Git, conforme escopo.
+
+Classificação anterior PROPRIETARY continua aplicável às revisões históricas dos dois
+arquivos. Versão corrente: interface/catálogo demonstrativo, com demais riscos de
+proveniência de fixtures/assets ainda sujeitos à revisão indicada acima.
