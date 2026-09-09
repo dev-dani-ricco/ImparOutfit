@@ -1,0 +1,22 @@
+title = "UNIVERSO IMPAR - secrets e caminhos privados"
+
+[extend]
+useDefault = true
+
+# Complementa os detectores de tokens/chaves do Gitleaks. Não substitui revisão
+# de IP/PII: conteúdo privado em um arquivo comum exige avaliação humana.
+[[rules]]
+id = "private-material-path"
+description = "Conteúdo em diretório reservado para material privado"
+path = '''(?i)(^|/)(secrets|\.secrets|credentials|private|\.private|confidential|customer-data|client-data|personal-data|dados-clientes|personal-models|body-scans|captures|recordings|uploads|private-knowledge|personal-knowledge|system-prompts|learning-cases|private-conversations)(/|$)|(^|/)(knowledge/(raw|candidates)|prompts/production|datasets/(raw|customers))(/|$)'''
+regex = '''(?s).+'''
+
+[[rules]]
+id = "runtime-env-file"
+description = "Arquivo de ambiente real não deve ser versionado"
+path = '''(?i)(^|/)(\.env([^/]*|)|[^/]+\.env(\.[^/]+)?|\.envrc[^/]*)$'''
+regex = '''(?s).+'''
+
+[[rules.allowlists]]
+description = "Somente exemplos nomeados; detectores de secrets continuam ativos"
+paths = ['''(^|/)(\.env\.example|server\.env\.example)$''']
