@@ -104,6 +104,9 @@ export async function updateProfile(req, res) {
     for (const [key,column] of Object.entries(clearable)) {
       if (Object.hasOwn(value,key) && value[key] === null) await client.query('UPDATE customer_profiles SET '+column+'=NULL WHERE user_id=$1',[req.user.id]);
     }
+    if (Object.hasOwn(value,'hairStyle') && value.hairStyle === null) {
+      await client.query("UPDATE customer_profiles SET avatar_config=avatar_config-'hairStyle' WHERE user_id=$1",[req.user.id]);
+    }
     const row = (await client.query(profileSelect, [req.user.id])).rows[0];
     await client.query('COMMIT');
     res.json(toProfile(row));

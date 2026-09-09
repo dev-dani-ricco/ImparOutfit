@@ -96,6 +96,8 @@ test('private profile and media remain authorized; spoofed images fail and publi
   await auth('put','/profile',A).send({age:30,waist:70}).expect(200);
   assert.equal((await auth('get','/profile',B)).body.age,null);
   assert.equal((await auth('put','/profile',A).send({waist:null}).expect(200)).body.waist,null);
+  await auth('put','/profile',A).send({hairStyle:'Longo'}).expect(200);
+  assert.equal((await auth('put','/profile',A).send({hairStyle:null}).expect(200)).body.avatarConfig.hairStyle,undefined);
   const png=await sharp({create:{width:3,height:3,channels:3,background:'red'}}).png().toBuffer();
   await auth('post','/profile/photo',A).attach('photo',Buffer.from('not an image'),'photo.jpg').expect(415);
   const photo=(await auth('post','/profile/photo',A).attach('photo',png,'../photo.png').expect(200)).body;
