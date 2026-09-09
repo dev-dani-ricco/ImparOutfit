@@ -39,6 +39,7 @@ export async function feed(req, res) {
            FROM products item
            JOIN follows follow ON follow.store_id = item.store_id
            JOIN stores store ON store.id = item.store_id
+           JOIN organizations org ON org.id=store.organization_id AND org.status='ACTIVE'
           WHERE follow.follower_user_id = $1
             AND item.status = 'PUBLISHED'
          UNION ALL
@@ -53,6 +54,7 @@ export async function feed(req, res) {
            FROM showcases showcase
            JOIN follows follow ON follow.store_id = showcase.store_id
            JOIN stores store ON store.id = showcase.store_id
+           JOIN organizations org ON org.id=store.organization_id AND org.status='ACTIVE'
           WHERE follow.follower_user_id = $1
        ) store_feed
       ORDER BY created_at DESC

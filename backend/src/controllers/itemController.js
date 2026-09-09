@@ -9,7 +9,8 @@ import { HttpError } from '../utils/http.js';
 export const productSelect = `SELECT p.id,p.store_id,p.name,p.category,p.color,p.sizes,p.price,p.purchase_link,p.created_at,
   'COMMERCIAL_PREVIEW' AS kind,
   COALESCE((SELECT array_agg('/api/products/'||p.id||'/media/'||pm.media_id) FROM product_media pm WHERE pm.product_id=p.id),p.legacy_image_urls) image_urls
-  FROM products p`;
+  FROM products p JOIN stores catalog_store ON catalog_store.id=p.store_id
+  JOIN organizations catalog_org ON catalog_org.id=catalog_store.organization_id AND catalog_org.status='ACTIVE'`;
 export const wardrobeSelect = `SELECT w.*,COALESCE((SELECT array_agg('/api/media/'||wm.media_id) FROM wardrobe_media wm WHERE wm.wardrobe_item_id=w.id),'{}') image_urls
   FROM wardrobe_items w`;
 export async function listItems(req,res) {
@@ -47,7 +48,8 @@ export async function createWardrobeItem(req,res) {
 export async function saveProduct(req,res) {
   const b=validate(Joi.object({kind:Joi.string().valid('COMMERCIAL_PREVIEW','SPONSORED_PREVIEW').default('COMMERCIAL_PREVIEW')}),req.body||{});
   const row=(await query(`INSERT INTO commercial_saved_items(person_id,product_id,kind)
-    SELECT $1,id,$3 FROM products WHERE id=$2 AND status='PUBLISHED'
+    SELECT $1,p.id,$3 FROM products p JOIN stores s ON s.id=p.store_id JOIN organizations o ON o.id=s.organization_id
+    WHERE p.id=$2 AND p.status='PUBLISHED' AND o.status='ACTIVE'
     ON CONFLICT(person_id,product_id) DO UPDATE SET product_id=EXCLUDED.product_id RETURNING id,product_id,kind,created_at`,[req.auth.personId,req.params.id,b.kind])).rows[0];
   if(!row) throw new HttpError(404,'Produto não encontrado');
   res.status(201).json(row);

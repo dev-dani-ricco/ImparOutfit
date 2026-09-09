@@ -15,12 +15,19 @@ import { authorizeCapability } from '../src/services/authorizationService.js';
 process.env.JWT_SECRET=randomBytes(48).toString('hex');
 process.env.MEDIA_ROOT=await mkdtemp(join(tmpdir(),'impar-media-test-'));
 const {createApp}=await import('../src/app.js');
-let db,app,A,B,storeA,storeB,marketing,product,owned,look;
+let db,app,A,B,storeA,storeB,marketing,product,owned,look,reviewer,institution;
 const password='synthetic-password-2026';
 const auth=(method,path,user)=>request(app)[method]('/api'+path).auth(user.token,{type:'bearer'});
 async function register(label,store=false) {
   const b={name:label,email:label+'@example.com',password,...(store?{profileType:'STORE',store:{storeName:label}}:{})};
   const r=await request(app).post('/api/auth/register').send(b).expect(201);
+  if(store){
+    assert.equal(r.body.user.contexts.length,0);
+    await auth('get','/stores/me',r.body).expect(403);
+    await auth('post','/store-requests/'+r.body.user.store_requests[0].id+'/review',reviewer)
+      .send({institutionId:institution,decision:'ACTIVE',reason:'Synthetic institutional approval'}).expect(200);
+    r.body.user=(await auth('get','/auth/me',r.body)).body;
+  }
   return r.body;
 }
 before(async()=>{
@@ -29,6 +36,10 @@ before(async()=>{
   pool.query=db.query.bind(db);
   pool.connect=async()=>({query:db.query.bind(db),release(){}});
   app=createApp();
+  reviewer=await register('institution-reviewer');
+  institution=(await db.query("INSERT INTO organizations(name,created_by_person_id,kind,status) VALUES('Synthetic institution',$1,'INSTITUTIONAL','ACTIVE') RETURNING id",[reviewer.user.person_id])).rows[0].id;
+  const reviewerMember=(await db.query('INSERT INTO memberships(person_id,organization_id,created_by_person_id) VALUES($1,$2,$1) RETURNING id',[reviewer.user.person_id,institution])).rows[0];
+  await db.query("INSERT INTO grants(membership_id,capability_code,granted_by_person_id) VALUES($1,'store_requests.review',$2)",[reviewerMember.id,reviewer.user.person_id]);
   A=await register('client-a'); B=await register('client-b');
   storeA=await register('store-a',true);storeB=await register('store-b',true);marketing=await register('marketing');
 });
@@ -51,6 +62,20 @@ test('entitlements remove legacy 50 cap and enforce database-configured limits',
     await db.query("UPDATE plan_limits SET limit_value=3 WHERE plan_id='FREE'");
     await auth('post','/wardrobe/items',A).send({name:'Denied',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(409);
   } finally {await db.exec('ROLLBACK');}
+});
+test('store requests require submission and institutional authority; suspension removes access and visibility',async()=>{
+  const draft=(await auth('post','/store-requests',A).send({name:'Synthetic pending'}).expect(201)).body;
+  assert.equal(draft.status,'DRAFT');
+  await auth('post','/store-requests/'+draft.id+'/submit',B).expect(404);
+  await auth('post','/store-requests/'+draft.id+'/submit',A).expect(202);
+  await auth('post','/store-requests/'+draft.id+'/review',A).send({institutionId:institution,decision:'ACTIVE',reason:'Forbidden self review'}).expect(403);
+  await auth('post','/store-requests/'+draft.id+'/review',reviewer).send({institutionId:institution,decision:'ACTIVE',reason:'Test approval'}).expect(200);
+  const sid=(await auth('get','/auth/me',A)).body.contexts[0].store_id;
+  await request(app).get('/api/stores/'+sid).expect(200);
+  await auth('post','/store-requests/'+draft.id+'/review',reviewer).send({institutionId:institution,decision:'SUSPENDED',reason:'Test suspension'}).expect(200);
+  await auth('get','/stores/me',A).expect(403);
+  await request(app).get('/api/stores/'+sid).expect(404);
+  assert.equal((await auth('get','/auth/me',A)).body.contexts.length,0);
 });
 test('B: person/customer and store membership coexist; account claim contains no global role authority',async()=>{
   assert.ok(storeA.user.person_id);

@@ -50,6 +50,7 @@ export async function mediaAccess(req,res) {
 export async function readCatalogMedia(req,res) {
   const asset=(await query(`SELECT m.* FROM media_assets m JOIN product_media pm ON pm.media_id=m.id
     JOIN products p ON p.id=pm.product_id JOIN stores s ON s.id=p.store_id
+    JOIN organizations o ON o.id=s.organization_id AND o.status='ACTIVE'
     WHERE m.id=$1 AND p.id=$2 AND p.status='PUBLISHED' AND m.purpose='CATALOG' AND m.organization_id=s.organization_id AND m.status='READY'`,[req.params.mediaId,req.params.id])).rows[0];
   if (!asset) throw new HttpError(404,'Mídia não encontrada');
   return deliver(asset,res);

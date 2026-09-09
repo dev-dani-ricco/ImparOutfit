@@ -4,7 +4,6 @@ import Joi from 'joi';
 import { pool, query } from '../config/db.js';
 import { HttpError } from '../utils/http.js';
 import { validate } from '../utils/validation.js';
-import { grantBundle } from '../services/authorizationService.js';
 
 const password = Joi.string().min(10).max(72).custom((value, helpers) => Buffer.byteLength(value) > 72 ? helpers.error('any.invalid') : value);
 const schema = Joi.object({
@@ -22,8 +21,10 @@ export async function identity(accountId, db = { query }) {
   user.contexts = (await db.query(`SELECT m.id membership_id,m.organization_id,s.id store_id,s.store_name,
     COALESCE(array_agg(DISTINCT g.capability_code) FILTER (WHERE g.id IS NOT NULL AND g.resource_id IS NULL),'{}') capabilities
     FROM memberships m JOIN stores s ON s.organization_id=m.organization_id
+    JOIN organizations o ON o.id=m.organization_id AND o.status='ACTIVE'
     LEFT JOIN grants g ON g.membership_id=m.id AND g.revoked_at IS NULL AND (g.expires_at IS NULL OR g.expires_at>now())
     WHERE m.person_id=$1 AND m.status='ACTIVE' GROUP BY m.id,s.id`, [user.person_id])).rows;
+  user.store_requests=(await db.query('SELECT id,name,status FROM store_requests WHERE person_id=$1 ORDER BY created_at DESC',[user.person_id])).rows;
   return user;
 }
 export async function register(req,res) {
@@ -41,11 +42,8 @@ export async function register(req,res) {
     await client.query('INSERT INTO customer_profiles(user_id) VALUES($1)',[user.id]);
     await client.query("INSERT INTO person_entitlements(person_id,plan_id,source) SELECT $1,id,'INITIAL_ACCESS' FROM plans WHERE is_default",[person.id]);
     if(value.store) {
-      // Legacy self-service onboarding retained. Every registrant is also a person/customer.
-      const org=(await client.query('INSERT INTO organizations(name,created_by_person_id) VALUES($1,$2) RETURNING id',[value.store.storeName,person.id])).rows[0];
-      await client.query('INSERT INTO stores(owner_user_id,organization_id,store_name,cnpj,description,social_links) VALUES($1,$2,$3,$4,$5,$6)',[user.id,org.id,value.store.storeName,value.store.cnpj,value.store.description,value.store.socialLinks]);
-      const member=(await client.query('INSERT INTO memberships(person_id,organization_id,created_by_person_id) VALUES($1,$2,$1) RETURNING id',[person.id,org.id])).rows[0];
-      await grantBundle(client,member.id,'OWNER',person.id);
+      const request=(await client.query("INSERT INTO store_requests(person_id,name,status,details) VALUES($1,$2,'PENDING_REVIEW',$3) RETURNING id",[person.id,value.store.storeName,value.store])).rows[0];
+      await client.query("INSERT INTO store_request_events(request_id,actor_person_id,from_status,to_status) VALUES($1,$2,'DRAFT','PENDING_REVIEW')",[request.id,person.id]);
     }
     user=await identity(user.id,client);
     await client.query('COMMIT');

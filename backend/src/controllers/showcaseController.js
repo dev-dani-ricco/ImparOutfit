@@ -22,6 +22,8 @@ export async function createShowcase(req,res) {
 export async function listShowcases(req,res) {
   res.json((await query(`SELECT sh.id,sh.store_id,sh.title,sh.description,sh.starts_at,sh.ends_at,sh.created_at,s.store_name,
     COALESCE(array_agg(sp.product_id) FILTER(WHERE sp.product_id IS NOT NULL),'{}') item_ids
-    FROM showcases sh JOIN stores s ON s.id=sh.store_id LEFT JOIN showcase_products sp ON sp.showcase_id=sh.id
+    FROM showcases sh JOIN stores s ON s.id=sh.store_id
+    JOIN organizations o ON o.id=s.organization_id AND o.status='ACTIVE'
+    LEFT JOIN showcase_products sp ON sp.showcase_id=sh.id
     WHERE ($1::uuid IS NULL OR sh.store_id=$1) GROUP BY sh.id,s.id ORDER BY sh.created_at DESC LIMIT 100`,[req.query.storeId||null])).rows);
 }

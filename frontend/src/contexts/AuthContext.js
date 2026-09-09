@@ -94,6 +94,8 @@ export function AuthProvider({ children }) {
   async function register(payload) {
     if (demoMode) {
       return loginDemo(payload.profileType, {
+        contexts: [],
+        store_requests: payload.store ? [{id:'demo-request',name:payload.store.storeName,status:'PENDING_REVIEW'}] : [],
         name: payload.name || demoUsers[payload.profileType]?.name,
         email: payload.email || demoUsers[payload.profileType]?.email,
       });

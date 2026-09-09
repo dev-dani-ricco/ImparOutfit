@@ -19,9 +19,9 @@ export async function updateStore(req,res) {
   const row=(await query('UPDATE stores SET store_name=COALESCE($2,store_name),description=CASE WHEN $4 THEN $3 ELSE description END WHERE id=$1 RETURNING '+publicColumns,[req.context.storeId,b.storeName,b.description,Object.hasOwn(b,'description')])).rows[0];
   res.json(row);
 }
-export async function listStores(_req,res) { res.json((await query('SELECT '+publicColumns+' FROM stores ORDER BY created_at DESC LIMIT 100')).rows); }
+export async function listStores(_req,res) { res.json((await query('SELECT '+publicColumns+" FROM stores WHERE organization_id IN (SELECT id FROM organizations WHERE status='ACTIVE') ORDER BY created_at DESC LIMIT 100")).rows); }
 export async function getStore(req,res) {
-  const row=(await query('SELECT '+publicColumns+' FROM stores WHERE id=$1',[req.params.id])).rows[0];
+  const row=(await query('SELECT '+publicColumns+' FROM stores WHERE id=$1 AND organization_id IN (SELECT id FROM organizations WHERE status=\'ACTIVE\')',[req.params.id])).rows[0];
   if(!row) throw new HttpError(404,'Loja não encontrada');
   res.json(row);
 }

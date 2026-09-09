@@ -284,8 +284,10 @@ components:
         status:
           type: string
           enum:
-            - PENDING
-            - APPROVED
+            - DRAFT
+            - PENDING_REVIEW
+            - ACTIVE
+            - SUSPENDED
             - REJECTED
         created_at:
           type: string
@@ -758,7 +760,8 @@ paths:
   /auth/register:
     post:
       summary: Registrar Person/Account e contexto comercial opcional
-      description: Autorização por pessoa/recurso quando privado.
+      description: Person e conta criadas normalmente. STORE gera solicitação
+        PENDING_REVIEW, sem autoridade comercial antes de revisão institucional.
       operationId: post__auth_register
       security: []
       parameters: []
@@ -1598,86 +1601,48 @@ paths:
                 - category
   /store-requests:
     post:
-      summary: Solicitar contexto comercial; não concede permissões
-      description: Autorização por pessoa/recurso quando privado.
-      operationId: post__store_requests
+      summary: Criar rascunho privado
       security:
         - bearerAuth: []
-      parameters: []
       responses:
-        "202":
-          description: Solicitar contexto comercial; não concede permissões
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StoreRequest"
-        "400":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
+        "201":
+          description: Sucesso
         "401":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
+          description: Sem sessão
         "403":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
+          description: Sem autoridade
         "404":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
+          description: Indisponível
         "409":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "429":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
-            capacidade/contexto negado; 404: recurso ausente ou privado de outra
-            pessoa."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
+          description: Transição inválida
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required:
+                - name
               properties:
                 name:
                   type: string
-              required:
-                - name
+                  minLength: 2
+                  maxLength: 160
+    get:
+      summary: Listar solicitações próprias
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Sucesso
+        "401":
+          description: Sem sessão
+        "403":
+          description: Sem autoridade
+        "404":
+          description: Indisponível
+        "409":
+          description: Transição inválida
   /stores/{storeId}/memberships:
     get:
       summary: Listar membros do contexto
@@ -4373,3 +4338,73 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
       deprecated: true
+  /store-requests/{id}/submit:
+    post:
+      summary: Submeter à revisão institucional
+      security:
+        - bearerAuth: []
+      responses:
+        "202":
+          description: Sucesso
+        "401":
+          description: Sem sessão
+        "403":
+          description: Sem autoridade
+        "404":
+          description: Indisponível
+        "409":
+          description: Transição inválida
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+  /store-requests/{id}/review:
+    post:
+      summary: Decisão institucional; autoaprovação proibida
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Sucesso
+        "401":
+          description: Sem sessão
+        "403":
+          description: Sem autoridade
+        "404":
+          description: Indisponível
+        "409":
+          description: Transição inválida
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - institutionId
+                - decision
+                - reason
+              properties:
+                institutionId:
+                  type: string
+                  format: uuid
+                decision:
+                  type: string
+                  enum:
+                    - ACTIVE
+                    - REJECTED
+                    - SUSPENDED
+                reason:
+                  type: string
+                  minLength: 3
+                  maxLength: 1000

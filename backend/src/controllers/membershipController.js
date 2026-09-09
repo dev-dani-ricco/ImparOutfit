@@ -46,8 +46,3 @@ export async function revoke(req,res) {
     res.status(204).end();
   } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 }
-export async function requestStore(req,res) {
-  const b=validate(Joi.object({name:Joi.string().trim().min(2).max(160).required()}),req.body);
-  const row=(await query('INSERT INTO store_requests(person_id,name) VALUES($1,$2) RETURNING id,status,created_at',[req.auth.personId,b.name])).rows[0];
-  res.status(202).json(row);
-}
