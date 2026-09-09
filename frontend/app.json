@@ -4,7 +4,9 @@
     "slug": "imparoutfit",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
+    "scheme": "imparoutfit",
     "orientation": "portrait",
+    "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.imparoutfit.app",
       "infoPlist": {
@@ -14,7 +16,27 @@
     "android": {
       "package": "com.imparoutfit.app"
     },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "A IMPAR Outfit usa suas fotos para digitalizar peças do guarda-roupa.",
+          "cameraPermission": "A IMPAR Outfit usa a câmera para registrar os ângulos das peças.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-asset",
+        {
+          "assets": [
+            "./assets/models"
+          ]
+        }
+      ]
+    ],
     "extra": {
+      "demoMode": true,
       "apiUrl": "http://localhost:4000/api",
       "eas": {
         "projectId": "2251ff12-7ff9-4567-b27c-fd5f26c33fc6"
