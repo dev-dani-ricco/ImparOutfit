@@ -1,56 +1,61 @@
-# IMPAROutfit
+# UNIVERSO ÍMPAR
 
-Aplicativo mobile de guarda-roupa inteligente com marketplace social para vitrines de lojistas e marcas.
+Fundação contextual e Showcase Expo. Person é a identidade principal; uma pessoa pode ter
+armário pessoal e memberships em lojas simultaneamente. Produtos comerciais salvos são
+referências, sem aquisição automática de posse.
 
-## Estrutura
-- `backend/`: API REST Node.js + Express, JWT, RBAC, PostgreSQL, Redis opcional em desenvolvimento e Cloudinary.
-- `frontend/`: React Native + Expo com telas de cadastro, login, feed, lojas, armário, painel lojista e vitrines.
-- `docs/`: OpenAPI e documentação de arquitetura/escala.
+- Backend: Express, PostgreSQL, JWT revogável, autorização por capabilities e storage privado.
+- Frontend: Expo 54/React Native; demonstração isolada por identidade e uma superfície de leitura da API.
+- [Arquitetura](docs/architecture.md), [ERD](docs/data-model.md), [OpenAPI](docs/openapi.yaml).
+- [Migrations](docs/migrations.md), [uploads](docs/upload-policy.md), [IP](docs/ip-classification.md).
+- [Baseline](docs/repository-baseline.md), [auditoria histórica](docs/current-state-audit.md), [CICLO 1](docs/cycle1-validation.md).
 
-## Perfis obrigatórios
-1. `PERSON`: pessoa física que gerencia guarda-roupa, monta looks e copia peças de vitrines.
-2. `STORE`: lojista/marca com perfil comercial, catálogo, vitrines temáticas e métricas.
+## Backend local
 
-## Backend
-```bash
+Copie backend/.env.example para backend/.env e configure banco PostgreSQL e JWT_SECRET aleatório
+com pelo menos 32 bytes. Exemplos não devem ser usados como credenciais de produção.
+
+```sh
 cd backend
-cp .env.example .env
-# Para subir sem Redis local no desenvolvimento, mantenha REDIS_REQUIRED=false.
-npm install
-psql "$DATABASE_URL" -f sql/001_schema.sql
+npm ci
+npm run migrate
+npm test
 npm run dev
 ```
 
-Endpoints principais:
-- `POST /api/auth/register`: cadastro escolhendo `PERSON` ou `STORE`.
-- `POST /api/auth/login`: autenticação JWT.
-- `GET /api/stores/me`: painel do lojista.
-- `POST /api/stores/items`: cria peças de catálogo da loja.
-- `POST /api/items/:id/copy-to-wardrobe`: copia uma peça de lojista para o guarda-roupa de usuário comum.
-- `GET /api/feed`: feed social mesclado.
-- `POST /api/showcases`: cria vitrine temática.
+Schema legado sem ledger exige backup/revisão e `npm run migrate:adopt`.
+Não reaplique SQL manualmente. Swagger: http://localhost:4000/api-docs.
+Mídia fica em MEDIA_ROOT privado; a leitura pessoal exige Bearer token.
 
-Swagger: `http://localhost:4000/api-docs`.
+Principais contratos: /api/auth/me, /api/wardrobe/items, /api/products, /api/commercial-saves,
+/api/looks, /api/profile e /api/stores/{storeId}/memberships.
+O endpoint copy-to-wardrobe retorna 410; use POST /api/products/{id}/save.
+Catalogação exige ownershipSource e ownershipAttested; só REAL_CAPTURE e MANUAL_CATALOG
+estão expostos, sem integração de compra.
 
-## Frontend
-```bash
+## Frontend e Showcase
+
+```sh
 cd frontend
-npm install
+npm ci
+npm test
 npm start
 ```
 
-Configure `frontend/app.json` ou variáveis Expo para apontar `extra.apiUrl` para a API publicada.
+demoMode=true em app.json abre a Showcase fictícia, independente da API. Estado por pessoa,
+sem reaproveitar a antiga chave global. Veja o [roteiro](docs/presentation-guide.md).
+demoMode=false exige apiUrl correto e apresenta leitura real de perfil, armário, saves,
+Looks e contexto comercial. Integração completa das telas está pendente.
 
-## Deploy Hostinger
-Para VPS/Cloud:
-```bash
-cd /workspace/ImparOutfit
-APP_DIR=/var/www/imparoutfit DATABASE_URL=postgres://... PORT=4000 backend/deploy/hostinger-vps.sh
-```
-Depois configure Nginx com proxy reverso para a porta da API e publique o app Expo usando EAS Build para Play Store e App Store.
+Bundles locais: `npx expo export --platform android --output-dir .expo-demo-check/android`
+e `npx expo export --platform web --output-dir .expo-demo-check/web`.
+Android export não é APK/AAB assinado nem validação em dispositivo.
+A renderização do avatar genérico é um experimento; não há reconstrução pessoal/fitting 3D.
 
-## Publicação mobile
-1. Criar contas Apple Developer e Google Play Console.
-2. Configurar `android.package` e `ios.bundleIdentifier` em `frontend/app.json`.
-3. Rodar builds com EAS (`eas build -p android`, `eas build -p ios`).
-4. Submeter os binários nas lojas.
+## Infraestrutura
+
+Compose: `docker compose --env-file .env.server -f compose.server.yml up --build -d`.
+O runner aplica migrations antes de iniciar API. Volume legado exige adoção explícita.
+PostgreSQL/Redis ficam na rede privada; mídia usa volume privado, API em 127.0.0.1:4000.
+VPS: backend/deploy/hostinger-vps.sh; revisar ambiente, backup, TLS e MEDIA_ROOT antes de executar.
+Não houve deploy, merge em main ou push neste ciclo.
