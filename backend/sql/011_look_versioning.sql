@@ -1,0 +1,10 @@
+ALTER TABLE looks ADD COLUMN current_version_id UUID;
+ALTER TABLE looks ADD COLUMN status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('DRAFT','ACTIVE','ARCHIVED'));
+ALTER TABLE look_versions ADD COLUMN parent_version_id UUID REFERENCES look_versions(id);
+ALTER TABLE look_versions ADD COLUMN created_by_person_id UUID REFERENCES persons(id);
+ALTER TABLE look_versions ADD CONSTRAINT look_versions_unique_number UNIQUE(look_id,version);
+CREATE INDEX looks_person_status ON looks(person_id,status,created_at DESC);
+CREATE INDEX look_versions_parent ON look_versions(parent_version_id);
+UPDATE look_versions SET created_by_person_id=person_id WHERE created_by_person_id IS NULL;
+UPDATE looks l SET current_version_id=(SELECT v.id FROM look_versions v WHERE v.look_id=l.id ORDER BY v.version DESC LIMIT 1) WHERE current_version_id IS NULL;
+ALTER TABLE looks ADD CONSTRAINT looks_current_version_owner FOREIGN KEY(current_version_id,person_id) REFERENCES look_versions(id,person_id);

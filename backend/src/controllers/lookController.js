@@ -21,7 +21,8 @@ async function version(req,res,existing=false) {
       look=(await client.query('INSERT INTO looks(user_id,person_id,title,is_public) VALUES($1,$2,$3,false) RETURNING id',[req.auth.accountId,req.auth.personId,b.title])).rows[0];
     }
     const next=(await client.query('SELECT COALESCE(max(version),0)+1 AS next FROM look_versions WHERE look_id=$1',[look.id])).rows[0].next;
-    const v=(await client.query('INSERT INTO look_versions(look_id,person_id,version) VALUES($1,$2,$3) RETURNING id,version',[look.id,req.auth.personId,next])).rows[0];
+    const parent=existing?(await client.query('SELECT current_version_id FROM looks WHERE id=$1',[look.id])).rows[0].current_version_id:null;
+    const v=(await client.query('INSERT INTO look_versions(look_id,person_id,version,parent_version_id,created_by_person_id) VALUES($1,$2,$3,$4,$2) RETURNING id,version',[look.id,req.auth.personId,next,parent])).rows[0];
     for(const [position,item] of b.items.entries()) {
       if(item.kind==='OWNED_ITEM') {
         if(!item.wardrobeItemId || item.productId) throw new HttpError(400,'OWNED_ITEM exige peça possuída');
@@ -32,7 +33,7 @@ async function version(req,res,existing=false) {
       }
       await client.query('INSERT INTO look_items(look_version_id,person_id,kind,wardrobe_item_id,product_id,position) VALUES($1,$2,$3,$4,$5,$6)',[v.id,req.auth.personId,item.kind,item.wardrobeItemId||null,item.productId||null,position]);
     }
-    await client.query('COMMIT');
+    await client.query("UPDATE looks SET current_version_id=$2,status='ACTIVE' WHERE id=$1",[look.id,v.id]);await client.query('COMMIT');
     res.status(201).json({id:look.id,versionId:v.id,version:v.version,items:b.items});
   } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 }
