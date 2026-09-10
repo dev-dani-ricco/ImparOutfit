@@ -230,15 +230,41 @@ test('Comparison evaluation schema keeps declared criteria and only results for 
     VALUES($1,$2,'another_declared_criterion',1) RETURNING id`,[evaluation.id,A.user.person_id])).rows[0];
   await assert.rejects(()=>db.query(`INSERT INTO comparison_evaluation_criteria(evaluation_id,owner_person_id,criterion_key,position)
     VALUES($1,$2,'duplicate_position',1)`,[evaluation.id,A.user.person_id]));
-  await db.query(`INSERT INTO comparison_evaluation_results(evaluation_id,comparison_id,look_id,criterion_id,owner_person_id,value,note)
-    VALUES($1,$2,$3,$4,$5,'declared value','declared note')`,[evaluation.id,comparison.id,first.lookId,criterion0.id,A.user.person_id]);
+  await db.query(`INSERT INTO comparison_evaluation_results(evaluation_id,comparison_id,look_id,look_version_id,criterion_id,owner_person_id,value,note)
+    VALUES($1,$2,$3,$4,$5,$6,'declared value','declared note')`,[evaluation.id,comparison.id,first.lookId,first.version2Id,criterion0.id,A.user.person_id]);
   assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0].count,1);
-  await assert.rejects(()=>db.query(`INSERT INTO comparison_evaluation_results(evaluation_id,comparison_id,look_id,criterion_id,owner_person_id)
-    VALUES($1,$2,$3,$4,$5)`,[evaluation.id,comparison.id,first.lookId,criterion0.id,A.user.person_id]));
-  await assert.rejects(()=>db.query(`INSERT INTO comparison_evaluation_results(evaluation_id,comparison_id,look_id,criterion_id,owner_person_id)
-    VALUES($1,$2,$3,$4,$5)`,[evaluation.id,comparison.id,unlinked.id,criterion1.id,A.user.person_id]));
-  await assert.rejects(()=>db.query(`INSERT INTO comparison_evaluation_results(evaluation_id,comparison_id,look_id,criterion_id,owner_person_id)
-    VALUES($1,$2,$3,$4,$5)`,[evaluation.id,comparison.id,lookB.id,criterion1.id,A.user.person_id]));
+  await assert.rejects(()=>db.query(`INSERT INTO comparison_evaluation_results(evaluation_id,comparison_id,look_id,look_version_id,criterion_id,owner_person_id)
+    VALUES($1,$2,$3,$4,$5,$6)`,[evaluation.id,comparison.id,first.lookId,first.version2Id,criterion0.id,A.user.person_id]));
+  await assert.rejects(()=>db.query(`INSERT INTO comparison_evaluation_results(evaluation_id,comparison_id,look_id,look_version_id,criterion_id,owner_person_id)
+    VALUES($1,$2,$3,$4,$5,$6)`,[evaluation.id,comparison.id,unlinked.id,unlinked.versionId,criterion1.id,A.user.person_id]));
+  await assert.rejects(()=>db.query(`INSERT INTO comparison_evaluation_results(evaluation_id,comparison_id,look_id,look_version_id,criterion_id,owner_person_id)
+    VALUES($1,$2,$3,$4,$5,$6)`,[evaluation.id,comparison.id,lookB.id,lookB.versionId,criterion1.id,A.user.person_id]));
+});
+test('Comparison evaluation results anchor an immutable version of the linked same-person Look',async()=>{
+  const first=await createVersionedLookFixture(A);
+  const second=await createVersionedLookFixture(A);
+  const comparison=(await db.query("INSERT INTO comparisons(owner_person_id,name) VALUES($1,'Versioned evaluation comparison') RETURNING id",[A.user.person_id])).rows[0];
+  await db.query('INSERT INTO comparison_looks(comparison_id,look_id,owner_person_id,position) VALUES($1,$2,$3,$4)',[comparison.id,first.lookId,A.user.person_id,0]);
+  await db.query('INSERT INTO comparison_looks(comparison_id,look_id,owner_person_id,position) VALUES($1,$2,$3,$4)',[comparison.id,second.lookId,A.user.person_id,1]);
+  const evaluation=(await db.query("INSERT INTO comparison_evaluations(comparison_id,owner_person_id,origin) VALUES($1,$2,'USER') RETURNING id",[comparison.id,A.user.person_id])).rows[0];
+  const criterion=(await db.query("INSERT INTO comparison_evaluation_criteria(evaluation_id,owner_person_id,criterion_key,position) VALUES($1,$2,'declared_versioned_criterion',0) RETURNING id",[evaluation.id,A.user.person_id])).rows[0];
+  await db.query(`INSERT INTO comparison_evaluation_results(evaluation_id,comparison_id,look_id,look_version_id,criterion_id,owner_person_id)
+    VALUES($1,$2,$3,$4,$5,$6)`,[evaluation.id,comparison.id,first.lookId,first.version2Id,criterion.id,A.user.person_id]);
+  const stored=(await db.query('SELECT look_id,look_version_id FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0];
+  assert.deepEqual(stored,{look_id:first.lookId,look_version_id:first.version2Id});
+  const version3=(await auth('post','/looks/'+first.lookId+'/versions',A)
+    .send({title:'Versioned fixture look v3',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
+  assert.ok(version3.versionId);
+  assert.deepEqual((await db.query('SELECT look_version_id FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0],{look_version_id:first.version2Id});
+  await assert.rejects(()=>db.query(`INSERT INTO comparison_evaluation_results(evaluation_id,comparison_id,look_id,look_version_id,criterion_id,owner_person_id)
+    VALUES($1,$2,$3,$4,$5,$6)`,[evaluation.id,comparison.id,first.lookId,second.version2Id,criterion.id,A.user.person_id]));
+  const ownedB=(await auth('post','/wardrobe/items',B).send({name:'B versioned evaluation shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+  const lookB=(await auth('post','/looks',B).send({title:'B versioned evaluation Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:ownedB.id}]}).expect(201)).body;
+  await assert.rejects(()=>db.query(`INSERT INTO comparison_evaluation_results(evaluation_id,comparison_id,look_id,look_version_id,criterion_id,owner_person_id)
+    VALUES($1,$2,$3,$4,$5,$6)`,[evaluation.id,comparison.id,first.lookId,lookB.versionId,criterion.id,A.user.person_id]));
+  const unlinked=(await auth('post','/looks',A).send({title:'Unlinked versioned evaluation Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
+  await assert.rejects(()=>db.query(`INSERT INTO comparison_evaluation_results(evaluation_id,comparison_id,look_id,look_version_id,criterion_id,owner_person_id)
+    VALUES($1,$2,$3,$4,$5,$6)`,[evaluation.id,comparison.id,unlinked.id,unlinked.versionId,criterion.id,A.user.person_id]));
 });
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({
