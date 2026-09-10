@@ -16,6 +16,7 @@ import * as storeRequests from '../controllers/storeRequestController.js';
 import * as looks from '../controllers/lookController.js';
 import * as contexts from '../controllers/contextController.js';
 import * as collections from '../controllers/collectionController.js';
+import * as comparisons from '../controllers/comparisonController.js';
 import * as media from '../services/imageService.js';
 import * as reconstruction from '../controllers/reconstructionController.js';
 
@@ -72,6 +73,7 @@ r.post('/collections',requireAuth,wrap(collections.create));
 r.post('/collections/:collectionId/looks/:lookId',requireAuth,wrap(collections.linkLook));
 r.get('/collections/:collectionId',requireAuth,wrap(collections.get));
 r.get('/collections/:collectionId/looks',requireAuth,wrap(collections.listLooks));
+r.post('/comparisons',requireAuth,wrap(comparisons.create));
 r.get('/media/:id',requireAuth,wrap(media.readMedia));
 r.post('/media/:id/access',requireAuth,wrap(media.mediaAccess));
 r.get('/looks',requireAuth,wrap(looks.list));

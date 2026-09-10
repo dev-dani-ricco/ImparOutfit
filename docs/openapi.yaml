@@ -721,6 +721,25 @@ components:
         linkedAt:
           type: string
           format: date-time
+    ComparisonInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 160
+          nullable: true
+    Comparison:
+      allOf:
+        - $ref: "#/components/schemas/ComparisonInput"
+        - type: object
+          required: [id, createdAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            createdAt:
+              type: string
+              format: date-time
     Profile:
       type: object
       properties:
@@ -3834,6 +3853,38 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Collection inexistente ou privada de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /comparisons:
+    post:
+      summary: Criar Comparison privada sem Looks iniciais
+      description: Estrutura neutra para comparação futura; não produz análise, ranking ou recomendação.
+      operationId: post__comparisons
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComparisonInput"
+      responses:
+        "201":
+          description: Comparison privada criada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comparison"
+        "400":
+          description: Dados inválidos ou campos não permitidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sessão ausente ou inválida.
           content:
             application/json:
               schema:

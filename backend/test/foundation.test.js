@@ -249,6 +249,24 @@ test('POST /collections creates generic private Collections without owner inject
   assert.equal((await db.query('SELECT count(*)::int AS count FROM collections WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count,countBeforeInvalid);
   assert.equal((await db.query('SELECT count(*)::int AS count FROM collections WHERE owner_person_id=$1',[B.user.person_id])).rows[0].count,bCountBeforeInjection);
 });
+test('POST /comparisons creates empty private Comparisons without ownership injection',async()=>{
+  const named=(await auth('post','/comparisons',A).send({name:'Synthetic comparison'}).expect(201)).body;
+  assert.equal(named.name,'Synthetic comparison');
+  assert.ok(named.createdAt);
+  assert.deepEqual((await db.query('SELECT owner_person_id,name FROM comparisons WHERE id=$1',[named.id])).rows[0],{owner_person_id:A.user.person_id,name:'Synthetic comparison'});
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_looks WHERE comparison_id=$1',[named.id])).rows[0].count,0);
+  const unnamed=(await auth('post','/comparisons',A).send({}).expect(201)).body;
+  const whitespace=(await auth('post','/comparisons',A).send({name:'   '}).expect(201)).body;
+  assert.equal(unnamed.name,null);
+  assert.equal(whitespace.name,null);
+  const repeated=(await auth('post','/comparisons',A).send({name:'Synthetic comparison'}).expect(201)).body;
+  assert.notEqual(repeated.id,named.id);
+  const countBeforeInjection=(await db.query('SELECT count(*)::int AS count FROM comparisons WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count;
+  const bCountBeforeInjection=(await db.query('SELECT count(*)::int AS count FROM comparisons WHERE owner_person_id=$1',[B.user.person_id])).rows[0].count;
+  await auth('post','/comparisons',A).send({name:'Injected owner',owner_person_id:B.user.person_id}).expect(400);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparisons WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count,countBeforeInjection);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparisons WHERE owner_person_id=$1',[B.user.person_id])).rows[0].count,bCountBeforeInjection);
+});
 test('POST /collections/:collectionId/looks/:lookId links only same-person resources once',async()=>{
   const first=await createVersionedLookFixture(A);
   const second=await createVersionedLookFixture(A);
