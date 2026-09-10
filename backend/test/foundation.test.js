@@ -281,6 +281,27 @@ test('POST /looks/:id/variations creates only an authorized variation from its m
   await auth('post','/looks/'+fixture.lookId+'/variations',A).send({}).expect(400);
   assert.equal((await db.query('SELECT count(*)::int AS count FROM look_variations WHERE owner_person_id=$1',[fixture.personId])).rows[0].count,countVariations);
 });
+test('LookVariation read endpoints return only the authenticated source owner records',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const created=(await auth('post','/looks/'+fixture.lookId+'/variations',A)
+    .send({sourceLookVersionId:fixture.version2Id,name:'Variação para leitura'}).expect(201)).body;
+  const variation=(await auth('get','/look-variations/'+created.variationId,A).expect(200)).body;
+  assert.deepEqual(variation,{
+    variationId:created.variationId,
+    name:'Variação para leitura',
+    sourceLookId:fixture.lookId,
+    sourceLookVersionId:fixture.version2Id,
+    resultingLookId:created.resultingLookId,
+    createdAt:variation.createdAt
+  });
+  assert.ok(variation.createdAt);
+  const listed=(await auth('get','/looks/'+fixture.lookId+'/variations',A).expect(200)).body;
+  assert.equal(listed.length,1);
+  assert.deepEqual(listed[0],variation);
+  await auth('get','/look-variations/'+created.variationId,B).expect(404);
+  await auth('get','/looks/'+fixture.lookId+'/variations',B).expect(404);
+  assert.deepEqual((await auth('get','/looks/'+created.resultingLookId+'/variations',A).expect(200)).body,[]);
+});
 test('private profile and media remain authorized; spoofed images fail and public route cannot expose them',async()=>{
   await auth('put','/profile',A).send({age:30,waist:70}).expect(200);
   assert.equal((await auth('get','/profile',B)).body.age,null);

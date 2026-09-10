@@ -598,6 +598,33 @@ components:
         resultingLookVersionId:
           type: string
           format: uuid
+    LookVariation:
+      type: object
+      required:
+        - variationId
+        - sourceLookId
+        - sourceLookVersionId
+        - resultingLookId
+        - createdAt
+      properties:
+        variationId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          nullable: true
+        sourceLookId:
+          type: string
+          format: uuid
+        sourceLookVersionId:
+          type: string
+          format: uuid
+        resultingLookId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
     Profile:
       type: object
       properties:
@@ -3921,6 +3948,73 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Look, versão ou recurso privado não encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: Listar variações de um Look fonte privado
+      description: Retorna somente variações criadas pela pessoa autenticada a partir do Look fonte.
+      operationId: get__looks_id_variations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Lista determinística de variações do Look fonte.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookVariation"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Look inexistente ou privado de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /look-variations/{id}:
+    get:
+      summary: Obter uma variação privada
+      description: Autorização por pessoa proprietária da variação.
+      operationId: get__look_variations_id_
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Variação privada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookVariation"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Variação inexistente ou privada de outra pessoa.
           content:
             application/json:
               schema:

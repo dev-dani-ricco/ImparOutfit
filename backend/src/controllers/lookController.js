@@ -76,6 +76,27 @@ export async function createVariation(req,res) {
     name:body.name
   }));
 }
+const variationDto=row=>({
+  variationId:row.id,
+  name:row.name,
+  sourceLookId:row.source_look_id,
+  sourceLookVersionId:row.source_look_version_id,
+  resultingLookId:row.resulting_look_id,
+  createdAt:row.created_at
+});
+export async function getVariation(req,res) {
+  const variation=(await query(`SELECT id,owner_person_id AS person_id,name,source_look_id,source_look_version_id,resulting_look_id,created_at
+    FROM look_variations WHERE id=$1`,[req.params.id])).rows[0];
+  authorizePersonal(req.auth,variation);
+  res.json(variationDto(variation));
+}
+export async function listVariations(req,res) {
+  const look=(await query('SELECT id,person_id FROM looks WHERE id=$1',[req.params.id])).rows[0];
+  authorizePersonal(req.auth,look);
+  const variations=(await query(`SELECT id,name,source_look_id,source_look_version_id,resulting_look_id,created_at
+    FROM look_variations WHERE source_look_id=$1 AND owner_person_id=$2 ORDER BY created_at DESC,id DESC`,[look.id,req.auth.personId])).rows;
+  res.json(variations.map(variationDto));
+}
 export async function list(req,res) {
   res.json((await query('SELECT id,title,created_at FROM looks WHERE person_id=$1 ORDER BY created_at DESC',[req.auth.personId])).rows);
 }
