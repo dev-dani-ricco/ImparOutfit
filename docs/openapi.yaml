@@ -4579,6 +4579,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /impar-analyses/{analysisId}:
+    get:
+      summary: Obter ÍMPAR Analysis privada
+      description: Retorna apenas referências estruturais persistidas. lookVersionId é histórico e methodologyVersionRef é um identificador opaco.
+      operationId: get__impar_analyses_analysisId
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: analysisId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Analysis privada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImparAnalysis"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Analysis inexistente ou privada de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /contexts/{contextId}:
     get:
       summary: Obter Context privado

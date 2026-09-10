@@ -40,3 +40,10 @@ export async function create(req,res) {
   ])).rows[0];
   res.status(201).json(toAnalysis(analysis));
 }
+
+export async function get(req,res) {
+  const analysis=(await query(`SELECT id,owner_person_id AS person_id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,created_at
+    FROM impar_analyses WHERE id=$1`,[req.params.analysisId])).rows[0];
+  authorizePersonal(req.auth,analysis);
+  res.json(toAnalysis(analysis));
+}

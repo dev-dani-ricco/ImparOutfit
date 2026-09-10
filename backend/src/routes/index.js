@@ -71,6 +71,7 @@ r.post('/profile/photo',requireAuth,uploadBudget,upload.single('photo'),validate
 r.post('/contexts',requireAuth,wrap(contexts.create));
 r.get('/contexts/:contextId',requireAuth,wrap(contexts.get));
 r.post('/impar-analyses',requireAuth,wrap(imparAnalyses.create));
+r.get('/impar-analyses/:analysisId',requireAuth,wrap(imparAnalyses.get));
 r.post('/collections',requireAuth,wrap(collections.create));
 r.post('/collections/:collectionId/looks/:lookId',requireAuth,wrap(collections.linkLook));
 r.get('/collections/:collectionId',requireAuth,wrap(collections.get));

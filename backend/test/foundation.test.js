@@ -339,6 +339,38 @@ test('POST /impar-analyses creates only private SYSTEM DRAFT identity records',a
     status:'DRAFT',methodologyVersionRef:null,lookVersionId:version3.versionId
   });
 });
+test('GET /impar-analyses/:analysisId returns only the private persisted structural references',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const context=(await auth('post','/contexts',A).send({occasion:'Readable analysis context'}).expect(201)).body;
+  const created=(await auth('post','/impar-analyses',A).send({
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM',methodologyVersionRef:'met_opaque_read'
+  }).expect(201)).body;
+  const version3=(await auth('post','/looks/'+fixture.lookId+'/versions',A)
+    .send({title:'Readable analysis v3',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
+  const before={
+    analysis:(await db.query('SELECT look_version_id,status,origin,methodology_version_ref FROM impar_analyses WHERE id=$1',[created.id])).rows[0],
+    currentVersion:(await db.query('SELECT current_version_id FROM looks WHERE id=$1',[fixture.lookId])).rows[0],
+    context:(await db.query('SELECT occasion FROM contexts WHERE id=$1',[context.id])).rows[0]
+  };
+  const read=(await auth('get','/impar-analyses/'+created.id,A).expect(200)).body;
+  assert.deepEqual({id:read.id,lookId:read.lookId,lookVersionId:read.lookVersionId,contextId:read.contextId,status:read.status,origin:read.origin,methodologyVersionRef:read.methodologyVersionRef},{
+    id:created.id,lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,status:'DRAFT',origin:'SYSTEM',methodologyVersionRef:'met_opaque_read'
+  });
+  assert.notEqual(read.lookVersionId,version3.versionId);
+  assert.equal(read.prompt,undefined);
+  assert.equal(read.methodology,undefined);
+  assert.equal(read.reasoning,undefined);
+  assert.equal(read.recommendation,undefined);
+  const withoutReference=(await auth('post','/impar-analyses',A).send({
+    lookId:fixture.lookId,lookVersionId:version3.versionId,contextId:context.id,origin:'SYSTEM'
+  }).expect(201)).body;
+  assert.equal((await auth('get','/impar-analyses/'+withoutReference.id,A).expect(200)).body.methodologyVersionRef,null);
+  await auth('get','/impar-analyses/'+created.id,B).expect(404);
+  await auth('get','/impar-analyses/00000000-0000-4000-8000-000000000018',A).expect(404);
+  assert.deepEqual((await db.query('SELECT look_version_id,status,origin,methodology_version_ref FROM impar_analyses WHERE id=$1',[created.id])).rows[0],before.analysis);
+  assert.deepEqual((await db.query('SELECT current_version_id FROM looks WHERE id=$1',[fixture.lookId])).rows[0],before.currentVersion);
+  assert.deepEqual((await db.query('SELECT occasion FROM contexts WHERE id=$1',[context.id])).rows[0],before.context);
+});
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({
     occasion:'Synthetic dinner',startsAt:'2026-09-10T19:30:00.000Z',locationText:'Synthetic location',
