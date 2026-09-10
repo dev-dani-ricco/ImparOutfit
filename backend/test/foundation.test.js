@@ -292,6 +292,39 @@ test('POST /comparisons/:comparisonId/looks/:lookId preserves explicit positions
   assert.equal((await db.query('SELECT count(*)::int AS count FROM look_versions WHERE look_id=$1',[first.lookId])).rows[0].count,2);
   assert.deepEqual((await db.query('SELECT name FROM comparisons WHERE id=$1',[comparison.id])).rows[0],{name:'Positioned comparison'});
 });
+test('Comparison read endpoints expose only linked Looks in ascending position order',async()=>{
+  const first=await createVersionedLookFixture(A);
+  const second=await createVersionedLookFixture(A);
+  const unlinked=(await auth('post','/looks',A).send({title:'Unlinked comparison Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
+  const comparison=(await auth('post','/comparisons',A).send({name:'Readable comparison'}).expect(201)).body;
+  const empty=(await auth('post','/comparisons',A).send({name:'Empty comparison'}).expect(201)).body;
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+second.lookId,A).send({position:1}).expect(201);
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+first.lookId,A).send({position:0}).expect(201);
+  const before={
+    comparison:(await db.query('SELECT id,name,created_at FROM comparisons WHERE id=$1',[comparison.id])).rows[0],
+    links:(await db.query('SELECT look_id,position FROM comparison_looks WHERE comparison_id=$1 ORDER BY position',[comparison.id])).rows,
+    version:(await db.query('SELECT current_version_id FROM looks WHERE id=$1',[first.lookId])).rows[0],
+    versions:(await db.query('SELECT count(*)::int AS count FROM look_versions WHERE look_id=$1',[first.lookId])).rows[0]
+  };
+  const byId=(await auth('get','/comparisons/'+comparison.id,A).expect(200)).body;
+  assert.deepEqual(byId,{id:comparison.id,name:'Readable comparison',createdAt:byId.createdAt});
+  assert.ok(byId.createdAt);
+  await auth('get','/comparisons/'+comparison.id,B).expect(404);
+  const looks=(await auth('get','/comparisons/'+comparison.id+'/looks',A).expect(200)).body;
+  assert.deepEqual(looks.map(lookRow=>({id:lookRow.id,position:lookRow.position})),[
+    {id:first.lookId,position:0},{id:second.lookId,position:1}
+  ]);
+  assert.equal(looks.some(lookRow=>lookRow.id===unlinked.id),false);
+  await auth('get','/comparisons/'+comparison.id+'/looks',B).expect(404);
+  assert.deepEqual((await auth('get','/comparisons/'+empty.id+'/looks',A).expect(200)).body,[]);
+  const after={
+    comparison:(await db.query('SELECT id,name,created_at FROM comparisons WHERE id=$1',[comparison.id])).rows[0],
+    links:(await db.query('SELECT look_id,position FROM comparison_looks WHERE comparison_id=$1 ORDER BY position',[comparison.id])).rows,
+    version:(await db.query('SELECT current_version_id FROM looks WHERE id=$1',[first.lookId])).rows[0],
+    versions:(await db.query('SELECT count(*)::int AS count FROM look_versions WHERE look_id=$1',[first.lookId])).rows[0]
+  };
+  assert.deepEqual(after,before);
+});
 test('POST /collections/:collectionId/looks/:lookId links only same-person resources once',async()=>{
   const first=await createVersionedLookFixture(A);
   const second=await createVersionedLookFixture(A);

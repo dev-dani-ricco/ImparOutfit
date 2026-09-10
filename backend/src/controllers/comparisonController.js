@@ -38,3 +38,19 @@ export async function linkLook(req,res) {
     throw error;
   }
 }
+
+export async function get(req,res) {
+  const comparison=(await query('SELECT id,owner_person_id AS person_id,name,created_at FROM comparisons WHERE id=$1',[req.params.comparisonId])).rows[0];
+  authorizePersonal(req.auth,comparison);
+  res.json({id:comparison.id,name:comparison.name,createdAt:comparison.created_at});
+}
+
+export async function listLooks(req,res) {
+  const comparison=(await query('SELECT id,owner_person_id AS person_id FROM comparisons WHERE id=$1',[req.params.comparisonId])).rows[0];
+  authorizePersonal(req.auth,comparison);
+  const looks=(await query(`SELECT cl.position,l.id,l.title,l.created_at FROM comparison_looks cl
+    JOIN looks l ON l.id=cl.look_id AND l.person_id=cl.owner_person_id
+    WHERE cl.comparison_id=$1 AND cl.owner_person_id=$2
+    ORDER BY cl.position ASC,l.id ASC`,[comparison.id,req.auth.personId])).rows;
+  res.json(looks);
+}

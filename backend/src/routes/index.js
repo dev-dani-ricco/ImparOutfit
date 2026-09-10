@@ -75,6 +75,8 @@ r.get('/collections/:collectionId',requireAuth,wrap(collections.get));
 r.get('/collections/:collectionId/looks',requireAuth,wrap(collections.listLooks));
 r.post('/comparisons',requireAuth,wrap(comparisons.create));
 r.post('/comparisons/:comparisonId/looks/:lookId',requireAuth,wrap(comparisons.linkLook));
+r.get('/comparisons/:comparisonId',requireAuth,wrap(comparisons.get));
+r.get('/comparisons/:comparisonId/looks',requireAuth,wrap(comparisons.listLooks));
 r.get('/media/:id',requireAuth,wrap(media.readMedia));
 r.post('/media/:id/access',requireAuth,wrap(media.mediaAccess));
 r.get('/looks',requireAuth,wrap(looks.list));

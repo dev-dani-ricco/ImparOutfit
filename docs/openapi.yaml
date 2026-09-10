@@ -763,6 +763,21 @@ components:
         linkedAt:
           type: string
           format: date-time
+    ComparisonLook:
+      type: object
+      required: [position, id, title, created_at]
+      properties:
+        position:
+          type: integer
+          minimum: 0
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        created_at:
+          type: string
+          format: date-time
     Profile:
       type: object
       properties:
@@ -3971,6 +3986,72 @@ paths:
                 $ref: "#/components/schemas/Error"
         "409":
           description: Look ou posição já vinculados de forma incompatível.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /comparisons/{comparisonId}:
+    get:
+      summary: Obter Comparison privada
+      operationId: get__comparisons_comparisonId
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: comparisonId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Comparison privada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comparison"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Comparison inexistente ou privada de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /comparisons/{comparisonId}/looks:
+    get:
+      summary: Listar Looks privados de uma Comparison por posição
+      operationId: get__comparisons_comparisonId_looks
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: comparisonId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Looks vinculados, ordenados por position crescente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ComparisonLook"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Comparison inexistente ou privada de outra pessoa.
           content:
             application/json:
               schema:
