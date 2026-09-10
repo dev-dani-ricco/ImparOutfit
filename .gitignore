@@ -270,3 +270,5 @@ audit-artifacts/
 security-reports/
 __pycache__/
 *.pyc
+
+frontend/.expo-cycle2-check/

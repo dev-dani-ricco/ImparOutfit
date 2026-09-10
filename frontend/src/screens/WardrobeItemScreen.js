@@ -42,7 +42,7 @@ export default function WardrobeItemScreen({ route }) {
         <Data label="Tamanho" value={item.size} />
         <Data label="Relação" value={publishedItem || item.kind!=='OWNED_ITEM' ? 'Referência comercial' : 'Peça catalogada como possuída'} />
         <Data label="Origem" value={item.source || 'Ateliê Aurora'} />
-        <Data label="Ativo 3D" value={`${item.model3d?.angles || 0} ângulos registrados`} />
+        <Data label="Fotos de referência" value={`${item.model3d?.angles || 0} ângulos registrados`} />
       </View>
       <View style={styles.required}>
         <Text style={styles.requiredTitle}>PADRÃO DO ARMÁRIO INTELIGENTE</Text>

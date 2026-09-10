@@ -72,7 +72,7 @@ function WardrobeStack() {
   return (
     <WardrobeStackNav.Navigator screenOptions={stackOptions}>
       <WardrobeStackNav.Screen name="Meu armário" component={WardrobeScreen} options={{ title: 'IMPAR OUTFIT  •  ARMÁRIO' }} />
-      <WardrobeStackNav.Screen name="Nova peça" component={ItemFormScreen} options={{ title: 'CADASTRO 2D + 3D' }} />
+      <WardrobeStackNav.Screen name="Nova peça" component={ItemFormScreen} options={{ title: 'CATALOGAÇÃO DE PEÇA' }} />
       <WardrobeStackNav.Screen name="Planos do armário" component={WardrobePlansScreen} options={{ title: 'CAPACIDADE E PLANOS' }} />
       <WardrobeStackNav.Screen name="Peça 2D e 3D" component={WardrobeItemScreen} options={{ title: 'ITEM DIGITAL' }} />
       <WardrobeStackNav.Screen name="Nova coleção" component={PersonalCollectionFormScreen} options={{ title: 'COLEÇÃO PARTICULAR' }} />

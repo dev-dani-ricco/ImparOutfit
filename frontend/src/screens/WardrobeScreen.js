@@ -29,7 +29,7 @@ export default function WardrobeScreen({ navigation }) {
         title="Seu acervo digital."
         description="Peças catalogadas como possuídas. Fotos e capturas preparam futuras combinações."
         stats={[
-          { value: wardrobe.length, label: 'peças 2D + 3D' },
+          { value: wardrobe.length, label: 'peças catalogadas' },
           { value: personalCollections.length, label: 'coleções pessoais' },
         ]}
       />
@@ -84,7 +84,7 @@ export default function WardrobeScreen({ navigation }) {
             onPress={() => navigation.navigate(wardrobeCapacity.isFull ? 'Planos do armário' : 'Nova peça')}
           >
             <Text style={styles.primaryText}>
-              {wardrobeCapacity.isFull ? 'AUMENTAR CAPACIDADE DO ARMÁRIO →' : '＋ CADASTRAR PEÇA EM 2D + 3D'}
+              {wardrobeCapacity.isFull ? 'AUMENTAR CAPACIDADE DO ARMÁRIO →' : '＋ CATALOGAR PEÇA FÍSICA'}
             </Text>
           </Pressable>
           <Text style={styles.filterTitle}>FILTRAR POR CATEGORIA</Text>

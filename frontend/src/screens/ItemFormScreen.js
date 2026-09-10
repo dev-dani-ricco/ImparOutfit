@@ -248,7 +248,7 @@ export default function ItemFormScreen({ navigation, route }) {
         {demoCapture && image && completedAngles === 4 ? (
           <View style={styles.demoPreview}>
             <Text style={styles.demoPreviewTag}>PRÉVIA VISUAL • FOTO ANIMADA</Text>
-            <Model3DPreview image={image} model={{ angles: 4, status: 'ready' }} compact />
+            <Model3DPreview image={image} model={{ angles: 4, status: 'CAPTURE_ONLY' }} compact />
             <Text style={styles.demoPreviewCopy}>As fotos estão registradas. Reconstrução de malha 3D ainda não disponível.</Text>
           </View>
         ) : null}

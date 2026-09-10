@@ -3,9 +3,11 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
 import { colors } from '../theme/colors';
+import ReconstructionScreen from './ReconstructionScreen';
 
 // Real API mode has an explicit small surface; showcase interactions stay in demo mode.
 export default function ApiFoundationScreen() {
+  const [reconstruction,setReconstruction]=useState(false);
   const {token,user,activeContext,switchContext,logout}=useAuth();
   const [data,setData]=useState(null),[error,setError]=useState('');
   useEffect(()=>{
@@ -17,7 +19,9 @@ export default function ApiFoundationScreen() {
     Promise.all(requests).then(result=>{if(!cancelled)setData(result);}).catch(()=>{if(!cancelled)setError('Não foi possível carregar este contexto.');});
     return ()=>{cancelled=true;};
   },[token,activeContext]);
+  if(reconstruction)return <ReconstructionScreen onClose={()=>setReconstruction(false)}/>;
   return <ScrollView contentContainerStyle={{padding:24,gap:18,backgroundColor:colors.bg,flexGrow:1}}>
+    <Pressable onPress={()=>setReconstruction(true)}><Text style={{color:colors.accent}}>CAPTURAR PEÇA REAL • POC 3D</Text></Pressable>
     <Text style={{fontSize:28,color:colors.text}}>UNIVERSO ÍMPAR</Text>
     <Text style={{color:colors.text}}>{user?.name}</Text>
     <Pressable onPress={()=>switchContext('personal')}><Text style={{color:colors.accent}}>Meu contexto pessoal</Text></Pressable>

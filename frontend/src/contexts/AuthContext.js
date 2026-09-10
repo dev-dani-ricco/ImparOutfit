@@ -7,7 +7,7 @@ import { api } from '../api/client';
 const AuthContext = createContext(null);
 const DEMO_SESSION_KEY = '@imparoutfit/presentation-session-v3';
 const TOKEN_KEY = 'imparoutfit-token';
-const demoMode = Constants.expoConfig?.extra?.demoMode === true;
+const configuredDemoMode = Constants.expoConfig?.extra?.demoMode === true;
 
 const demoUsers = {
   PERSON: {
@@ -32,6 +32,7 @@ const demoUsers = {
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }) {
+  const [demoMode,setDemoMode]=useState(configuredDemoMode);
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
   const [activeContext,setActiveContext]=useState('personal');
@@ -137,13 +138,14 @@ export function AuthProvider({ children }) {
     user,
     isReady,
     demoMode,
+    setDemoMode,
     activeContext,
     switchContext,
     register,
     login,
     loginDemo,
     logout,
-  }), [isReady, token, user,activeContext]);
+  }), [isReady, token, user,activeContext,demoMode]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

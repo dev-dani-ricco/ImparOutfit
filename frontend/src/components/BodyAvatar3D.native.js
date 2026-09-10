@@ -267,7 +267,7 @@ export default function BodyAvatar3D({ profile }) {
       <View
         style={styles.stage}
         accessible
-        accessibilityLabel="Avatar 3D. Arraste horizontalmente para girar e toque duas vezes para centralizar."
+        accessibilityLabel="Avatar genérico 3D experimental. Arraste horizontalmente para girar e toque duas vezes para centralizar."
         onTouchEnd={handleTouchEnd}
         {...panResponder.panHandlers}
       >
@@ -277,7 +277,7 @@ export default function BodyAvatar3D({ profile }) {
 
         <View style={styles.studioLabel} pointerEvents="none">
           <Text style={styles.studioOverline}>IMPAR DIGITAL ATELIER</Text>
-          <Text style={styles.studioTitle}>HUMAN 3D</Text>
+          <Text style={styles.studioTitle}>AVATAR GENÉRICO • EXPERIMENTAL</Text>
         </View>
         <View style={styles.liveBadge} pointerEvents="none">
           <View style={[styles.liveDot, modelAssetError && styles.errorDot]} />
@@ -294,7 +294,7 @@ export default function BodyAvatar3D({ profile }) {
         ) : null}
         <View style={styles.heightBadge} pointerEvents="none">
           <Text style={styles.heightValue}>{proportions.height}</Text>
-          <Text style={styles.heightUnit}>CM · CORPO PARAMÉTRICO</Text>
+          <Text style={styles.heightUnit}>CM DECLARADOS • SEM CALIBRAÇÃO</Text>
         </View>
       </View>
 

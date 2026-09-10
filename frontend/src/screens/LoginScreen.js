@@ -13,7 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
 
 export default function LoginScreen({ navigation }) {
-  const { demoMode, login, loginDemo } = useAuth();
+  const { demoMode, login, loginDemo, setDemoMode } = useAuth();
   const [email, setEmail] = useState('demo@impar.com');
   const [password, setPassword] = useState('demo');
   const [loadingRole, setLoadingRole] = useState(null);
@@ -46,6 +46,9 @@ export default function LoginScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+        <Pressable onPress={()=>{setEmail('');setPassword('');setDemoMode(!demoMode);}}>
+          <Text style={{color:colors.accent,padding:12}}>{demoMode?'ACESSAR POC COM CONTA REAL':'VOLTAR À SHOWCASE'}</Text>
+        </Pressable>
         <View style={styles.brandRow}>
           <View>
             <Text style={styles.brand}>IMPAR</Text>
