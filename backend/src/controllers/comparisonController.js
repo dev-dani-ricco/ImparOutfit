@@ -1,6 +1,6 @@
 import Joi from 'joi';
 import { query } from '../config/db.js';
-import { validate } from '../utils/validation.js';
+import { uuid, validate } from '../utils/validation.js';
 import { authorizePersonal } from '../services/authorizationService.js';
 import { HttpError } from '../utils/http.js';
 
@@ -10,6 +10,33 @@ export async function create(req,res) {
   const body=validate(schema,req.body||{});
   const comparison=(await query('INSERT INTO comparisons(owner_person_id,name) VALUES($1,$2) RETURNING id,name,created_at',[req.auth.personId,body.name])).rows[0];
   res.status(201).json({id:comparison.id,name:comparison.name,createdAt:comparison.created_at});
+}
+
+const evaluationSchema=Joi.object({
+  contextId:uuid,
+  origin:Joi.string().valid('USER','SYSTEM').required()
+});
+const evaluationDto=row=>({
+  id:row.id,
+  comparisonId:row.comparison_id,
+  contextId:row.context_id,
+  origin:row.origin,
+  status:row.status,
+  createdAt:row.created_at
+});
+export async function createEvaluation(req,res) {
+  const body=validate(evaluationSchema,req.body||{});
+  const comparison=(await query('SELECT id,owner_person_id AS person_id FROM comparisons WHERE id=$1',[req.params.comparisonId])).rows[0];
+  authorizePersonal(req.auth,comparison);
+  if(body.contextId) {
+    const context=(await query('SELECT id,owner_person_id AS person_id FROM contexts WHERE id=$1',[body.contextId])).rows[0];
+    authorizePersonal(req.auth,context);
+  }
+  const evaluation=(await query(`INSERT INTO comparison_evaluations(comparison_id,owner_person_id,context_id,origin,status)
+    VALUES($1,$2,$3,$4,'DRAFT') RETURNING id,comparison_id,context_id,origin,status,created_at`,[
+    comparison.id,req.auth.personId,body.contextId??null,body.origin
+  ])).rows[0];
+  res.status(201).json(evaluationDto(evaluation));
 }
 
 const linkSchema=Joi.object({position:Joi.number().integer().min(0).required()});

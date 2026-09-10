@@ -325,6 +325,27 @@ test('POST /comparisons creates empty private Comparisons without ownership inje
   assert.equal((await db.query('SELECT count(*)::int AS count FROM comparisons WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count,countBeforeInjection);
   assert.equal((await db.query('SELECT count(*)::int AS count FROM comparisons WHERE owner_person_id=$1',[B.user.person_id])).rows[0].count,bCountBeforeInjection);
 });
+test('POST /comparisons/:comparisonId/evaluations creates only private DRAFT evaluations',async()=>{
+  const comparison=(await auth('post','/comparisons',A).send({name:'Evaluation creation comparison'}).expect(201)).body;
+  const contextA=(await auth('post','/contexts',A).send({occasion:'Evaluation Context A'}).expect(201)).body;
+  const contextB=(await auth('post','/contexts',B).send({occasion:'Evaluation Context B'}).expect(201)).body;
+  const withContext=(await auth('post','/comparisons/'+comparison.id+'/evaluations',A)
+    .send({contextId:contextA.id,origin:'USER'}).expect(201)).body;
+  assert.deepEqual({comparisonId:withContext.comparisonId,contextId:withContext.contextId,origin:withContext.origin,status:withContext.status},{comparisonId:comparison.id,contextId:contextA.id,origin:'USER',status:'DRAFT'});
+  const stored=(await db.query('SELECT comparison_id,owner_person_id,context_id,origin,status FROM comparison_evaluations WHERE id=$1',[withContext.id])).rows[0];
+  assert.deepEqual(stored,{comparison_id:comparison.id,owner_person_id:A.user.person_id,context_id:contextA.id,origin:'USER',status:'DRAFT'});
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_criteria WHERE evaluation_id=$1',[withContext.id])).rows[0].count,0);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_results WHERE evaluation_id=$1',[withContext.id])).rows[0].count,0);
+  const empty=(await auth('post','/comparisons/'+comparison.id+'/evaluations',A).send({origin:'SYSTEM'}).expect(201)).body;
+  assert.deepEqual({contextId:empty.contextId,origin:empty.origin,status:empty.status},{contextId:null,origin:'SYSTEM',status:'DRAFT'});
+  await auth('post','/comparisons/'+comparison.id+'/evaluations',B).send({origin:'USER'}).expect(404);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations',A).send({contextId:contextB.id,origin:'USER'}).expect(404);
+  const countBeforeInvalid=(await db.query('SELECT count(*)::int AS count FROM comparison_evaluations WHERE comparison_id=$1',[comparison.id])).rows[0].count;
+  await auth('post','/comparisons/'+comparison.id+'/evaluations',A).send({origin:'DANI'}).expect(400);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations',A).send({origin:'USER',status:'COMPLETED'}).expect(400);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations',A).send({origin:'USER',owner_person_id:B.user.person_id}).expect(400);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_evaluations WHERE comparison_id=$1',[comparison.id])).rows[0].count,countBeforeInvalid);
+});
 test('POST /comparisons/:comparisonId/looks/:lookId preserves explicit positions',async()=>{
   const first=await createVersionedLookFixture(A);
   const second=await createVersionedLookFixture(A);

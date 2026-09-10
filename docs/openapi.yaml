@@ -740,6 +740,34 @@ components:
             createdAt:
               type: string
               format: date-time
+    ComparisonEvaluationInput:
+      type: object
+      required: [origin]
+      properties:
+        contextId:
+          type: string
+          format: uuid
+        origin:
+          type: string
+          enum: [USER, SYSTEM]
+    ComparisonEvaluation:
+      allOf:
+        - $ref: "#/components/schemas/ComparisonEvaluationInput"
+        - type: object
+          required: [id, comparisonId, status, createdAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            comparisonId:
+              type: string
+              format: uuid
+            status:
+              type: string
+              enum: [DRAFT]
+            createdAt:
+              type: string
+              format: date-time
     ComparisonLookLinkInput:
       type: object
       required: [position]
@@ -3923,6 +3951,51 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /comparisons/{comparisonId}/evaluations:
+    post:
+      summary: Criar avaliação privada de Comparison em DRAFT
+      description: Cria somente a estrutura de avaliação neutra; não cria critérios, resultados, score ou decisão.
+      operationId: post__comparisons_comparisonId_evaluations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: comparisonId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComparisonEvaluationInput"
+      responses:
+        "201":
+          description: Avaliação privada criada em DRAFT.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonEvaluation"
+        "400":
+          description: Dados inválidos, origem não permitida ou campo não aceito.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Comparison ou Context inexistente ou privado de outra pessoa.
           content:
             application/json:
               schema:
