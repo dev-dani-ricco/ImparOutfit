@@ -267,6 +267,31 @@ test('POST /comparisons creates empty private Comparisons without ownership inje
   assert.equal((await db.query('SELECT count(*)::int AS count FROM comparisons WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count,countBeforeInjection);
   assert.equal((await db.query('SELECT count(*)::int AS count FROM comparisons WHERE owner_person_id=$1',[B.user.person_id])).rows[0].count,bCountBeforeInjection);
 });
+test('POST /comparisons/:comparisonId/looks/:lookId preserves explicit positions',async()=>{
+  const first=await createVersionedLookFixture(A);
+  const second=await createVersionedLookFixture(A);
+  const comparison=(await auth('post','/comparisons',A).send({name:'Positioned comparison'}).expect(201)).body;
+  const ownedB=(await auth('post','/wardrobe/items',B).send({name:'B positioned shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+  const lookB=(await auth('post','/looks',B).send({title:'B positioned Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:ownedB.id}]}).expect(201)).body;
+  const firstLink=(await auth('post','/comparisons/'+comparison.id+'/looks/'+first.lookId,A).send({position:0}).expect(201)).body;
+  assert.deepEqual({...firstLink,linkedAt:Boolean(firstLink.linkedAt)},{comparisonId:comparison.id,lookId:first.lookId,position:0,linkedAt:true});
+  assert.deepEqual((await auth('post','/comparisons/'+comparison.id+'/looks/'+first.lookId,A).send({position:0}).expect(200)).body,firstLink);
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+first.lookId,A).send({position:2}).expect(409);
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+second.lookId,A).send({position:0}).expect(409);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_looks WHERE comparison_id=$1 AND look_id=$2',[comparison.id,second.lookId])).rows[0].count,0);
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+second.lookId,A).send({position:1}).expect(201);
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+lookB.id,B).send({position:0}).expect(404);
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+lookB.id,A).send({position:2}).expect(404);
+  await auth('post','/comparisons/00000000-0000-4000-8000-000000000005/looks/'+first.lookId,A).send({position:2}).expect(404);
+  await auth('post','/comparisons/'+comparison.id+'/looks/00000000-0000-4000-8000-000000000006',A).send({position:2}).expect(404);
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+first.lookId,A).send({position:-1}).expect(400);
+  assert.deepEqual((await db.query('SELECT look_id,position FROM comparison_looks WHERE comparison_id=$1 ORDER BY position',[comparison.id])).rows,[
+    {look_id:first.lookId,position:0},{look_id:second.lookId,position:1}
+  ]);
+  assert.deepEqual((await db.query('SELECT current_version_id FROM looks WHERE id=$1',[first.lookId])).rows[0],{current_version_id:first.version2Id});
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM look_versions WHERE look_id=$1',[first.lookId])).rows[0].count,2);
+  assert.deepEqual((await db.query('SELECT name FROM comparisons WHERE id=$1',[comparison.id])).rows[0],{name:'Positioned comparison'});
+});
 test('POST /collections/:collectionId/looks/:lookId links only same-person resources once',async()=>{
   const first=await createVersionedLookFixture(A);
   const second=await createVersionedLookFixture(A);

@@ -740,6 +740,29 @@ components:
             createdAt:
               type: string
               format: date-time
+    ComparisonLookLinkInput:
+      type: object
+      required: [position]
+      properties:
+        position:
+          type: integer
+          minimum: 0
+    ComparisonLookLink:
+      type: object
+      required: [comparisonId, lookId, position, linkedAt]
+      properties:
+        comparisonId:
+          type: string
+          format: uuid
+        lookId:
+          type: string
+          format: uuid
+        position:
+          type: integer
+          minimum: 0
+        linkedAt:
+          type: string
+          format: date-time
     Profile:
       type: object
       properties:
@@ -3885,6 +3908,69 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /comparisons/{comparisonId}/looks/{lookId}:
+    post:
+      summary: Vincular Look privado a uma Comparison em posição explícita
+      description: Não reordena posições. Repetição com a mesma posição retorna o vínculo existente.
+      operationId: post__comparisons_comparisonId_looks_lookId
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: comparisonId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: lookId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComparisonLookLinkInput"
+      responses:
+        "201":
+          description: Vínculo criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonLookLink"
+        "200":
+          description: Vínculo idempotente existente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonLookLink"
+        "400":
+          description: Position inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Comparison ou Look inexistente ou privado de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Look ou posição já vinculados de forma incompatível.
           content:
             application/json:
               schema:
