@@ -339,6 +339,37 @@ test('POST /impar-analyses creates only private SYSTEM DRAFT identity records',a
     status:'DRAFT',methodologyVersionRef:null,lookVersionId:version3.versionId
   });
 });
+test('ÍMPAR Analysis Result schema preserves private versioned structured outputs separately from Analysis',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const context=(await auth('post','/contexts',A).send({occasion:'Result persistence context'}).expect(201)).body;
+  const analysis=(await auth('post','/impar-analyses',A).send({
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'
+  }).expect(201)).body;
+  const before=(await db.query('SELECT look_id,look_version_id,context_id,status,origin,methodology_version_ref FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0];
+  const version1=(await db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status,payload)
+    VALUES($1,$2,1,'DRAFT',$3::jsonb) RETURNING id,result_version,status,payload`,[
+    analysis.id,A.user.person_id,JSON.stringify({schema:'synthetic-v1'})
+  ])).rows[0];
+  const version2=(await db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status,payload)
+    VALUES($1,$2,2,'FINAL',$3::jsonb) RETURNING id,result_version,status,payload`,[
+    analysis.id,A.user.person_id,JSON.stringify({schema:'synthetic-v2'})
+  ])).rows[0];
+  assert.deepEqual({result_version:version1.result_version,status:version1.status,payload:version1.payload},{result_version:1,status:'DRAFT',payload:{schema:'synthetic-v1'}});
+  assert.deepEqual({result_version:version2.result_version,status:version2.status,payload:version2.payload},{result_version:2,status:'FINAL',payload:{schema:'synthetic-v2'}});
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM impar_analysis_results WHERE analysis_id=$1',[analysis.id])).rows[0].count,2);
+  assert.deepEqual((await db.query('SELECT result_version,status,payload FROM impar_analysis_results WHERE id=$1',[version1.id])).rows[0],{result_version:1,status:'DRAFT',payload:{schema:'synthetic-v1'}});
+  await assert.rejects(()=>db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status)
+    VALUES($1,$2,2,'DRAFT')`,[analysis.id,A.user.person_id]));
+  await assert.rejects(()=>db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status)
+    VALUES($1,$2,0,'DRAFT')`,[analysis.id,A.user.person_id]));
+  await assert.rejects(()=>db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status)
+    VALUES($1,$2,-1,'DRAFT')`,[analysis.id,A.user.person_id]));
+  await assert.rejects(()=>db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status)
+    VALUES($1,$2,3,'DRAFT')`,[analysis.id,B.user.person_id]));
+  await assert.rejects(()=>db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status)
+    VALUES($1,$2,3,'INVALID')`,[analysis.id,A.user.person_id]));
+  assert.deepEqual((await db.query('SELECT look_id,look_version_id,context_id,status,origin,methodology_version_ref FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],before);
+});
 test('GET /impar-analyses/:analysisId returns only the private persisted structural references',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const context=(await auth('post','/contexts',A).send({occasion:'Readable analysis context'}).expect(201)).body;
