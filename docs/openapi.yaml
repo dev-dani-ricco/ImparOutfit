@@ -4266,6 +4266,78 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /comparisons/{comparisonId}/evaluations/{evaluationId}/complete:
+    post:
+      summary: Finalizar Evaluation neutra com matriz completa
+      description: Exige ao menos dois Looks, um Criterion e um Result versionado para cada par Look × Criterion. Não calcula score, ranking ou vencedor.
+      operationId: post__comparisons_comparisonId_evaluations_evaluationId_complete
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: comparisonId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: evaluationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        "200":
+          description: Evaluation concluída ou estado COMPLETED já existente, sem mutar Results.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, comparisonId, status, createdAt]
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  comparisonId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [COMPLETED]
+                  createdAt:
+                    type: string
+                    format: date-time
+        "400":
+          description: Campos de negócio não são aceitos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Comparison ou Evaluation inexistente, incompatível ou privada de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Matriz incompleta, requisitos mínimos ausentes ou estado incompatível.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /comparisons/{comparisonId}/looks/{lookId}:
     post:
       summary: Vincular Look privado a uma Comparison em posição explícita

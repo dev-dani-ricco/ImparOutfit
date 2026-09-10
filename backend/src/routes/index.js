@@ -78,6 +78,7 @@ r.post('/comparisons/:comparisonId/evaluations',requireAuth,wrap(comparisons.cre
 r.post('/comparisons/:comparisonId/evaluations/:evaluationId/criteria',requireAuth,wrap(comparisons.createEvaluationCriterion));
 r.post('/comparisons/:comparisonId/evaluations/:evaluationId/results',requireAuth,wrap(comparisons.createEvaluationResult));
 r.get('/comparisons/:comparisonId/evaluations/:evaluationId',requireAuth,wrap(comparisons.getEvaluation));
+r.post('/comparisons/:comparisonId/evaluations/:evaluationId/complete',requireAuth,wrap(comparisons.completeEvaluation));
 r.post('/comparisons/:comparisonId/looks/:lookId',requireAuth,wrap(comparisons.linkLook));
 r.get('/comparisons/:comparisonId',requireAuth,wrap(comparisons.get));
 r.get('/comparisons/:comparisonId/looks',requireAuth,wrap(comparisons.listLooks));

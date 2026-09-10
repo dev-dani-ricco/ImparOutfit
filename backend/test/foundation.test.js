@@ -468,6 +468,55 @@ test('GET /comparisons/:comparisonId/evaluations/:evaluationId reads only ordere
   assert.deepEqual((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0],before.results);
   assert.deepEqual((await db.query('SELECT name FROM comparisons WHERE id=$1',[comparison.id])).rows[0],before.comparison);
 });
+test('POST /comparisons/:comparisonId/evaluations/:evaluationId/complete finalizes only a complete versioned matrix',async()=>{
+  const zeroComparison=(await auth('post','/comparisons',A).send({name:'Zero completion comparison'}).expect(201)).body;
+  const zeroEvaluation=(await auth('post','/comparisons/'+zeroComparison.id+'/evaluations',A).send({origin:'USER'}).expect(201)).body;
+  await auth('post','/comparisons/'+zeroComparison.id+'/evaluations/'+zeroEvaluation.id+'/complete',A).send({}).expect(409);
+  const first=await createVersionedLookFixture(A);
+  const oneComparison=(await auth('post','/comparisons',A).send({name:'One completion comparison'}).expect(201)).body;
+  await auth('post','/comparisons/'+oneComparison.id+'/looks/'+first.lookId,A).send({position:0}).expect(201);
+  const oneEvaluation=(await auth('post','/comparisons/'+oneComparison.id+'/evaluations',A).send({origin:'USER'}).expect(201)).body;
+  await auth('post','/comparisons/'+oneComparison.id+'/evaluations/'+oneEvaluation.id+'/complete',A).send({}).expect(409);
+  const second=await createVersionedLookFixture(A);
+  const comparison=(await auth('post','/comparisons',A).send({name:'Complete matrix comparison'}).expect(201)).body;
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+first.lookId,A).send({position:0}).expect(201);
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+second.lookId,A).send({position:1}).expect(201);
+  const evaluation=(await auth('post','/comparisons/'+comparison.id+'/evaluations',A).send({origin:'SYSTEM'}).expect(201)).body;
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/complete',A).send({}).expect(409);
+  const criterion0=(await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A).send({criterionKey:'first_declared',position:0}).expect(201)).body;
+  const criterion1=(await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A).send({criterionKey:'second_declared',position:1}).expect(201)).body;
+  const createResult=(criterion,look,version)=>auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/results',A)
+    .send({criterionId:criterion.id,lookId:look.lookId,lookVersionId:version});
+  await createResult(criterion0,first,first.version2Id).expect(201);
+  await createResult(criterion0,second,second.version2Id).expect(201);
+  await createResult(criterion1,first,first.version2Id).expect(201);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/complete',A).send({}).expect(409);
+  const version3=(await auth('post','/looks/'+first.lookId+'/versions',A).send({title:'Completion v3',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
+  await createResult(criterion1,second,second.version2Id).expect(201);
+  const before={
+    criteria:(await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_criteria WHERE evaluation_id=$1',[evaluation.id])).rows[0],
+    results:(await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0],
+    versions:(await db.query('SELECT count(*)::int AS count FROM look_versions WHERE look_id=$1',[first.lookId])).rows[0],
+    comparison:(await db.query('SELECT name FROM comparisons WHERE id=$1',[comparison.id])).rows[0]
+  };
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/complete',B).send({}).expect(404);
+  const otherComparison=(await auth('post','/comparisons',A).send({name:'Other completion comparison'}).expect(201)).body;
+  const otherEvaluation=(await auth('post','/comparisons/'+otherComparison.id+'/evaluations',A).send({origin:'USER'}).expect(201)).body;
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+otherEvaluation.id+'/complete',A).send({}).expect(404);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/complete',A).send({status:'COMPLETED'}).expect(400);
+  const completed=(await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/complete',A).send({}).expect(200)).body;
+  assert.deepEqual({id:completed.id,comparisonId:completed.comparisonId,status:completed.status},{id:evaluation.id,comparisonId:comparison.id,status:'COMPLETED'});
+  assert.equal((await db.query('SELECT look_version_id FROM comparison_evaluation_results WHERE evaluation_id=$1 AND look_id=$2 AND criterion_id=$3',[evaluation.id,first.lookId,criterion0.id])).rows[0].look_version_id,first.version2Id);
+  assert.notEqual(version3.versionId,first.version2Id);
+  const idempotent=(await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/complete',A).send({}).expect(200)).body;
+  assert.deepEqual(idempotent,completed);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A).send({criterionKey:'after_completion',position:2}).expect(409);
+  await createResult(criterion1,first,first.version2Id).expect(409);
+  assert.deepEqual((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_criteria WHERE evaluation_id=$1',[evaluation.id])).rows[0],before.criteria);
+  assert.deepEqual((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0],before.results);
+  assert.deepEqual((await db.query('SELECT count(*)::int AS count FROM look_versions WHERE look_id=$1',[first.lookId])).rows[0],before.versions);
+  assert.deepEqual((await db.query('SELECT name FROM comparisons WHERE id=$1',[comparison.id])).rows[0],before.comparison);
+});
 test('POST /comparisons/:comparisonId/looks/:lookId preserves explicit positions',async()=>{
   const first=await createVersionedLookFixture(A);
   const second=await createVersionedLookFixture(A);

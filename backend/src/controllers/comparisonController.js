@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { query } from '../config/db.js';
+import { pool, query } from '../config/db.js';
 import { uuid, validate } from '../utils/validation.js';
 import { authorizePersonal } from '../services/authorizationService.js';
 import { HttpError } from '../utils/http.js';
@@ -166,6 +166,46 @@ export async function getEvaluation(req,res) {
     WHERE r.evaluation_id=$1 AND r.owner_person_id=$2
     ORDER BY c.position ASC,cl.position ASC,r.created_at ASC,r.look_id ASC,r.criterion_id ASC`,[evaluation.id,req.auth.personId])).rows;
   res.json({...evaluationDto(evaluation),criteria:criteria.map(readCriterionDto),results:results.map(readResultDto)});
+}
+
+export async function completeEvaluation(req,res) {
+  validate(Joi.object({}),req.body||{});
+  const client=await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const comparison=(await client.query('SELECT id,owner_person_id AS person_id FROM comparisons WHERE id=$1 FOR UPDATE',[req.params.comparisonId])).rows[0];
+    authorizePersonal(req.auth,comparison);
+    const evaluation=(await client.query(`SELECT id,comparison_id,status,created_at,owner_person_id AS person_id
+      FROM comparison_evaluations WHERE id=$1 AND comparison_id=$2 FOR UPDATE`,[req.params.evaluationId,comparison.id])).rows[0];
+    authorizePersonal(req.auth,evaluation);
+    if(evaluation.status==='COMPLETED') {
+      await client.query('COMMIT');
+      return res.status(200).json({id:evaluation.id,comparisonId:evaluation.comparison_id,status:evaluation.status,createdAt:evaluation.created_at});
+    }
+    const looks=(await client.query(`SELECT look_id FROM comparison_looks
+      WHERE comparison_id=$1 AND owner_person_id=$2 FOR SHARE`,[comparison.id,req.auth.personId])).rows;
+    if(looks.length<2) throw new HttpError(409,'Comparison exige pelo menos 2 Looks para finalizar');
+    const criteria=(await client.query(`SELECT id FROM comparison_evaluation_criteria
+      WHERE evaluation_id=$1 AND owner_person_id=$2 FOR SHARE`,[evaluation.id,req.auth.personId])).rows;
+    if(!criteria.length) throw new HttpError(409,'Evaluation exige pelo menos 1 Criterion para finalizar');
+    const results=(await client.query(`SELECT r.look_id,r.criterion_id,r.look_version_id,
+      (SELECT v.id FROM look_versions v WHERE v.id=r.look_version_id AND v.look_id=r.look_id AND v.person_id=r.owner_person_id) AS valid_look_version_id
+      FROM comparison_evaluation_results r
+      WHERE r.evaluation_id=$1 AND r.owner_person_id=$2 FOR SHARE`,[evaluation.id,req.auth.personId])).rows;
+    const expected=looks.length*criteria.length;
+    if(results.length!==expected || results.some(result=>!result.valid_look_version_id)) {
+      throw new HttpError(409,'Evaluation exige matriz completa de Results com LookVersions válidas');
+    }
+    const completed=(await client.query(`UPDATE comparison_evaluations SET status='COMPLETED'
+      WHERE id=$1 AND owner_person_id=$2 AND status='DRAFT'
+      RETURNING id,comparison_id,status,created_at`,[evaluation.id,req.auth.personId])).rows[0];
+    if(!completed) throw new HttpError(409,'Evaluation não pode ser finalizada neste estado');
+    await client.query('COMMIT');
+    res.status(200).json({id:completed.id,comparisonId:completed.comparison_id,status:completed.status,createdAt:completed.created_at});
+  } catch(error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
 }
 
 const linkSchema=Joi.object({position:Joi.number().integer().min(0).required()});
