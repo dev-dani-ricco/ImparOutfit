@@ -421,6 +421,53 @@ test('POST /comparisons/:comparisonId/evaluations/:evaluationId/results records 
   assert.deepEqual((await db.query('SELECT criterion_key,position FROM comparison_evaluation_criteria WHERE id=$1',[criterion.id])).rows[0],original.criterion);
   assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0].count,1);
 });
+test('GET /comparisons/:comparisonId/evaluations/:evaluationId reads only ordered private versioned data',async()=>{
+  const first=await createVersionedLookFixture(A);
+  const second=await createVersionedLookFixture(A);
+  const comparison=(await auth('post','/comparisons',A).send({name:'Readable evaluation'}).expect(201)).body;
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+second.lookId,A).send({position:1}).expect(201);
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+first.lookId,A).send({position:0}).expect(201);
+  const evaluation=(await auth('post','/comparisons/'+comparison.id+'/evaluations',A).send({origin:'SYSTEM'}).expect(201)).body;
+  const criterionOne=(await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A)
+    .send({criterionKey:'position_one',criterionLabel:'Position one',position:1}).expect(201)).body;
+  const criterionZero=(await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A)
+    .send({criterionKey:'position_zero',criterionLabel:'Position zero',position:0}).expect(201)).body;
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/results',A)
+    .send({criterionId:criterionOne.id,lookId:second.lookId,lookVersionId:second.version2Id,value:'second'}).expect(201);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/results',A)
+    .send({criterionId:criterionZero.id,lookId:first.lookId,lookVersionId:first.version2Id,value:'first'}).expect(201);
+  const version3=(await auth('post','/looks/'+first.lookId+'/versions',A)
+    .send({title:'Readable evaluation v3',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
+  assert.ok(version3.versionId);
+  const before={
+    evaluation:(await db.query('SELECT status,origin FROM comparison_evaluations WHERE id=$1',[evaluation.id])).rows[0],
+    criteria:(await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_criteria WHERE evaluation_id=$1',[evaluation.id])).rows[0],
+    results:(await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0],
+    comparison:(await db.query('SELECT name FROM comparisons WHERE id=$1',[comparison.id])).rows[0]
+  };
+  const read=(await auth('get','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id,A).expect(200)).body;
+  assert.deepEqual({id:read.id,comparisonId:read.comparisonId,contextId:read.contextId,origin:read.origin,status:read.status},{
+    id:evaluation.id,comparisonId:comparison.id,contextId:null,origin:'SYSTEM',status:'DRAFT'
+  });
+  assert.deepEqual(read.criteria.map(c=>({id:c.id,position:c.position})),[{id:criterionZero.id,position:0},{id:criterionOne.id,position:1}]);
+  assert.deepEqual(read.results.map(r=>({criterionId:r.criterionId,lookId:r.lookId,lookVersionId:r.lookVersionId,value:r.value})),[
+    {criterionId:criterionZero.id,lookId:first.lookId,lookVersionId:first.version2Id,value:'first'},
+    {criterionId:criterionOne.id,lookId:second.lookId,lookVersionId:second.version2Id,value:'second'}
+  ]);
+  assert.equal(read.results.some(r=>r.lookVersionId===version3.versionId),false);
+  const emptyComparison=(await auth('post','/comparisons',A).send({name:'Empty readable evaluation'}).expect(201)).body;
+  const emptyEvaluation=(await auth('post','/comparisons/'+emptyComparison.id+'/evaluations',A).send({origin:'USER'}).expect(201)).body;
+  assert.deepEqual((await auth('get','/comparisons/'+emptyComparison.id+'/evaluations/'+emptyEvaluation.id,A).expect(200)).body.criteria,[]);
+  assert.deepEqual((await auth('get','/comparisons/'+emptyComparison.id+'/evaluations/'+emptyEvaluation.id,A).expect(200)).body.results,[]);
+  await auth('get','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id,B).expect(404);
+  const otherComparison=(await auth('post','/comparisons',A).send({name:'Mismatched readable evaluation'}).expect(201)).body;
+  const otherEvaluation=(await auth('post','/comparisons/'+otherComparison.id+'/evaluations',A).send({origin:'USER'}).expect(201)).body;
+  await auth('get','/comparisons/'+comparison.id+'/evaluations/'+otherEvaluation.id,A).expect(404);
+  assert.deepEqual((await db.query('SELECT status,origin FROM comparison_evaluations WHERE id=$1',[evaluation.id])).rows[0],before.evaluation);
+  assert.deepEqual((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_criteria WHERE evaluation_id=$1',[evaluation.id])).rows[0],before.criteria);
+  assert.deepEqual((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0],before.results);
+  assert.deepEqual((await db.query('SELECT name FROM comparisons WHERE id=$1',[comparison.id])).rows[0],before.comparison);
+});
 test('POST /comparisons/:comparisonId/looks/:lookId preserves explicit positions',async()=>{
   const first=await createVersionedLookFixture(A);
   const second=await createVersionedLookFixture(A);

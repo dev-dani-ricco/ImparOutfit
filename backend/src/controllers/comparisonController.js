@@ -135,6 +135,39 @@ export async function createEvaluationResult(req,res) {
   }
 }
 
+const readCriterionDto=row=>({
+  id:row.id,
+  criterionKey:row.criterion_key,
+  criterionLabel:row.criterion_label,
+  position:row.position,
+  createdAt:row.created_at
+});
+const readResultDto=row=>({
+  criterionId:row.criterion_id,
+  lookId:row.look_id,
+  lookVersionId:row.look_version_id,
+  value:row.value,
+  note:row.note,
+  createdAt:row.created_at
+});
+export async function getEvaluation(req,res) {
+  const comparison=(await query('SELECT id,owner_person_id AS person_id FROM comparisons WHERE id=$1',[req.params.comparisonId])).rows[0];
+  authorizePersonal(req.auth,comparison);
+  const evaluation=(await query(`SELECT id,comparison_id,context_id,origin,status,created_at,owner_person_id AS person_id
+    FROM comparison_evaluations WHERE id=$1 AND comparison_id=$2`,[req.params.evaluationId,comparison.id])).rows[0];
+  authorizePersonal(req.auth,evaluation);
+  const criteria=(await query(`SELECT id,criterion_key,criterion_label,position,created_at
+    FROM comparison_evaluation_criteria WHERE evaluation_id=$1 AND owner_person_id=$2
+    ORDER BY position ASC,created_at ASC,id ASC`,[evaluation.id,req.auth.personId])).rows;
+  const results=(await query(`SELECT r.criterion_id,r.look_id,r.look_version_id,r.value,r.note,r.created_at
+    FROM comparison_evaluation_results r
+    JOIN comparison_evaluation_criteria c ON c.id=r.criterion_id AND c.evaluation_id=r.evaluation_id AND c.owner_person_id=r.owner_person_id
+    JOIN comparison_looks cl ON cl.comparison_id=r.comparison_id AND cl.look_id=r.look_id AND cl.owner_person_id=r.owner_person_id
+    WHERE r.evaluation_id=$1 AND r.owner_person_id=$2
+    ORDER BY c.position ASC,cl.position ASC,r.created_at ASC,r.look_id ASC,r.criterion_id ASC`,[evaluation.id,req.auth.personId])).rows;
+  res.json({...evaluationDto(evaluation),criteria:criteria.map(readCriterionDto),results:results.map(readResultDto)});
+}
+
 const linkSchema=Joi.object({position:Joi.number().integer().min(0).required()});
 const linkDto=row=>({comparisonId:row.comparison_id,lookId:row.look_id,position:row.position,linkedAt:row.created_at});
 export async function linkLook(req,res) {

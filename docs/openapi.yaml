@@ -831,6 +831,56 @@ components:
             createdAt:
               type: string
               format: date-time
+    ComparisonEvaluationDetail:
+      allOf:
+        - $ref: "#/components/schemas/ComparisonEvaluation"
+        - type: object
+          required: [criteria, results]
+          properties:
+            criteria:
+              type: array
+              items:
+                type: object
+                required: [id, criterionKey, position, createdAt]
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  criterionKey:
+                    type: string
+                  criterionLabel:
+                    type: string
+                    nullable: true
+                  position:
+                    type: integer
+                    minimum: 0
+                  createdAt:
+                    type: string
+                    format: date-time
+            results:
+              type: array
+              items:
+                type: object
+                required: [criterionId, lookId, lookVersionId, createdAt]
+                properties:
+                  criterionId:
+                    type: string
+                    format: uuid
+                  lookId:
+                    type: string
+                    format: uuid
+                  lookVersionId:
+                    type: string
+                    format: uuid
+                  value:
+                    type: string
+                    nullable: true
+                  note:
+                    type: string
+                    nullable: true
+                  createdAt:
+                    type: string
+                    format: date-time
     ComparisonLookLinkInput:
       type: object
       required: [position]
@@ -4173,6 +4223,45 @@ paths:
                 $ref: "#/components/schemas/Error"
         "409":
           description: Evaluation fora de DRAFT ou Result duplicado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /comparisons/{comparisonId}/evaluations/{evaluationId}:
+    get:
+      summary: Obter Evaluation privada com Criteria e Results versionados
+      description: Results mantêm o lookVersionId explicitamente registrado, sem substituir pela versão atual do Look.
+      operationId: get__comparisons_comparisonId_evaluations_evaluationId
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: comparisonId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: evaluationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Evaluation privada, com critérios por posição e Results em ordem determinística.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonEvaluationDetail"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Comparison ou Evaluation inexistente, incompatível ou privada de outra pessoa.
           content:
             application/json:
               schema:
