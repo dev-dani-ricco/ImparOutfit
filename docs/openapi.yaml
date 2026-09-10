@@ -562,6 +562,42 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LookItem"
+    LookVariationInput:
+      type: object
+      properties:
+        sourceLookVersionId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+      required:
+        - sourceLookVersionId
+    LookVariationCreated:
+      type: object
+      required:
+        - variationId
+        - sourceLookId
+        - sourceLookVersionId
+        - resultingLookId
+        - resultingLookVersionId
+      properties:
+        variationId:
+          type: string
+          format: uuid
+        sourceLookId:
+          type: string
+          format: uuid
+        sourceLookVersionId:
+          type: string
+          format: uuid
+        resultingLookId:
+          type: string
+          format: uuid
+        resultingLookVersionId:
+          type: string
+          format: uuid
     Profile:
       type: object
       properties:
@@ -3844,6 +3880,51 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/LookInput"
+  /looks/{id}/variations:
+    post:
+      summary: Criar Look independente a partir de uma versão existente
+      description: A versão fonte e o Look do caminho devem pertencer à pessoa autenticada.
+      operationId: post__looks_id_variations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LookVariationInput"
+      responses:
+        "201":
+          description: Variação criada com Look e versão inicial independentes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookVariationCreated"
+        "400":
+          description: Payload inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Look, versão ou recurso privado não encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /stores/{id}/follow:
     post:
       summary: Seguir loja comercial

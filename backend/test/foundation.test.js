@@ -11,13 +11,20 @@ import { join } from 'node:path';
 import { pool } from '../src/config/db.js';
 import { migrate } from '../src/db/migrate.js';
 import { authorizeCapability } from '../src/services/authorizationService.js';
+import { createLookVariation } from '../src/controllers/lookController.js';
 
 process.env.JWT_SECRET=randomBytes(48).toString('hex');
 process.env.MEDIA_ROOT=await mkdtemp(join(tmpdir(),'impar-media-test-'));
+process.env.TRUST_PROXY_HOPS='1';
 const {createApp}=await import('../src/app.js');
 let db,app,A,B,storeA,storeB,marketing,product,owned,look,reviewer,institution;
 const password='synthetic-password-2026';
-const auth=(method,path,user)=>request(app)[method]('/api'+path).auth(user.token,{type:'bearer'});
+let authRequestNumber=1;
+const auth=(method,path,user)=>{
+  const requestNumber=authRequestNumber++;
+  const testIp=`198.18.${Math.floor(requestNumber/254)}.${requestNumber%254||1}`;
+  return request(app)[method]('/api'+path).auth(user.token,{type:'bearer'}).set('X-Forwarded-For',testIp);
+};
 async function register(label,store=false) {
   const b={name:label,email:label+'@example.com',password,...(store?{profileType:'STORE',store:{storeName:label}}:{})};
   const r=await request(app).post('/api/auth/register').send(b).expect(201);
@@ -29,6 +36,33 @@ async function register(label,store=false) {
     r.body.user=(await auth('get','/auth/me',r.body)).body;
   }
   return r.body;
+}
+async function createVersionedLookFixture(user=A) {
+  if(!owned) owned=(await auth('post','/wardrobe/items',user).send({name:'Fixture owned shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+  if(!product) product=(await auth('post','/stores/items',storeA).send({name:'Fixture commercial shirt',category:'tops'}).expect(201)).body;
+  const version1Items=[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}];
+  const created=(await auth('post','/looks',user).send({title:'Versioned fixture look',items:version1Items}).expect(201)).body;
+  const version2Items=[
+    {kind:'OWNED_ITEM',wardrobeItemId:owned.id},
+    {kind:'COMMERCIAL_PREVIEW',productId:product.id}
+  ];
+  const version2=(await auth('post','/looks/'+created.id+'/versions',user)
+    .send({title:'Versioned fixture look',items:version2Items}).expect(201)).body;
+  const current=(await auth('get','/looks/'+created.id,user).expect(200)).body;
+  const currentVersionId=(await db.query('SELECT current_version_id FROM looks WHERE id=$1',[created.id])).rows[0].current_version_id;
+  assert.equal(currentVersionId,version2.versionId);
+  assert.equal(current.versions.length,2);
+  assert.ok(current.versions.some(version=>version.id===created.versionId));
+  assert.ok(current.versions.some(version=>version.id===version2.versionId));
+  return {
+    personId:user.user.person_id,
+    lookId:created.id,
+    version1Id:created.versionId,
+    version2Id:version2.versionId,
+    currentVersionId,
+    version1Items,
+    version2Items
+  };
 }
 before(async()=>{
   db=new PGlite({extensions:{pgcrypto}});
@@ -128,6 +162,124 @@ test('E/F: save/preview does not create ownership or use wardrobe capacity; mixe
   const v=(await auth('post','/looks/'+look.id+'/versions',A).send({title:'Version 2',items:[{kind:'COMMERCIAL_PREVIEW',productId:product.id}]}).expect(201)).body;
   assert.equal(v.version,2);
   assert.equal((await auth('get','/looks/'+look.id,A).expect(200)).body.versions.length,2);
+});
+test('createLookVariation copies the current source snapshot into an independent Look',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const result=await createLookVariation({
+    personId:fixture.personId,
+    sourceLookVersionId:fixture.version2Id,
+    name:'Variação teste'
+  });
+  assert.ok(result.variationId);
+  assert.equal(result.sourceLookId,fixture.lookId);
+  assert.equal(result.sourceLookVersionId,fixture.version2Id);
+  assert.ok(result.resultingLookId);
+  assert.notEqual(result.resultingLookId,fixture.lookId);
+  assert.ok(result.resultingLookVersionId);
+  const variation=(await db.query('SELECT owner_person_id,source_look_id,source_look_version_id,resulting_look_id FROM look_variations WHERE id=$1',[result.variationId])).rows[0];
+  assert.deepEqual(variation,{
+    owner_person_id:fixture.personId,
+    source_look_id:fixture.lookId,
+    source_look_version_id:fixture.version2Id,
+    resulting_look_id:result.resultingLookId
+  });
+  const resultingLook=(await db.query('SELECT person_id,current_version_id FROM looks WHERE id=$1',[result.resultingLookId])).rows[0];
+  assert.equal(resultingLook.person_id,fixture.personId);
+  assert.equal(resultingLook.current_version_id,result.resultingLookVersionId);
+  assert.deepEqual((await db.query('SELECT version FROM look_versions WHERE id=$1',[result.resultingLookVersionId])).rows[0],{version:1});
+  const snapshot=(await db.query(`SELECT kind,wardrobe_item_id AS "wardrobeItemId",product_id AS "productId",position
+    FROM look_items WHERE look_version_id=$1 ORDER BY position`,[result.resultingLookVersionId])).rows;
+  assert.deepEqual(snapshot,fixture.version2Items.map((item,position)=>({
+    kind:item.kind,
+    wardrobeItemId:item.wardrobeItemId??null,
+    productId:item.productId??null,
+    position
+  })));
+  assert.deepEqual((await db.query('SELECT current_version_id FROM looks WHERE id=$1',[fixture.lookId])).rows[0],{current_version_id:fixture.version2Id});
+  assert.deepEqual((await db.query('SELECT id FROM look_versions WHERE id=$1',[fixture.version2Id])).rows[0],{id:fixture.version2Id});
+});
+test('createLookVariation conceals another person source and leaves no partial variation',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const personB=await register('variation-intruder');
+  const countForB=async()=>({
+    looks:(await db.query('SELECT count(*)::int AS count FROM looks WHERE person_id=$1',[personB.user.person_id])).rows[0].count,
+    versions:(await db.query('SELECT count(*)::int AS count FROM look_versions WHERE person_id=$1',[personB.user.person_id])).rows[0].count,
+    items:(await db.query('SELECT count(*)::int AS count FROM look_items WHERE person_id=$1',[personB.user.person_id])).rows[0].count,
+    variations:(await db.query('SELECT count(*)::int AS count FROM look_variations WHERE owner_person_id=$1',[personB.user.person_id])).rows[0].count
+  });
+  const beforeCounts=await countForB();
+  await assert.rejects(
+    ()=>createLookVariation({personId:personB.user.person_id,sourceLookVersionId:fixture.version2Id,name:'Tentativa indevida'}),
+    error=>error.status===404
+  );
+  assert.deepEqual(await countForB(),beforeCounts);
+  assert.deepEqual((await db.query('SELECT current_version_id FROM looks WHERE id=$1',[fixture.lookId])).rows[0],{current_version_id:fixture.version2Id});
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM look_versions WHERE id IN ($1,$2)',[fixture.version1Id,fixture.version2Id])).rows[0].count,2);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM look_items WHERE look_version_id=$1',[fixture.version2Id])).rows[0].count,fixture.version2Items.length);
+});
+test('createLookVariation rolls back every transient write after a controlled late failure',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const countForA=async()=>({
+    looks:(await db.query('SELECT count(*)::int AS count FROM looks WHERE person_id=$1',[fixture.personId])).rows[0].count,
+    versions:(await db.query('SELECT count(*)::int AS count FROM look_versions WHERE person_id=$1',[fixture.personId])).rows[0].count,
+    items:(await db.query('SELECT count(*)::int AS count FROM look_items WHERE person_id=$1',[fixture.personId])).rows[0].count,
+    variations:(await db.query('SELECT count(*)::int AS count FROM look_variations WHERE owner_person_id=$1',[fixture.personId])).rows[0].count
+  });
+  const beforeCounts=await countForA();
+  const sourceSnapshot=(await db.query(`SELECT kind,wardrobe_item_id,product_id,position
+    FROM look_items WHERE look_version_id=$1 ORDER BY position`,[fixture.version2Id])).rows;
+  const originalConnect=pool.connect;
+  let injected=false,releaseCalled=false;
+  pool.connect=async()=>{
+    const client=await originalConnect();
+    return {
+      async query(text,values) {
+        if(!injected && text.includes('INSERT INTO look_variations')) {
+          injected=true;
+          throw new Error('controlled late variation insert failure');
+        }
+        return client.query(text,values);
+      },
+      release() {
+        releaseCalled=true;
+        client.release();
+      }
+    };
+  };
+  try {
+    await assert.rejects(
+      ()=>createLookVariation({personId:fixture.personId,sourceLookVersionId:fixture.version2Id,name:'Falha controlada'}),
+      /controlled late variation insert failure/
+    );
+  } finally {
+    pool.connect=originalConnect;
+  }
+  assert.equal(injected,true);
+  assert.equal(releaseCalled,true);
+  assert.deepEqual(await countForA(),beforeCounts);
+  assert.deepEqual((await db.query('SELECT current_version_id FROM looks WHERE id=$1',[fixture.lookId])).rows[0],{current_version_id:fixture.version2Id});
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM look_versions WHERE id IN ($1,$2)',[fixture.version1Id,fixture.version2Id])).rows[0].count,2);
+  assert.deepEqual((await db.query(`SELECT kind,wardrobe_item_id,product_id,position
+    FROM look_items WHERE look_version_id=$1 ORDER BY position`,[fixture.version2Id])).rows,sourceSnapshot);
+});
+test('POST /looks/:id/variations creates only an authorized variation from its matching Look version',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const created=(await auth('post','/looks/'+fixture.lookId+'/variations',A)
+    .send({sourceLookVersionId:fixture.version2Id,name:'Variação HTTP'}).expect(201)).body;
+  assert.ok(created.variationId);
+  assert.equal(created.sourceLookId,fixture.lookId);
+  assert.equal(created.sourceLookVersionId,fixture.version2Id);
+  assert.ok(created.resultingLookId);
+  assert.notEqual(created.resultingLookId,fixture.lookId);
+  assert.ok(created.resultingLookVersionId);
+  assert.equal((await db.query('SELECT current_version_id FROM looks WHERE id=$1',[created.resultingLookId])).rows[0].current_version_id,created.resultingLookVersionId);
+  const countVariations=(await db.query('SELECT count(*)::int AS count FROM look_variations WHERE owner_person_id=$1',[fixture.personId])).rows[0].count;
+  await auth('post','/looks/'+fixture.lookId+'/variations',B)
+    .send({sourceLookVersionId:fixture.version2Id,name:'Tentativa indevida'}).expect(404);
+  await auth('post','/looks/'+created.resultingLookId+'/variations',A)
+    .send({sourceLookVersionId:fixture.version2Id,name:'Caminho inconsistente'}).expect(404);
+  await auth('post','/looks/'+fixture.lookId+'/variations',A).send({}).expect(400);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM look_variations WHERE owner_person_id=$1',[fixture.personId])).rows[0].count,countVariations);
 });
 test('private profile and media remain authorized; spoofed images fail and public route cannot expose them',async()=>{
   await auth('put','/profile',A).send({age:30,waist:70}).expect(200);

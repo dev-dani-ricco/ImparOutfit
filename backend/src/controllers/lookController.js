@@ -8,6 +8,10 @@ const schema=Joi.object({title:Joi.string().min(1).max(160).required(),items:Joi
   kind:Joi.string().valid('OWNED_ITEM','COMMERCIAL_PREVIEW','SPONSORED_PREVIEW').required(),
   wardrobeItemId:uuid,productId:uuid,
 }).xor('wardrobeItemId','productId')).required()});
+const variationSchema=Joi.object({
+  sourceLookVersionId:uuid.required(),
+  name:Joi.string().trim().min(1).max(160).optional()
+});
 async function version(req,res,existing=false) {
   const b=validate(schema,req.body), client=await pool.connect();
   try {
@@ -39,6 +43,39 @@ async function version(req,res,existing=false) {
 }
 export const create=(req,res)=>version(req,res);
 export const addVersion=(req,res)=>version(req,res,true);
+export async function createLookVariation({personId,sourceLookVersionId,name}={}) {
+  const client=await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const source=(await client.query(`SELECT v.id,v.look_id,v.person_id,v.version,l.user_id,l.title
+      FROM look_versions v JOIN looks l ON l.id=v.look_id WHERE v.id=$1 FOR UPDATE`,[sourceLookVersionId])).rows[0];
+    authorizePersonal({personId},source);
+    const items=(await client.query(`SELECT kind,wardrobe_item_id,product_id,position
+      FROM look_items WHERE look_version_id=$1 ORDER BY position FOR SHARE`,[source.id])).rows;
+    const resulting=(await client.query(`INSERT INTO looks(user_id,person_id,title,is_public,status)
+      VALUES($1,$2,$3,false,'ACTIVE') RETURNING id`,[source.user_id,personId,name||source.title])).rows[0];
+    const resultingVersion=(await client.query(`INSERT INTO look_versions(look_id,person_id,version,created_by_person_id)
+      VALUES($1,$2,1,$2) RETURNING id`,[resulting.id,personId])).rows[0];
+    for(const item of items) await client.query(`INSERT INTO look_items(look_version_id,person_id,kind,wardrobe_item_id,product_id,position)
+      VALUES($1,$2,$3,$4,$5,$6)`,[resultingVersion.id,personId,item.kind,item.wardrobe_item_id,item.product_id,item.position]);
+    await client.query('UPDATE looks SET current_version_id=$2 WHERE id=$1',[resulting.id,resultingVersion.id]);
+    const variation=(await client.query(`INSERT INTO look_variations(owner_person_id,source_look_id,source_look_version_id,resulting_look_id,name)
+      VALUES($1,$2,$3,$4,$5) RETURNING id`,[personId,source.look_id,source.id,resulting.id,name||null])).rows[0];
+    await client.query('COMMIT');
+    return {variationId:variation.id,sourceLookId:source.look_id,sourceLookVersionId:source.id,resultingLookId:resulting.id,resultingLookVersionId:resultingVersion.id};
+  } catch(error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+}
+export async function createVariation(req,res) {
+  const body=validate(variationSchema,req.body);
+  const source=(await query('SELECT id,look_id,person_id FROM look_versions WHERE id=$1',[body.sourceLookVersionId])).rows[0];
+  authorizePersonal(req.auth,source);
+  if(source.look_id!==req.params.id) throw new HttpError(404,'Recurso não encontrado');
+  res.status(201).json(await createLookVariation({
+    personId:req.auth.personId,
+    sourceLookVersionId:body.sourceLookVersionId,
+    name:body.name
+  }));
+}
 export async function list(req,res) {
   res.json((await query('SELECT id,title,created_at FROM looks WHERE person_id=$1 ORDER BY created_at DESC',[req.auth.personId])).rows);
 }
