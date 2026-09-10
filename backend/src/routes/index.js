@@ -70,6 +70,8 @@ r.post('/contexts',requireAuth,wrap(contexts.create));
 r.get('/contexts/:contextId',requireAuth,wrap(contexts.get));
 r.post('/collections',requireAuth,wrap(collections.create));
 r.post('/collections/:collectionId/looks/:lookId',requireAuth,wrap(collections.linkLook));
+r.get('/collections/:collectionId',requireAuth,wrap(collections.get));
+r.get('/collections/:collectionId/looks',requireAuth,wrap(collections.listLooks));
 r.get('/media/:id',requireAuth,wrap(media.readMedia));
 r.post('/media/:id/access',requireAuth,wrap(media.mediaAccess));
 r.get('/looks',requireAuth,wrap(looks.list));

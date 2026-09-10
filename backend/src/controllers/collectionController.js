@@ -27,3 +27,19 @@ export async function linkLook(req,res) {
   if(!link) link=(await query('SELECT collection_id,look_id,created_at FROM collection_looks WHERE collection_id=$1 AND look_id=$2 AND owner_person_id=$3',[collection.id,look.id,req.auth.personId])).rows[0];
   res.status(created?201:200).json({collectionId:link.collection_id,lookId:link.look_id,linkedAt:link.created_at});
 }
+
+export async function get(req,res) {
+  const collection=(await query('SELECT id,owner_person_id AS person_id,name,description,created_at FROM collections WHERE id=$1',[req.params.collectionId])).rows[0];
+  authorizePersonal(req.auth,collection);
+  res.json(toCollection(collection));
+}
+
+export async function listLooks(req,res) {
+  const collection=(await query('SELECT id,owner_person_id AS person_id FROM collections WHERE id=$1',[req.params.collectionId])).rows[0];
+  authorizePersonal(req.auth,collection);
+  const looks=(await query(`SELECT l.id,l.title,l.created_at FROM collection_looks cl
+    JOIN looks l ON l.id=cl.look_id AND l.person_id=cl.owner_person_id
+    WHERE cl.collection_id=$1 AND cl.owner_person_id=$2
+    ORDER BY cl.created_at DESC,l.id DESC`,[collection.id,req.auth.personId])).rows;
+  res.json(looks);
+}

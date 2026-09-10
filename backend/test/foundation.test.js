@@ -258,6 +258,32 @@ test('POST /collections/:collectionId/looks/:lookId links only same-person resou
   assert.equal((await db.query('SELECT count(*)::int AS count FROM look_versions WHERE look_id=$1',[first.lookId])).rows[0].count,2);
   assert.deepEqual((await db.query('SELECT name FROM collections WHERE id=$1',[collectionA.id])).rows[0],{name:'Collection A'});
 });
+test('Collection read endpoints expose only linked private Looks',async()=>{
+  const first=await createVersionedLookFixture(A);
+  const second=await createVersionedLookFixture(A);
+  const unlinked=(await auth('post','/looks',A).send({title:'Unlinked Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
+  const collectionA=(await auth('post','/collections',A).send({name:'Readable Collection',description:'Private collection'}).expect(201)).body;
+  const collectionB=(await auth('post','/collections',A).send({name:'Second Collection'}).expect(201)).body;
+  const empty=(await auth('post','/collections',A).send({name:'Empty Collection'}).expect(201)).body;
+  await auth('post','/collections/'+collectionA.id+'/looks/'+first.lookId,A).send({}).expect(201);
+  await auth('post','/collections/'+collectionA.id+'/looks/'+second.lookId,A).send({}).expect(201);
+  await auth('post','/collections/'+collectionB.id+'/looks/'+first.lookId,A).send({}).expect(201);
+  const byId=(await auth('get','/collections/'+collectionA.id,A).expect(200)).body;
+  assert.deepEqual(byId,{id:collectionA.id,name:'Readable Collection',description:'Private collection',createdAt:byId.createdAt});
+  assert.ok(byId.createdAt);
+  await auth('get','/collections/'+collectionA.id,B).expect(404);
+  const looksA=(await auth('get','/collections/'+collectionA.id+'/looks',A).expect(200)).body;
+  assert.equal(looksA.length,2);
+  assert.deepEqual(new Set(looksA.map(lookRow=>lookRow.id)),new Set([first.lookId,second.lookId]));
+  assert.equal(looksA.some(lookRow=>lookRow.id===unlinked.id),false);
+  await auth('get','/collections/'+collectionA.id+'/looks',B).expect(404);
+  assert.deepEqual((await auth('get','/collections/'+empty.id+'/looks',A).expect(200)).body,[]);
+  const looksB=(await auth('get','/collections/'+collectionB.id+'/looks',A).expect(200)).body;
+  assert.deepEqual(looksB.map(lookRow=>lookRow.id),[first.lookId]);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM collection_looks WHERE look_id=$1',[first.lookId])).rows[0].count,2);
+  assert.deepEqual((await db.query('SELECT current_version_id FROM looks WHERE id=$1',[first.lookId])).rows[0],{current_version_id:first.version2Id});
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM look_versions WHERE look_id=$1',[first.lookId])).rows[0].count,2);
+});
 test('POST /looks/:lookId/contexts/:contextId links only same-person resources once',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const contextA=(await auth('post','/contexts',A).send({occasion:'Context A'}).expect(201)).body;

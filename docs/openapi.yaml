@@ -3771,6 +3771,73 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /collections/{collectionId}:
+    get:
+      summary: Obter Collection privada
+      operationId: get__collections_collectionId
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: collectionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Collection privada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collection"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Collection inexistente ou privada de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /collections/{collectionId}/looks:
+    get:
+      summary: Listar Looks privados vinculados a uma Collection
+      description: A lista é derivada de collection_looks e ordenada pela criação do vínculo.
+      operationId: get__collections_collectionId_looks
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: collectionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Looks vinculados à Collection.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Look"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Collection inexistente ou privada de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /contexts:
     post:
       summary: Criar Context privado da pessoa autenticada
