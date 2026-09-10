@@ -189,6 +189,25 @@ test('Collection schema organizes Looks without trip fields or cross-person link
   await assert.rejects(()=>db.query('INSERT INTO collection_looks(collection_id,look_id,owner_person_id) VALUES($1,$2,$3)',[collectionB.id,first.lookId,B.user.person_id]));
   await assert.rejects(()=>db.query("INSERT INTO collections(owner_person_id,name) VALUES($1,'   ')",[A.user.person_id]));
 });
+test('Comparison schema keeps ordered same-person Look candidates without a minimum size',async()=>{
+  const first=await createVersionedLookFixture(A);
+  const second=await createVersionedLookFixture(A);
+  const third=(await auth('post','/looks',A).send({title:'Third comparison Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
+  const ownedB=(await auth('post','/wardrobe/items',B).send({name:'B comparison shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+  const lookB=(await auth('post','/looks',B).send({title:'B comparison Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:ownedB.id}]}).expect(201)).body;
+  const comparisonA=(await db.query("INSERT INTO comparisons(owner_person_id,name) VALUES($1,'Synthetic comparison') RETURNING id",[A.user.person_id])).rows[0];
+  const comparisonA2=(await db.query("INSERT INTO comparisons(owner_person_id,name) VALUES($1,'Another comparison') RETURNING id",[A.user.person_id])).rows[0];
+  const empty=(await db.query("INSERT INTO comparisons(owner_person_id) VALUES($1) RETURNING id",[A.user.person_id])).rows[0];
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_looks WHERE comparison_id=$1',[empty.id])).rows[0].count,0);
+  await db.query('INSERT INTO comparison_looks(comparison_id,look_id,owner_person_id,position) VALUES($1,$2,$3,$4)',[comparisonA.id,first.lookId,A.user.person_id,0]);
+  await db.query('INSERT INTO comparison_looks(comparison_id,look_id,owner_person_id,position) VALUES($1,$2,$3,$4)',[comparisonA.id,second.lookId,A.user.person_id,1]);
+  await db.query('INSERT INTO comparison_looks(comparison_id,look_id,owner_person_id,position) VALUES($1,$2,$3,$4)',[comparisonA2.id,first.lookId,A.user.person_id,0]);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_looks WHERE comparison_id=$1',[comparisonA.id])).rows[0].count,2);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_looks WHERE look_id=$1',[first.lookId])).rows[0].count,2);
+  await assert.rejects(()=>db.query('INSERT INTO comparison_looks(comparison_id,look_id,owner_person_id,position) VALUES($1,$2,$3,$4)',[comparisonA.id,first.lookId,A.user.person_id,2]));
+  await assert.rejects(()=>db.query('INSERT INTO comparison_looks(comparison_id,look_id,owner_person_id,position) VALUES($1,$2,$3,$4)',[comparisonA.id,third.id,A.user.person_id,1]));
+  await assert.rejects(()=>db.query('INSERT INTO comparison_looks(comparison_id,look_id,owner_person_id,position) VALUES($1,$2,$3,$4)',[comparisonA.id,lookB.id,A.user.person_id,2]));
+});
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({
     occasion:'Synthetic dinner',startsAt:'2026-09-10T19:30:00.000Z',locationText:'Synthetic location',
