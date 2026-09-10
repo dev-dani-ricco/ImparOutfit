@@ -163,6 +163,17 @@ test('E/F: save/preview does not create ownership or use wardrobe capacity; mixe
   assert.equal(v.version,2);
   assert.equal((await auth('get','/looks/'+look.id,A).expect(200)).body.versions.length,2);
 });
+test('Context schema keeps progressive fields independent and prevents cross-person Look links',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const contextA=(await db.query(`INSERT INTO contexts(owner_person_id,occasion,starts_at,location_text,provenance)
+    VALUES($1,'Synthetic occasion',now(),'Synthetic location','USER_DECLARED') RETURNING id,owner_person_id`,[A.user.person_id])).rows[0];
+  const contextB=(await db.query("INSERT INTO contexts(owner_person_id,provenance) VALUES($1,'EXPERT_VALIDATED') RETURNING id",[B.user.person_id])).rows[0];
+  await db.query('INSERT INTO look_contexts(look_id,context_id,owner_person_id) VALUES($1,$2,$3)',[fixture.lookId,contextA.id,A.user.person_id]);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM look_contexts WHERE look_id=$1 AND context_id=$2',[fixture.lookId,contextA.id])).rows[0].count,1);
+  await assert.rejects(()=>db.query('INSERT INTO look_contexts(look_id,context_id,owner_person_id) VALUES($1,$2,$3)',[fixture.lookId,contextA.id,A.user.person_id]));
+  await assert.rejects(()=>db.query('INSERT INTO look_contexts(look_id,context_id,owner_person_id) VALUES($1,$2,$3)',[fixture.lookId,contextB.id,A.user.person_id]));
+  await assert.rejects(()=>db.query("INSERT INTO contexts(owner_person_id,provenance) VALUES($1,'INVALID')",[A.user.person_id]));
+});
 test('createLookVariation copies the current source snapshot into an independent Look',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const result=await createLookVariation({
