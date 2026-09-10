@@ -216,6 +216,25 @@ test('POST /looks/:lookId/contexts/:contextId links only same-person resources o
   assert.deepEqual((await db.query('SELECT current_version_id FROM looks WHERE id=$1',[fixture.lookId])).rows[0],{current_version_id:fixture.version2Id});
   assert.deepEqual((await db.query('SELECT owner_person_id,occasion FROM contexts WHERE id=$1',[contextA.id])).rows[0],{owner_person_id:A.user.person_id,occasion:'Context A'});
 });
+test('Context read endpoints expose only associated private Contexts in deterministic order',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const context1=(await auth('post','/contexts',A).send({occasion:'Earlier',startsAt:'2026-09-10T09:00:00.000Z'}).expect(201)).body;
+  const context2=(await auth('post','/contexts',A).send({occasion:'Later',startsAt:'2026-09-10T18:00:00.000Z'}).expect(201)).body;
+  const unlinked=(await auth('post','/contexts',A).send({occasion:'Unlinked'}).expect(201)).body;
+  await auth('post','/looks/'+fixture.lookId+'/contexts/'+context1.id,A).send({}).expect(201);
+  await auth('post','/looks/'+fixture.lookId+'/contexts/'+context2.id,A).send({}).expect(201);
+  const byId=(await auth('get','/contexts/'+context1.id,A).expect(200)).body;
+  assert.equal(byId.id,context1.id);
+  assert.equal(byId.occasion,'Earlier');
+  assert.equal(byId.provenance,'USER_DECLARED');
+  await auth('get','/contexts/'+context1.id,B).expect(404);
+  const listed=(await auth('get','/looks/'+fixture.lookId+'/contexts',A).expect(200)).body;
+  assert.deepEqual(listed.map(context=>context.id),[context1.id,context2.id]);
+  assert.equal(listed.some(context=>context.id===unlinked.id),false);
+  await auth('get','/looks/'+fixture.lookId+'/contexts',B).expect(404);
+  const emptyLook=(await auth('post','/looks',A).send({title:'No context fixture',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
+  assert.deepEqual((await auth('get','/looks/'+emptyLook.id+'/contexts',A).expect(200)).body,[]);
+});
 test('createLookVariation copies the current source snapshot into an independent Look',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const result=await createLookVariation({

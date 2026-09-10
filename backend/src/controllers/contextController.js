@@ -50,3 +50,19 @@ export async function linkLook(req,res) {
   if(!link) link=(await query('SELECT look_id,context_id,created_at FROM look_contexts WHERE look_id=$1 AND context_id=$2 AND owner_person_id=$3',[look.id,context.id,req.auth.personId])).rows[0];
   res.status(created?201:200).json({lookId:link.look_id,contextId:link.context_id,linkedAt:link.created_at});
 }
+
+export async function get(req,res) {
+  const context=(await query('SELECT *,owner_person_id AS person_id FROM contexts WHERE id=$1',[req.params.contextId])).rows[0];
+  authorizePersonal(req.auth,context);
+  res.json(toContext(context));
+}
+
+export async function listForLook(req,res) {
+  const look=(await query('SELECT id,person_id FROM looks WHERE id=$1',[req.params.lookId])).rows[0];
+  authorizePersonal(req.auth,look);
+  const contexts=(await query(`SELECT c.*,c.owner_person_id AS person_id FROM look_contexts lc
+    JOIN contexts c ON c.id=lc.context_id AND c.owner_person_id=lc.owner_person_id
+    WHERE lc.look_id=$1 AND lc.owner_person_id=$2
+    ORDER BY c.starts_at ASC NULLS LAST,c.created_at DESC,c.id DESC`,[look.id,req.auth.personId])).rows;
+  res.json(contexts.map(toContext));
+}

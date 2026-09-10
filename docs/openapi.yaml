@@ -3689,6 +3689,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /contexts/{contextId}:
+    get:
+      summary: Obter Context privado
+      operationId: get__contexts_contextId
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: contextId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Context privado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonalContext"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Context inexistente ou privado de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /looks:
     get:
       summary: Listar Looks privados
@@ -3956,6 +3988,41 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Look ou Context inexistente ou privado de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /looks/{lookId}/contexts:
+    get:
+      summary: Listar Contexts privados vinculados a um Look
+      description: A lista é derivada de look_contexts e ordenada por startsAt, depois criação e id.
+      operationId: get__looks_lookId_contexts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: lookId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Contexts vinculados ao Look.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PersonalContext"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Look inexistente ou privado de outra pessoa.
           content:
             application/json:
               schema:
