@@ -1,6 +1,7 @@
-# UNIVERSO ÍMPAR — arquitetura da fundação
+# UNIVERSO ÍMPAR — arquitetura da fundação e CICLO 2
 
-CICLO 1. Estado implementado no monólito Express/PostgreSQL, sem reconstrução ampla do 3D.
+CICLO 1 estabeleceu a fundação; o CICLO 2 acrescenta uma POC de reconstrução multivista local,
+privada e rastreável. Ela não é ainda um serviço de produção nem uma garantia de fitting.
 Fontes: requisitos explícitos do ciclo e auditorias do CICLO 0. Originais da Especificação
 Executiva/Prompt Mestre não estavam disponíveis no checkout; não se presume sua leitura.
 
@@ -71,8 +72,11 @@ não são sincronizados à API. `demoMode=false` apresenta uma superfície real 
 integração completa das telas continua pendente, sem mutações locais apresentadas como reais.
 
 3D: renderer genérico native preexistente preservado como experimento. Foto animada é prévia
-visual, não modelo validado. Nenhuma reconstrução corporal, malha de roupa, fitting ou compra
-foi implementada. O próximo marco é a POC vertical real com pipeline e estados verificáveis.
+visual, não modelo validado. O CICLO 2 acrescenta captura multivista autenticada, jobs de
+reconstrução, worker CPU local, GLB privado, quality gate e composição proporcional com avatar
+de referência. Não há reconstrução corporal, fitting, física de tecido ou compra. Veja a
+[arquitetura 3D](3d/architecture.md), o [estado auditado](3d/current-state.md) e o
+[caminho de produção](3d/production-path.md).
 
 Persistência e deploy: migrations versionadas, checksum normalizado LF, transação/advisory lock,
 adoção explícita do schema legado e rollback de índices quando seguro. Compose deixa de montar

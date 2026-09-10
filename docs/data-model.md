@@ -40,6 +40,12 @@ erDiagram
   Showcase ||--o{ ShowcaseProduct : contains
   Product ||--o{ ShowcaseProduct : same_store
   Person ||--o{ LegacyItemReview : reviews
+  Person ||--o{ ReconstructionJob : owns
+  WardrobeItem o|--o{ ReconstructionJob : reconstructs
+  Product o|--o{ ReconstructionJob : reconstructs_preview
+  ReconstructionJob ||--|{ ReconstructionInput : receives
+  MediaAsset ||--o{ ReconstructionInput : captured_as
+  ReconstructionJob ||--o{ ReconstructionOutput : produces
 
   Person { uuid id PK string display_name timestamp created_at timestamp updated_at }
   Identifier { uuid id PK uuid person_id FK string kind string value UK timestamp verified_at }
@@ -58,6 +64,9 @@ erDiagram
   LookVersion { uuid id PK uuid look_id FK uuid person_id FK int version }
   LookItem { uuid id PK uuid look_version_id FK uuid person_id FK string kind uuid wardrobe_item_id FK uuid product_id FK int position }
   MediaAsset { uuid id PK uuid person_id FK uuid organization_id FK string purpose string storage_key UK string mime int bytes string sha256 string status }
+  ReconstructionJob { uuid id PK uuid person_id FK uuid wardrobe_item_id FK uuid product_id FK string state string pipeline_version string technique int input_revision jsonb metrics jsonb quality jsonb placement }
+  ReconstructionInput { uuid job_id FK uuid person_id FK uuid media_id FK int azimuth string elevation }
+  ReconstructionOutput { uuid id PK uuid job_id FK uuid person_id FK string storage_key UK string mime string sha256 string lifecycle jsonb metadata }
 ```
 
 Invariantes: Person+Organization única por membership; Identifier(kind,value) único; e-mail
@@ -72,3 +81,9 @@ de identidades por e-mail ou telefone. `verified_at` nasce vazio: cadastro não 
 `owner_user_id`, `profile_type`, items/item_saves e arrays legados permanecem compatibilidade/
 histórico; os endpoints novos não usam esses campos como autoridade nem prova de posse.
 Looks legados ficam privados, preservados sem reinterpretar arrays antigos como ownership válido.
+
+Reconstrução exige exatamente um item pessoal ou produto comercial e preserva a pessoa no job,
+input e output. Trigger de banco impede mídia de outra pessoa, mídia fora do contexto comercial e
+mídia não READY. A saída é GLB derivado privado; seu lifecycle e checksum são metadados de banco,
+enquanto o binário permanece no storage privado. READY é estado posterior ao quality gate, não ao
+upload nem à execução do worker.

@@ -28,7 +28,7 @@ Não reaplique SQL manualmente. Swagger: http://localhost:4000/api-docs.
 Mídia fica em MEDIA_ROOT privado; a leitura pessoal exige Bearer token.
 
 Principais contratos: /api/auth/me, /api/wardrobe/items, /api/products, /api/commercial-saves,
-/api/looks, /api/profile e /api/stores/{storeId}/memberships.
+/api/looks, /api/profile, /api/stores/{storeId}/memberships e /api/reconstruction/jobs.
 O endpoint copy-to-wardrobe retorna 410; use POST /api/products/{id}/save.
 Catalogação exige ownershipSource e ownershipAttested; só REAL_CAPTURE e MANUAL_CATALOG
 estão expostos, sem integração de compra.
@@ -45,12 +45,18 @@ npm start
 demoMode=true em app.json abre a Showcase fictícia, independente da API. Estado por pessoa,
 sem reaproveitar a antiga chave global. Veja o [roteiro](docs/presentation-guide.md).
 demoMode=false exige apiUrl correto e apresenta leitura real de perfil, armário, saves,
-Looks e contexto comercial. Integração completa das telas está pendente.
+Looks, contexto comercial e a captura experimental de uma peça para reconstrução. A captura
+e a saída GLB são privadas por pessoa; o frontend só permite composição após inspeção e
+quality gate. Veja o [estado 3D](docs/3d/current-state.md) e a
+[decisão técnica](docs/adr/002-local-reconstruction.md).
 
 Bundles locais: `npx expo export --platform android --output-dir .expo-demo-check/android`
 e `npx expo export --platform web --output-dir .expo-demo-check/web`.
 Android export não é APK/AAB assinado nem validação em dispositivo.
-A renderização do avatar genérico é um experimento; não há reconstrução pessoal/fitting 3D.
+A renderização do avatar genérico e a reconstrução local por CPU são experimentais: não há
+fitting, simulação de tecido, escala automática ou alegação de precisão física. O worker é
+executado explicitamente com `npm run reconstruction:worker` e requer o ambiente Python
+isolado descrito em `tools/reconstruction/requirements.txt`.
 
 ## Infraestrutura
 
