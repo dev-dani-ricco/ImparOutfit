@@ -14,14 +14,16 @@ export default function ApiFoundationScreen() {
     let cancelled=false;
     setData(null);setError('');
     const requests=activeContext==='personal'
-      ? ['/profile','/wardrobe/items','/commercial-saves','/looks'].map(path=>api(path,{token}))
+      ? ['/profile','/wardrobe/items','/commercial-saves','/looks','/reconstruction/jobs'].map(path=>api(path,{token}))
       : [api('/stores/me',{token,headers:{'X-Organization-Id':activeContext}})];
     Promise.all(requests).then(result=>{if(!cancelled)setData(result);}).catch(()=>{if(!cancelled)setError('Não foi possível carregar este contexto.');});
     return ()=>{cancelled=true;};
   },[token,activeContext]);
   if(reconstruction)return <ReconstructionScreen onClose={()=>setReconstruction(false)}/>;
   return <ScrollView contentContainerStyle={{padding:24,gap:18,backgroundColor:colors.bg,flexGrow:1}}>
-    <Pressable onPress={()=>setReconstruction(true)}><Text style={{color:colors.accent}}>CAPTURAR PEÇA REAL • POC 3D</Text></Pressable>
+    <Text style={{fontSize:18,color:colors.text}}>Golden Path • preparação</Text>
+    {['Experimentar','Criar meu avatar (experimental)','Adicionar minha primeira peça','Captura e processamento','Armário e Look','Visualizar e comparar','Dani Digital: próximo estágio'].map((step,index)=><Text key={step} style={{color:index===3?colors.accent:colors.muted}}>{index+1}. {step}</Text>)}
+    <Pressable onPress={()=>setReconstruction(true)}><Text style={{color:colors.accent}}>CONTINUAR CAPTURA / PROCESSAMENTO 3D</Text></Pressable>
     <Text style={{fontSize:28,color:colors.text}}>UNIVERSO ÍMPAR</Text>
     <Text style={{color:colors.text}}>{user?.name}</Text>
     <Pressable onPress={()=>switchContext('personal')}><Text style={{color:colors.accent}}>Meu contexto pessoal</Text></Pressable>
@@ -32,7 +34,9 @@ export default function ApiFoundationScreen() {
       <Text style={{color:colors.text}}>Referências comerciais • {data[2].length}</Text>
       {data[2].map(item=><Text key={item.id} style={{color:colors.text}}>{item.name} • {item.kind}</Text>)}
       <Text style={{color:colors.text}}>Looks privados • {data[3].length}</Text>
-      <Text style={{color:colors.muted}}>Os demais fluxos visuais estão em integração. A demonstração usa identidades fictícias separadas.</Text>
+      <Text style={{color:colors.text}}>Capturas e reconstruções • {data[4].length}</Text>
+      {data[4].map(job=><Pressable key={job.id} onPress={()=>setReconstruction(true)}><Text style={{color:colors.accent}}>{job.category} • {job.state} • retomar</Text></Pressable>)}
+      <Text style={{color:colors.muted}}>A captura pode ser retomada depois. PROCESSING depende do worker local; NEEDS_MORE_INPUT indica apenas as vistas pendentes. Nenhum estado afirma READY antes do quality gate.</Text>
     </> : <View><Text style={{color:colors.text}}>{data[0].store_name} • {data[0].pieces} produtos</Text></View>}
     <Pressable onPress={logout}><Text style={{color:colors.accent}}>Sair</Text></Pressable>
   </ScrollView>;

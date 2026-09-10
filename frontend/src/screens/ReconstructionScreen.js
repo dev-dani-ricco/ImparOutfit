@@ -6,6 +6,12 @@ import {api} from '../api/client';
 import {captureSteps} from '../reconstruction/composition.mjs';
 import CompositionView from '../reconstruction/CompositionView';
 const names={TOP:'Camiseta/top',PANTS:'Calça',DRESS:'Vestido',FOOTWEAR:'Calçado',BAG:'Bolsa',ACCESSORY:'Acessório pequeno'};
+const stateInfo={
+ CAPTURED:['Captura iniciada.','Adicione a próxima vista guiada.'],VALIDATING:['Validando cobertura e integridade.','Aguarde a validação.'],
+ QUEUED:['Na fila de processamento local.','Você pode fechar o app e retornar depois.'],PROCESSING:['Reconstruindo no worker local.','Você pode fechar o app e acompanhar o estado depois.'],
+ QUALITY_CHECK:['Asset derivado aguardando inspeção.','Confira completude, cor, categoria e dimensão real.'],READY:['Asset validado para composição experimental.','Visualize, gire, aplique zoom ou compare.'],
+ NEEDS_MORE_INPUT:['A captura ainda não é suficiente.','Adicione somente as posições e medidas indicadas abaixo.'],FAILED:['O processamento falhou sem produzir READY.','Leia o motivo e envie apenas a recaptura necessária.']
+};
 export default function ReconstructionScreen({onClose}){
  const {token}=useAuth();
  const [protocol,setProtocol]=useState(null),[jobs,setJobs]=useState([]),[job,setJob]=useState(null),[items,setItems]=useState([]);
@@ -78,9 +84,11 @@ export default function ReconstructionScreen({onClose}){
   {jobs.map(j=>button(names[j.category]+' • '+j.state+' • '+j.id.slice(0,6),()=>selectJob(j)))}
   {job&&<>
    <Text style={{fontSize:20}}>{names[job.category]} • {job.state}</Text>
+   <Text>{stateInfo[job.state]?.[0]}</Text><Text>{stateInfo[job.state]?.[1]}</Text>
    {job.capture_metadata?.source==='SYNTHETIC_CONTROL'&&<Text>CONTROLE SINTÉTICO DO RENDERER — não comprova captura ou reconstrução física.</Text>}
    <Text>Job {job.id} • fotos {job.inputs?.length||0}</Text>
    {(job.guidance||[]).map((g,i)=><Text key={i}>{typeof g==='string'?g:g.message}</Text>)}
+   {(job.captureSession?.validation?.missingPositions||[]).map((v,i)=><Text key={'missing-'+i}>Recapturar: {v.azimuth}° • {v.elevation}</Text>)}
    {job.error_code&&<Text>Motivo: {job.error_code}</Text>}
    {canCapture&&<>
     <Text>Próxima vista: {captureSteps[step].azimuth}° • altura {captureSteps[step].elevation}. Preferência: 36 fotos em três voltas.</Text>
