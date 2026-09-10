@@ -371,6 +371,56 @@ test('POST /comparisons/:comparisonId/evaluations/:evaluationId/criteria adds on
   assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_criteria WHERE evaluation_id=$1',[evaluation.id])).rows[0].count,1);
   assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0].count,0);
 });
+test('POST /comparisons/:comparisonId/evaluations/:evaluationId/results records only explicit linked LookVersions',async()=>{
+  const first=await createVersionedLookFixture(A);
+  const second=await createVersionedLookFixture(A);
+  const comparison=(await auth('post','/comparisons',A).send({name:'Result comparison'}).expect(201)).body;
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+first.lookId,A).send({position:0}).expect(201);
+  await auth('post','/comparisons/'+comparison.id+'/looks/'+second.lookId,A).send({position:1}).expect(201);
+  const evaluation=(await auth('post','/comparisons/'+comparison.id+'/evaluations',A).send({origin:'USER'}).expect(201)).body;
+  const criterion=(await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A)
+    .send({criterionKey:'declared_result',position:0}).expect(201)).body;
+  const result=(await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/results',A)
+    .send({criterionId:criterion.id,lookId:first.lookId,lookVersionId:first.version2Id,value:'  declared value  ',note:'  declared note  '}).expect(201)).body;
+  assert.deepEqual({evaluationId:result.evaluationId,criterionId:result.criterionId,lookId:result.lookId,lookVersionId:result.lookVersionId,value:result.value,note:result.note},{
+    evaluationId:evaluation.id,criterionId:criterion.id,lookId:first.lookId,lookVersionId:first.version2Id,value:'declared value',note:'declared note'
+  });
+  const persisted=(await db.query(`SELECT evaluation_id,criterion_id,look_id,look_version_id,value,note FROM comparison_evaluation_results
+    WHERE evaluation_id=$1 AND look_id=$2 AND criterion_id=$3`,[evaluation.id,first.lookId,criterion.id])).rows[0];
+  assert.deepEqual(persisted,{evaluation_id:evaluation.id,criterion_id:criterion.id,look_id:first.lookId,look_version_id:first.version2Id,value:'declared value',note:'declared note'});
+  const original={
+    comparison:(await db.query('SELECT name FROM comparisons WHERE id=$1',[comparison.id])).rows[0],
+    criterion:(await db.query('SELECT criterion_key,position FROM comparison_evaluation_criteria WHERE id=$1',[criterion.id])).rows[0],
+    currentVersion:(await db.query('SELECT current_version_id FROM looks WHERE id=$1',[first.lookId])).rows[0]
+  };
+  const version3=(await auth('post','/looks/'+first.lookId+'/versions',A).send({title:'Result look v3',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
+  assert.ok(version3.versionId);
+  assert.deepEqual((await db.query('SELECT look_version_id FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0],{look_version_id:first.version2Id});
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/results',A)
+    .send({criterionId:criterion.id,lookId:first.lookId,lookVersionId:second.version2Id}).expect(404);
+  const unlinked=(await auth('post','/looks',A).send({title:'Unlinked result Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/results',A)
+    .send({criterionId:criterion.id,lookId:unlinked.id,lookVersionId:unlinked.versionId}).expect(404);
+  const ownedB=(await auth('post','/wardrobe/items',B).send({name:'B result shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+  const lookB=(await auth('post','/looks',B).send({title:'B result Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:ownedB.id}]}).expect(201)).body;
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/results',A)
+    .send({criterionId:criterion.id,lookId:lookB.id,lookVersionId:lookB.versionId}).expect(404);
+  const otherEvaluation=(await auth('post','/comparisons/'+comparison.id+'/evaluations',A).send({origin:'SYSTEM'}).expect(201)).body;
+  const otherCriterion=(await auth('post','/comparisons/'+comparison.id+'/evaluations/'+otherEvaluation.id+'/criteria',A)
+    .send({criterionKey:'other_evaluation_criterion',position:0}).expect(201)).body;
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/results',A)
+    .send({criterionId:otherCriterion.id,lookId:second.lookId,lookVersionId:second.version2Id}).expect(404);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/results',A)
+    .send({criterionId:criterion.id,lookId:first.lookId,lookVersionId:first.version2Id}).expect(409);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/results',A)
+    .send({criterionId:criterion.id,lookId:second.lookId,lookVersionId:second.version2Id,owner_person_id:B.user.person_id}).expect(400);
+  await db.query("UPDATE comparison_evaluations SET status='COMPLETED' WHERE id=$1",[evaluation.id]);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/results',A)
+    .send({criterionId:criterion.id,lookId:second.lookId,lookVersionId:second.version2Id}).expect(409);
+  assert.deepEqual((await db.query('SELECT name FROM comparisons WHERE id=$1',[comparison.id])).rows[0],original.comparison);
+  assert.deepEqual((await db.query('SELECT criterion_key,position FROM comparison_evaluation_criteria WHERE id=$1',[criterion.id])).rows[0],original.criterion);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0].count,1);
+});
 test('POST /comparisons/:comparisonId/looks/:lookId preserves explicit positions',async()=>{
   const first=await createVersionedLookFixture(A);
   const second=await createVersionedLookFixture(A);

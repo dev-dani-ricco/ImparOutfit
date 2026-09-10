@@ -798,6 +798,39 @@ components:
             createdAt:
               type: string
               format: date-time
+    ComparisonEvaluationResultInput:
+      type: object
+      required: [criterionId, lookId, lookVersionId]
+      properties:
+        criterionId:
+          type: string
+          format: uuid
+        lookId:
+          type: string
+          format: uuid
+        lookVersionId:
+          type: string
+          format: uuid
+        value:
+          type: string
+          maxLength: 500
+          nullable: true
+        note:
+          type: string
+          maxLength: 5000
+          nullable: true
+    ComparisonEvaluationResult:
+      allOf:
+        - $ref: "#/components/schemas/ComparisonEvaluationResultInput"
+        - type: object
+          required: [evaluationId, createdAt]
+          properties:
+            evaluationId:
+              type: string
+              format: uuid
+            createdAt:
+              type: string
+              format: date-time
     ComparisonLookLinkInput:
       type: object
       required: [position]
@@ -4083,6 +4116,63 @@ paths:
                 $ref: "#/components/schemas/Error"
         "409":
           description: Evaluation fora de DRAFT, criterionKey duplicada ou posição ocupada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /comparisons/{comparisonId}/evaluations/{evaluationId}/results:
+    post:
+      summary: Registrar Result declarado para LookVersion explícita
+      description: Requer Look vinculado à Comparison e LookVersion pertencente ao Look; não calcula score, ranking ou vencedor.
+      operationId: post__comparisons_comparisonId_evaluations_evaluationId_results
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: comparisonId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: evaluationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComparisonEvaluationResultInput"
+      responses:
+        "201":
+          description: Result privado criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonEvaluationResult"
+        "400":
+          description: Dados inválidos ou campos não aceitos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Comparison, Evaluation, Criterion, Look ou LookVersion inexistente, incompatível ou privado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Evaluation fora de DRAFT ou Result duplicado.
           content:
             application/json:
               schema:

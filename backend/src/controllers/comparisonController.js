@@ -80,6 +80,61 @@ export async function createEvaluationCriterion(req,res) {
   }
 }
 
+const resultSchema=Joi.object({
+  criterionId:uuid.required(),
+  lookId:uuid.required(),
+  lookVersionId:uuid.required(),
+  value:Joi.string().trim().max(500).allow('',null),
+  note:Joi.string().trim().max(5000).allow('',null)
+});
+const resultDto=row=>({
+  evaluationId:row.evaluation_id,
+  criterionId:row.criterion_id,
+  lookId:row.look_id,
+  lookVersionId:row.look_version_id,
+  value:row.value,
+  note:row.note,
+  createdAt:row.created_at
+});
+export async function createEvaluationResult(req,res) {
+  const body=validate(resultSchema,req.body||{});
+  const comparison=(await query('SELECT id,owner_person_id AS person_id FROM comparisons WHERE id=$1',[req.params.comparisonId])).rows[0];
+  authorizePersonal(req.auth,comparison);
+  const evaluation=(await query(`SELECT id,comparison_id,owner_person_id AS person_id,status FROM comparison_evaluations
+    WHERE id=$1 AND comparison_id=$2`,[req.params.evaluationId,comparison.id])).rows[0];
+  authorizePersonal(req.auth,evaluation);
+  if(evaluation.status!=='DRAFT') throw new HttpError(409,'Evaluation não aceita Results fora de DRAFT');
+  const criterion=(await query(`SELECT id,evaluation_id,owner_person_id AS person_id FROM comparison_evaluation_criteria
+    WHERE id=$1 AND evaluation_id=$2`,[body.criterionId,evaluation.id])).rows[0];
+  authorizePersonal(req.auth,criterion);
+  const look=(await query('SELECT id,person_id FROM looks WHERE id=$1',[body.lookId])).rows[0];
+  authorizePersonal(req.auth,look);
+  if(!(await query(`SELECT look_id FROM comparison_looks
+    WHERE comparison_id=$1 AND look_id=$2 AND owner_person_id=$3`,[comparison.id,look.id,req.auth.personId])).rows[0]) {
+    throw new HttpError(404,'Look não pertence a esta Comparison');
+  }
+  const lookVersion=(await query('SELECT id,look_id,person_id FROM look_versions WHERE id=$1',[body.lookVersionId])).rows[0];
+  authorizePersonal(req.auth,lookVersion);
+  if(lookVersion.look_id!==look.id) throw new HttpError(404,'LookVersion não pertence a este Look');
+  if((await query(`SELECT evaluation_id FROM comparison_evaluation_results
+    WHERE evaluation_id=$1 AND look_id=$2 AND criterion_id=$3`,[evaluation.id,look.id,criterion.id])).rows[0]) {
+    throw new HttpError(409,'Result já existe para este Look e Criterion');
+  }
+  try {
+    const result=(await query(`INSERT INTO comparison_evaluation_results(
+      evaluation_id,comparison_id,look_id,look_version_id,criterion_id,owner_person_id,value,note
+    ) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+    RETURNING evaluation_id,criterion_id,look_id,look_version_id,value,note,created_at`,[
+      evaluation.id,comparison.id,look.id,lookVersion.id,criterion.id,req.auth.personId,
+      body.value??null,body.note??null
+    ])).rows[0];
+    res.status(201).json(resultDto(result));
+  } catch(error) {
+    if(error.code==='23505') throw new HttpError(409,'Result já existe ou referências são incompatíveis');
+    throw error;
+  }
+}
+
 const linkSchema=Joi.object({position:Joi.number().integer().min(0).required()});
 const linkDto=row=>({comparisonId:row.comparison_id,lookId:row.look_id,position:row.position,linkedAt:row.created_at});
 export async function linkLook(req,res) {
