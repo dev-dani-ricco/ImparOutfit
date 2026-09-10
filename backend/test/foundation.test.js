@@ -230,6 +230,34 @@ test('POST /collections creates generic private Collections without owner inject
   assert.equal((await db.query('SELECT count(*)::int AS count FROM collections WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count,countBeforeInvalid);
   assert.equal((await db.query('SELECT count(*)::int AS count FROM collections WHERE owner_person_id=$1',[B.user.person_id])).rows[0].count,bCountBeforeInjection);
 });
+test('POST /collections/:collectionId/looks/:lookId links only same-person resources once',async()=>{
+  const first=await createVersionedLookFixture(A);
+  const second=await createVersionedLookFixture(A);
+  const collectionA=(await auth('post','/collections',A).send({name:'Collection A'}).expect(201)).body;
+  const collectionB=(await auth('post','/collections',A).send({name:'Collection B'}).expect(201)).body;
+  const ownedB=(await auth('post','/wardrobe/items',B).send({name:'B owned shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+  const lookB=(await auth('post','/looks',B).send({title:'B Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:ownedB.id}]}).expect(201)).body;
+  const linked=(await auth('post','/collections/'+collectionA.id+'/looks/'+first.lookId,A).send({}).expect(201)).body;
+  assert.equal(linked.collectionId,collectionA.id);
+  assert.equal(linked.lookId,first.lookId);
+  assert.ok(linked.linkedAt);
+  assert.deepEqual((await db.query('SELECT collection_id,look_id,owner_person_id FROM collection_looks WHERE collection_id=$1 AND look_id=$2',[collectionA.id,first.lookId])).rows[0],{
+    collection_id:collectionA.id,look_id:first.lookId,owner_person_id:A.user.person_id
+  });
+  assert.deepEqual((await auth('post','/collections/'+collectionA.id+'/looks/'+first.lookId,A).send({}).expect(200)).body,linked);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM collection_looks WHERE collection_id=$1 AND look_id=$2',[collectionA.id,first.lookId])).rows[0].count,1);
+  await auth('post','/collections/'+collectionA.id+'/looks/'+second.lookId,A).send({}).expect(201);
+  await auth('post','/collections/'+collectionB.id+'/looks/'+first.lookId,A).send({}).expect(201);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM collection_looks WHERE collection_id=$1',[collectionA.id])).rows[0].count,2);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM collection_looks WHERE look_id=$1',[first.lookId])).rows[0].count,2);
+  await auth('post','/collections/'+collectionA.id+'/looks/'+lookB.id,B).send({}).expect(404);
+  await auth('post','/collections/'+collectionA.id+'/looks/'+lookB.id,A).send({}).expect(404);
+  await auth('post','/collections/00000000-0000-4000-8000-000000000003/looks/'+first.lookId,A).send({}).expect(404);
+  await auth('post','/collections/'+collectionA.id+'/looks/00000000-0000-4000-8000-000000000004',A).send({}).expect(404);
+  assert.deepEqual((await db.query('SELECT current_version_id FROM looks WHERE id=$1',[first.lookId])).rows[0],{current_version_id:first.version2Id});
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM look_versions WHERE look_id=$1',[first.lookId])).rows[0].count,2);
+  assert.deepEqual((await db.query('SELECT name FROM collections WHERE id=$1',[collectionA.id])).rows[0],{name:'Collection A'});
+});
 test('POST /looks/:lookId/contexts/:contextId links only same-person resources once',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const contextA=(await auth('post','/contexts',A).send({occasion:'Context A'}).expect(201)).body;

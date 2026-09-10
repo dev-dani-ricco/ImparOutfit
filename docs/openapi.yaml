@@ -708,6 +708,19 @@ components:
             createdAt:
               type: string
               format: date-time
+    CollectionLookLink:
+      type: object
+      required: [collectionId, lookId, linkedAt]
+      properties:
+        collectionId:
+          type: string
+          format: uuid
+        lookId:
+          type: string
+          format: uuid
+        linkedAt:
+          type: string
+          format: date-time
     Profile:
       type: object
       properties:
@@ -3709,6 +3722,51 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /collections/{collectionId}/looks/{lookId}:
+    post:
+      summary: Vincular Look privado a uma Collection privada
+      description: Collection e Look devem pertencer à mesma pessoa autenticada. Repetições retornam o vínculo existente.
+      operationId: post__collections_collectionId_looks_lookId
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: collectionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: lookId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "201":
+          description: Vínculo criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectionLookLink"
+        "200":
+          description: Vínculo já existente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectionLookLink"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Collection ou Look inexistente ou privado de outra pessoa.
           content:
             application/json:
               schema:
