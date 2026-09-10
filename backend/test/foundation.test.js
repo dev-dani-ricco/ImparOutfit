@@ -266,6 +266,33 @@ test('Comparison evaluation results anchor an immutable version of the linked sa
   await assert.rejects(()=>db.query(`INSERT INTO comparison_evaluation_results(evaluation_id,comparison_id,look_id,look_version_id,criterion_id,owner_person_id)
     VALUES($1,$2,$3,$4,$5,$6)`,[evaluation.id,comparison.id,unlinked.id,unlinked.versionId,criterion.id,A.user.person_id]));
 });
+test('ÍMPAR Analysis schema keeps private LookVersion and Context references without methodology content',async()=>{
+  const first=await createVersionedLookFixture(A);
+  const second=await createVersionedLookFixture(A);
+  const ownedB=(await auth('post','/wardrobe/items',B).send({name:'B analysis shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+  const lookB=(await auth('post','/looks',B).send({title:'B analysis Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:ownedB.id}]}).expect(201)).body;
+  const contextA=(await db.query("INSERT INTO contexts(owner_person_id,provenance) VALUES($1,'USER_DECLARED') RETURNING id",[A.user.person_id])).rows[0];
+  const contextB=(await db.query("INSERT INTO contexts(owner_person_id,provenance) VALUES($1,'USER_DECLARED') RETURNING id",[B.user.person_id])).rows[0];
+  const analysis=(await db.query(`INSERT INTO impar_analyses(owner_person_id,look_id,look_version_id,context_id,origin)
+    VALUES($1,$2,$3,$4,'SYSTEM') RETURNING id,look_id,look_version_id,context_id,status,origin,methodology_version_ref`,[
+    A.user.person_id,first.lookId,first.version2Id,contextA.id
+  ])).rows[0];
+  assert.deepEqual(analysis,{id:analysis.id,look_id:first.lookId,look_version_id:first.version2Id,context_id:contextA.id,status:'DRAFT',origin:'SYSTEM',methodology_version_ref:null});
+  await assert.rejects(()=>db.query(`INSERT INTO impar_analyses(owner_person_id,look_id,look_version_id,context_id,origin)
+    VALUES($1,$2,$3,$4,'EXPERT')`,[A.user.person_id,first.lookId,second.version2Id,contextA.id]));
+  await assert.rejects(()=>db.query(`INSERT INTO impar_analyses(owner_person_id,look_id,look_version_id,context_id,origin)
+    VALUES($1,$2,$3,$4,'SYSTEM')`,[A.user.person_id,first.lookId,first.version2Id,contextB.id]));
+  await assert.rejects(()=>db.query(`INSERT INTO impar_analyses(owner_person_id,look_id,look_version_id,context_id,origin)
+    VALUES($1,$2,$3,$4,'SYSTEM')`,[A.user.person_id,lookB.id,lookB.versionId,contextA.id]));
+  await assert.rejects(()=>db.query(`INSERT INTO impar_analyses(owner_person_id,look_id,look_version_id,context_id,origin)
+    VALUES($1,$2,$3,$4,'INVALID')`,[A.user.person_id,first.lookId,first.version2Id,contextA.id]));
+  await assert.rejects(()=>db.query(`INSERT INTO impar_analyses(owner_person_id,look_id,look_version_id,context_id,origin,status)
+    VALUES($1,$2,$3,$4,'SYSTEM','INVALID')`,[A.user.person_id,first.lookId,first.version2Id,contextA.id]));
+  const version3=(await auth('post','/looks/'+first.lookId+'/versions',A)
+    .send({title:'Analysis fixture look v3',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
+  assert.ok(version3.versionId);
+  assert.deepEqual((await db.query('SELECT look_version_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{look_version_id:first.version2Id});
+});
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({
     occasion:'Synthetic dinner',startsAt:'2026-09-10T19:30:00.000Z',locationText:'Synthetic location',
