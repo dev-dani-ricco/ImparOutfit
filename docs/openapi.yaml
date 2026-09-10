@@ -625,6 +625,52 @@ components:
         createdAt:
           type: string
           format: date-time
+    PersonalContextInput:
+      type: object
+      properties:
+        occasion:
+          type: string
+          maxLength: 160
+          nullable: true
+        startsAt:
+          type: string
+          format: date-time
+          nullable: true
+        locationText:
+          type: string
+          maxLength: 500
+          nullable: true
+        climateReference:
+          type: string
+          maxLength: 500
+          nullable: true
+        formality:
+          type: string
+          maxLength: 80
+          nullable: true
+        objective:
+          type: string
+          maxLength: 500
+          nullable: true
+        notes:
+          type: string
+          maxLength: 5000
+          nullable: true
+        provenance:
+          type: string
+          enum: [USER_DECLARED, IMAGE_INFERRED, SYSTEM_ESTIMATED, MERCHANT_DECLARED, EXPERT_VALIDATED]
+    PersonalContext:
+      allOf:
+        - $ref: "#/components/schemas/PersonalContextInput"
+        - type: object
+          required: [id, provenance, createdAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            createdAt:
+              type: string
+              format: date-time
     Profile:
       type: object
       properties:
@@ -3594,6 +3640,38 @@ paths:
           description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
             capacidade/contexto negado; 404: recurso ausente ou privado de outra
             pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /contexts:
+    post:
+      summary: Criar Context privado da pessoa autenticada
+      description: Campos progressivos; a proveniência padrão é USER_DECLARED.
+      operationId: post__contexts
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersonalContextInput"
+      responses:
+        "201":
+          description: Context privado criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonalContext"
+        "400":
+          description: Dados inválidos ou campos não permitidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sessão ausente ou inválida.
           content:
             application/json:
               schema:

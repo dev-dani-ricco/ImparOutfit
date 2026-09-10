@@ -174,6 +174,27 @@ test('Context schema keeps progressive fields independent and prevents cross-per
   await assert.rejects(()=>db.query('INSERT INTO look_contexts(look_id,context_id,owner_person_id) VALUES($1,$2,$3)',[fixture.lookId,contextB.id,A.user.person_id]));
   await assert.rejects(()=>db.query("INSERT INTO contexts(owner_person_id,provenance) VALUES($1,'INVALID')",[A.user.person_id]));
 });
+test('POST /contexts creates only private progressive Context records',async()=>{
+  const full=(await auth('post','/contexts',A).send({
+    occasion:'Synthetic dinner',startsAt:'2026-09-10T19:30:00.000Z',locationText:'Synthetic location',
+    climateReference:'Synthetic climate',formality:'Optional formality',objective:'Synthetic objective',notes:'Synthetic notes',
+    provenance:'EXPERT_VALIDATED'
+  }).expect(201)).body;
+  assert.equal(full.occasion,'Synthetic dinner');
+  assert.equal(full.provenance,'EXPERT_VALIDATED');
+  assert.ok(full.createdAt);
+  const fullRow=(await db.query('SELECT owner_person_id,occasion,provenance FROM contexts WHERE id=$1',[full.id])).rows[0];
+  assert.deepEqual(fullRow,{owner_person_id:A.user.person_id,occasion:'Synthetic dinner',provenance:'EXPERT_VALIDATED'});
+  const progressive=(await auth('post','/contexts',A).send({}).expect(201)).body;
+  assert.equal(progressive.provenance,'USER_DECLARED');
+  for(const field of ['occasion','startsAt','locationText','climateReference','formality','objective','notes']) assert.equal(progressive[field],null);
+  const countBeforeInvalid=(await db.query('SELECT count(*)::int AS count FROM contexts WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count;
+  const countBeforeOwnerInjection=(await db.query('SELECT count(*)::int AS count FROM contexts WHERE owner_person_id=$1',[B.user.person_id])).rows[0].count;
+  await auth('post','/contexts',A).send({provenance:'INVALID'}).expect(400);
+  await auth('post','/contexts',A).send({owner_person_id:B.user.person_id}).expect(400);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM contexts WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count,countBeforeInvalid);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM contexts WHERE owner_person_id=$1',[B.user.person_id])).rows[0].count,countBeforeOwnerInjection);
+});
 test('createLookVariation copies the current source snapshot into an independent Look',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const result=await createLookVariation({

@@ -14,6 +14,7 @@ import * as profile from '../controllers/profileController.js';
 import * as memberships from '../controllers/membershipController.js';
 import * as storeRequests from '../controllers/storeRequestController.js';
 import * as looks from '../controllers/lookController.js';
+import * as contexts from '../controllers/contextController.js';
 import * as media from '../services/imageService.js';
 import * as reconstruction from '../controllers/reconstructionController.js';
 
@@ -64,6 +65,7 @@ r.post('/wardrobe/upgrade-requests',requireAuth,wrap(wardrobe.requestUpgrade));
 r.get('/profile',requireAuth,wrap(profile.getProfile));
 r.put('/profile',requireAuth,wrap(profile.updateProfile));
 r.post('/profile/photo',requireAuth,uploadBudget,upload.single('photo'),validateImages,wrap(profile.uploadProfilePhoto));
+r.post('/contexts',requireAuth,wrap(contexts.create));
 r.get('/media/:id',requireAuth,wrap(media.readMedia));
 r.post('/media/:id/access',requireAuth,wrap(media.mediaAccess));
 r.get('/looks',requireAuth,wrap(looks.list));
