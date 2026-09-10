@@ -174,6 +174,21 @@ test('Context schema keeps progressive fields independent and prevents cross-per
   await assert.rejects(()=>db.query('INSERT INTO look_contexts(look_id,context_id,owner_person_id) VALUES($1,$2,$3)',[fixture.lookId,contextB.id,A.user.person_id]));
   await assert.rejects(()=>db.query("INSERT INTO contexts(owner_person_id,provenance) VALUES($1,'INVALID')",[A.user.person_id]));
 });
+test('Collection schema organizes Looks without trip fields or cross-person links',async()=>{
+  const first=await createVersionedLookFixture(A);
+  const second=await createVersionedLookFixture(A);
+  const collectionA=(await db.query("INSERT INTO collections(owner_person_id,name,description) VALUES($1,'Synthetic collection','Generic organization') RETURNING id",[A.user.person_id])).rows[0];
+  const collectionA2=(await db.query("INSERT INTO collections(owner_person_id,name) VALUES($1,'Synthetic collection') RETURNING id",[A.user.person_id])).rows[0];
+  const collectionB=(await db.query("INSERT INTO collections(owner_person_id,name) VALUES($1,'Other collection') RETURNING id",[B.user.person_id])).rows[0];
+  await db.query('INSERT INTO collection_looks(collection_id,look_id,owner_person_id) VALUES($1,$2,$3)',[collectionA.id,first.lookId,A.user.person_id]);
+  await db.query('INSERT INTO collection_looks(collection_id,look_id,owner_person_id) VALUES($1,$2,$3)',[collectionA.id,second.lookId,A.user.person_id]);
+  await db.query('INSERT INTO collection_looks(collection_id,look_id,owner_person_id) VALUES($1,$2,$3)',[collectionA2.id,first.lookId,A.user.person_id]);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM collection_looks WHERE collection_id=$1',[collectionA.id])).rows[0].count,2);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM collection_looks WHERE look_id=$1',[first.lookId])).rows[0].count,2);
+  await assert.rejects(()=>db.query('INSERT INTO collection_looks(collection_id,look_id,owner_person_id) VALUES($1,$2,$3)',[collectionA.id,first.lookId,A.user.person_id]));
+  await assert.rejects(()=>db.query('INSERT INTO collection_looks(collection_id,look_id,owner_person_id) VALUES($1,$2,$3)',[collectionB.id,first.lookId,B.user.person_id]));
+  await assert.rejects(()=>db.query("INSERT INTO collections(owner_person_id,name) VALUES($1,'   ')",[A.user.person_id]));
+});
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({
     occasion:'Synthetic dinner',startsAt:'2026-09-10T19:30:00.000Z',locationText:'Synthetic location',
