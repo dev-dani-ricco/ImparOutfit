@@ -684,6 +684,30 @@ components:
         linkedAt:
           type: string
           format: date-time
+    CollectionInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+    Collection:
+      allOf:
+        - $ref: "#/components/schemas/CollectionInput"
+        - type: object
+          required: [id, createdAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            createdAt:
+              type: string
+              format: date-time
     Profile:
       type: object
       properties:
@@ -3653,6 +3677,38 @@ paths:
           description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
             capacidade/contexto negado; 404: recurso ausente ou privado de outra
             pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /collections:
+    post:
+      summary: Criar Collection privada de Looks
+      description: Organização genérica de Looks, sem atributos de Mala Inteligente.
+      operationId: post__collections
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CollectionInput"
+      responses:
+        "201":
+          description: Collection privada criada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collection"
+        "400":
+          description: Dados inválidos ou campos não permitidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sessão ausente ou inválida.
           content:
             application/json:
               schema:

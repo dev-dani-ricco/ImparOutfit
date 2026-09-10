@@ -210,6 +210,26 @@ test('POST /contexts creates only private progressive Context records',async()=>
   assert.equal((await db.query('SELECT count(*)::int AS count FROM contexts WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count,countBeforeInvalid);
   assert.equal((await db.query('SELECT count(*)::int AS count FROM contexts WHERE owner_person_id=$1',[B.user.person_id])).rows[0].count,countBeforeOwnerInjection);
 });
+test('POST /collections creates generic private Collections without owner injection',async()=>{
+  const first=(await auth('post','/collections',A).send({name:'Synthetic collection',description:'Optional description'}).expect(201)).body;
+  assert.equal(first.name,'Synthetic collection');
+  assert.equal(first.description,'Optional description');
+  assert.ok(first.createdAt);
+  assert.deepEqual((await db.query('SELECT owner_person_id,name,description FROM collections WHERE id=$1',[first.id])).rows[0],{
+    owner_person_id:A.user.person_id,name:'Synthetic collection',description:'Optional description'
+  });
+  const withoutDescription=(await auth('post','/collections',A).send({name:'No description'}).expect(201)).body;
+  assert.equal(withoutDescription.description,null);
+  const repeated=(await auth('post','/collections',A).send({name:'Synthetic collection'}).expect(201)).body;
+  assert.notEqual(repeated.id,first.id);
+  const countBeforeInvalid=(await db.query('SELECT count(*)::int AS count FROM collections WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count;
+  const bCountBeforeInjection=(await db.query('SELECT count(*)::int AS count FROM collections WHERE owner_person_id=$1',[B.user.person_id])).rows[0].count;
+  await auth('post','/collections',A).send({name:'   '}).expect(400);
+  await auth('post','/collections',A).send({name:''}).expect(400);
+  await auth('post','/collections',A).send({name:'Injected owner',personId:B.user.person_id}).expect(400);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM collections WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count,countBeforeInvalid);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM collections WHERE owner_person_id=$1',[B.user.person_id])).rows[0].count,bCountBeforeInjection);
+});
 test('POST /looks/:lookId/contexts/:contextId links only same-person resources once',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const contextA=(await auth('post','/contexts',A).send({occasion:'Context A'}).expect(201)).body;

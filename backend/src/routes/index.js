@@ -15,6 +15,7 @@ import * as memberships from '../controllers/membershipController.js';
 import * as storeRequests from '../controllers/storeRequestController.js';
 import * as looks from '../controllers/lookController.js';
 import * as contexts from '../controllers/contextController.js';
+import * as collections from '../controllers/collectionController.js';
 import * as media from '../services/imageService.js';
 import * as reconstruction from '../controllers/reconstructionController.js';
 
@@ -67,6 +68,7 @@ r.put('/profile',requireAuth,wrap(profile.updateProfile));
 r.post('/profile/photo',requireAuth,uploadBudget,upload.single('photo'),validateImages,wrap(profile.uploadProfilePhoto));
 r.post('/contexts',requireAuth,wrap(contexts.create));
 r.get('/contexts/:contextId',requireAuth,wrap(contexts.get));
+r.post('/collections',requireAuth,wrap(collections.create));
 r.get('/media/:id',requireAuth,wrap(media.readMedia));
 r.post('/media/:id/access',requireAuth,wrap(media.mediaAccess));
 r.get('/looks',requireAuth,wrap(looks.list));
