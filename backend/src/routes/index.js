@@ -17,6 +17,7 @@ import * as looks from '../controllers/lookController.js';
 import * as contexts from '../controllers/contextController.js';
 import * as collections from '../controllers/collectionController.js';
 import * as comparisons from '../controllers/comparisonController.js';
+import * as imparAnalyses from '../controllers/imparAnalysisController.js';
 import * as media from '../services/imageService.js';
 import * as reconstruction from '../controllers/reconstructionController.js';
 
@@ -69,6 +70,7 @@ r.put('/profile',requireAuth,wrap(profile.updateProfile));
 r.post('/profile/photo',requireAuth,uploadBudget,upload.single('photo'),validateImages,wrap(profile.uploadProfilePhoto));
 r.post('/contexts',requireAuth,wrap(contexts.create));
 r.get('/contexts/:contextId',requireAuth,wrap(contexts.get));
+r.post('/impar-analyses',requireAuth,wrap(imparAnalyses.create));
 r.post('/collections',requireAuth,wrap(collections.create));
 r.post('/collections/:collectionId/looks/:lookId',requireAuth,wrap(collections.linkLook));
 r.get('/collections/:collectionId',requireAuth,wrap(collections.get));

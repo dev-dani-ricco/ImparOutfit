@@ -293,6 +293,52 @@ test('ÍMPAR Analysis schema keeps private LookVersion and Context references wi
   assert.ok(version3.versionId);
   assert.deepEqual((await db.query('SELECT look_version_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{look_version_id:first.version2Id});
 });
+test('POST /impar-analyses creates only private SYSTEM DRAFT identity records',async()=>{
+  const first=await createVersionedLookFixture(A);
+  const second=await createVersionedLookFixture(A);
+  const contextA=(await auth('post','/contexts',A).send({occasion:'Analysis API Context'}).expect(201)).body;
+  const contextB=(await auth('post','/contexts',B).send({occasion:'Other Analysis API Context'}).expect(201)).body;
+  const created=(await auth('post','/impar-analyses',A).send({
+    lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',methodologyVersionRef:'  met_opaque  '
+  }).expect(201)).body;
+  assert.deepEqual({lookId:created.lookId,lookVersionId:created.lookVersionId,contextId:created.contextId,status:created.status,origin:created.origin,methodologyVersionRef:created.methodologyVersionRef},{
+    lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,status:'DRAFT',origin:'SYSTEM',methodologyVersionRef:'met_opaque'
+  });
+  assert.deepEqual((await db.query(`SELECT owner_person_id,look_id,look_version_id,context_id,status,origin,methodology_version_ref
+    FROM impar_analyses WHERE id=$1`,[created.id])).rows[0],{
+    owner_person_id:A.user.person_id,look_id:first.lookId,look_version_id:first.version2Id,context_id:contextA.id,status:'DRAFT',origin:'SYSTEM',methodology_version_ref:'met_opaque'
+  });
+  const version3=(await auth('post','/looks/'+first.lookId+'/versions',A)
+    .send({title:'Analysis API v3',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
+  assert.ok(version3.versionId);
+  assert.deepEqual((await db.query('SELECT look_version_id FROM impar_analyses WHERE id=$1',[created.id])).rows[0],{look_version_id:first.version2Id});
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:second.version2Id,contextId:contextA.id,origin:'SYSTEM'}).expect(404);
+  const ownedB=(await auth('post','/wardrobe/items',B).send({name:'B API analysis shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+  const lookB=(await auth('post','/looks',B).send({title:'B API analysis Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:ownedB.id}]}).expect(201)).body;
+  await auth('post','/impar-analyses',A).send({lookId:lookB.id,lookVersionId:lookB.versionId,contextId:contextA.id,origin:'SYSTEM'}).expect(404);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextB.id,origin:'SYSTEM'}).expect(404);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,contextId:contextA.id,origin:'SYSTEM'}).expect(400);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,origin:'SYSTEM'}).expect(400);
+  const countBeforeRejected=(await db.query('SELECT count(*)::int AS count FROM impar_analyses WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count;
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',status:'COMPLETED'}).expect(400);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',owner_person_id:B.user.person_id}).expect(400);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'EXPERT'}).expect(403);
+  for(const origin of ['DANI','AI','MERCHANT','SPONSORED']) {
+    await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin}).expect(400);
+  }
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',methodologyVersionRef:'   '}).expect(400);
+  await auth('post','/impar-analyses',A).send({
+    lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',
+    prompt:'private',reasoning:'private',knowledge:'private',recommendation:'private'
+  }).expect(400);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM impar_analyses WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count,countBeforeRejected);
+  const withoutReference=(await auth('post','/impar-analyses',A).send({
+    lookId:first.lookId,lookVersionId:version3.versionId,contextId:contextA.id,origin:'SYSTEM'
+  }).expect(201)).body;
+  assert.deepEqual({status:withoutReference.status,methodologyVersionRef:withoutReference.methodologyVersionRef,lookVersionId:withoutReference.lookVersionId},{
+    status:'DRAFT',methodologyVersionRef:null,lookVersionId:version3.versionId
+  });
+});
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({
     occasion:'Synthetic dinner',startsAt:'2026-09-10T19:30:00.000Z',locationText:'Synthetic location',

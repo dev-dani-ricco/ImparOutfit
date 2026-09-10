@@ -857,6 +857,42 @@ components:
                   createdAt:
                     type: string
                     format: date-time
+    ImparAnalysisInput:
+      type: object
+      required: [lookId, lookVersionId, contextId, origin]
+      properties:
+        lookId:
+          type: string
+          format: uuid
+        lookVersionId:
+          type: string
+          format: uuid
+        contextId:
+          type: string
+          format: uuid
+        origin:
+          type: string
+          enum: [SYSTEM, EXPERT]
+        methodologyVersionRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+          nullable: true
+    ImparAnalysis:
+      allOf:
+        - $ref: "#/components/schemas/ImparAnalysisInput"
+        - type: object
+          required: [id, status, createdAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            status:
+              type: string
+              enum: [DRAFT]
+            createdAt:
+              type: string
+              format: date-time
             results:
               type: array
               items:
@@ -4495,6 +4531,50 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /impar-analyses:
+    post:
+      summary: Criar ÍMPAR Analysis privada em DRAFT
+      description: Exige LookVersion e Context explícitos. methodologyVersionRef é somente um identificador opaco; não recebe metodologia, prompts ou resultados. EXPERT exige futura autorização institucional de análise e é bloqueado neste fluxo atual.
+      operationId: post__impar_analyses
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImparAnalysisInput"
+      responses:
+        "201":
+          description: Analysis privada criada em DRAFT.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImparAnalysis"
+        "400":
+          description: Dados inválidos ou campos não aceitos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Origin EXPERT não possui autorização institucional de análise neste fluxo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Look, LookVersion ou Context inexistente, incompatível ou privado de outra pessoa.
           content:
             application/json:
               schema:
