@@ -402,6 +402,47 @@ test('GET /impar-analyses/:analysisId returns only the private persisted structu
   assert.deepEqual((await db.query('SELECT current_version_id FROM looks WHERE id=$1',[fixture.lookId])).rows[0],before.currentVersion);
   assert.deepEqual((await db.query('SELECT occasion FROM contexts WHERE id=$1',[context.id])).rows[0],before.context);
 });
+test('POST /impar-analyses/:analysisId/results creates immutable private DRAFT versions',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const context=(await auth('post','/contexts',A).send({occasion:'Draft Result context'}).expect(201)).body;
+  const analysis=(await auth('post','/impar-analyses',A).send({
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM',methodologyVersionRef:'met_result_draft'
+  }).expect(201)).body;
+  const create=payload=>auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload});
+  const version1=(await create({}).expect(201)).body;
+  const version2=(await create({schema:'synthetic-v2'}).expect(201)).body;
+  const version3=(await create({schema:'synthetic-v3'}).expect(201)).body;
+  assert.deepEqual([version1.resultVersion,version2.resultVersion,version3.resultVersion],[1,2,3]);
+  assert.equal(version1.status,'DRAFT');
+  assert.deepEqual(version1.payload,{});
+  assert.deepEqual((await db.query('SELECT result_version,status,payload FROM impar_analysis_results WHERE id=$1',[version1.id])).rows[0],{result_version:1,status:'DRAFT',payload:{}});
+  const before={
+    analysis:(await db.query('SELECT status,origin,methodology_version_ref FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],
+    versions:(await db.query('SELECT result_version,payload FROM impar_analysis_results WHERE analysis_id=$1 ORDER BY result_version',[analysis.id])).rows
+  };
+  await auth('post','/impar-analyses/'+analysis.id+'/results',B).send({payload:{}}).expect(404);
+  const countBeforeRejected=(await db.query('SELECT count(*)::int AS count FROM impar_analysis_results WHERE analysis_id=$1',[analysis.id])).rows[0].count;
+  await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{},resultVersion:99}).expect(400);
+  await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{},status:'FINAL'}).expect(400);
+  for(const payload of [null,[], 'string',1]) await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload}).expect(400);
+  await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{chainOfThought:'private'}}).expect(400);
+  await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{systemPrompt:'private'}}).expect(400);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM impar_analysis_results WHERE analysis_id=$1',[analysis.id])).rows[0].count,countBeforeRejected);
+  const concurrentAnalysis=(await auth('post','/impar-analyses',A).send({
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'
+  }).expect(201)).body;
+  const [parallelOne,parallelTwo]=await Promise.all([
+    auth('post','/impar-analyses/'+concurrentAnalysis.id+'/results',A).send({payload:{request:'one'}}),
+    auth('post','/impar-analyses/'+concurrentAnalysis.id+'/results',A).send({payload:{request:'two'}})
+  ]);
+  assert.equal(parallelOne.status,201);
+  assert.equal(parallelTwo.status,201);
+  assert.deepEqual([parallelOne.body.resultVersion,parallelTwo.body.resultVersion].sort((a,b)=>a-b),[1,2]);
+  await db.query("UPDATE impar_analyses SET status='COMPLETED' WHERE id=$1",[analysis.id]);
+  await create({after:'completed'}).expect(409);
+  assert.deepEqual((await db.query('SELECT status,origin,methodology_version_ref FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{...before.analysis,status:'COMPLETED'});
+  assert.deepEqual((await db.query('SELECT result_version,payload FROM impar_analysis_results WHERE analysis_id=$1 ORDER BY result_version',[analysis.id])).rows,before.versions);
+});
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({
     occasion:'Synthetic dinner',startsAt:'2026-09-10T19:30:00.000Z',locationText:'Synthetic location',

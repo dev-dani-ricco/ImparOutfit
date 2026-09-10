@@ -4612,6 +4612,82 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /impar-analyses/{analysisId}/results:
+    post:
+      summary: Criar Result privado versionado em DRAFT
+      description: A Analysis deve estar em DRAFT. O servidor controla resultVersion e status; payload é um objeto estrutural e não aceita internals de prompt ou RAG.
+      operationId: post__impar_analyses_analysisId_results
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: analysisId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payload]
+              additionalProperties: false
+              properties:
+                payload:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "201":
+          description: Result privado criado em DRAFT com versão atribuída pelo servidor.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, analysisId, resultVersion, status, payload, createdAt]
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  analysisId:
+                    type: string
+                    format: uuid
+                  resultVersion:
+                    type: integer
+                    minimum: 1
+                  status:
+                    type: string
+                    enum: [DRAFT]
+                  payload:
+                    type: object
+                  createdAt:
+                    type: string
+                    format: date-time
+        "400":
+          description: Payload inválido ou campos não aceitos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Analysis inexistente ou privada de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Analysis fora de DRAFT.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /contexts/{contextId}:
     get:
       summary: Obter Context privado
