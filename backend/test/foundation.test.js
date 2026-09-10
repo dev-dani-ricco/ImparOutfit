@@ -346,6 +346,31 @@ test('POST /comparisons/:comparisonId/evaluations creates only private DRAFT eva
   await auth('post','/comparisons/'+comparison.id+'/evaluations',A).send({origin:'USER',owner_person_id:B.user.person_id}).expect(400);
   assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_evaluations WHERE comparison_id=$1',[comparison.id])).rows[0].count,countBeforeInvalid);
 });
+test('POST /comparisons/:comparisonId/evaluations/:evaluationId/criteria adds only declared DRAFT criteria',async()=>{
+  const comparison=(await auth('post','/comparisons',A).send({name:'Criteria comparison'}).expect(201)).body;
+  const otherComparison=(await auth('post','/comparisons',A).send({name:'Other criteria comparison'}).expect(201)).body;
+  const evaluation=(await auth('post','/comparisons/'+comparison.id+'/evaluations',A).send({origin:'USER'}).expect(201)).body;
+  const otherEvaluation=(await auth('post','/comparisons/'+otherComparison.id+'/evaluations',A).send({origin:'SYSTEM'}).expect(201)).body;
+  const created=(await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A)
+    .send({criterionKey:'  declared_fit  ',criterionLabel:'Declared fit',position:0}).expect(201)).body;
+  assert.deepEqual({evaluationId:created.evaluationId,criterionKey:created.criterionKey,criterionLabel:created.criterionLabel,position:created.position},{evaluationId:evaluation.id,criterionKey:'declared_fit',criterionLabel:'Declared fit',position:0});
+  assert.deepEqual((await db.query('SELECT evaluation_id,owner_person_id,criterion_key,criterion_label,position FROM comparison_evaluation_criteria WHERE id=$1',[created.id])).rows[0],{
+    evaluation_id:evaluation.id,owner_person_id:A.user.person_id,criterion_key:'declared_fit',criterion_label:'Declared fit',position:0
+  });
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0].count,0);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',B).send({criterionKey:'other',position:1}).expect(404);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+otherEvaluation.id+'/criteria',A).send({criterionKey:'other',position:1}).expect(404);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A).send({criterionKey:'   ',position:1}).expect(400);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A).send({criterionKey:'negative',position:-1}).expect(400);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A).send({criterionKey:'fractional',position:1.5}).expect(400);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A).send({criterionKey:'position_conflict',position:0}).expect(409);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A).send({criterionKey:'DECLARED_FIT',position:1}).expect(409);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A).send({criterionKey:'injected',position:1,owner_person_id:B.user.person_id}).expect(400);
+  await db.query("UPDATE comparison_evaluations SET status='COMPLETED' WHERE id=$1",[evaluation.id]);
+  await auth('post','/comparisons/'+comparison.id+'/evaluations/'+evaluation.id+'/criteria',A).send({criterionKey:'after_complete',position:1}).expect(409);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_criteria WHERE evaluation_id=$1',[evaluation.id])).rows[0].count,1);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM comparison_evaluation_results WHERE evaluation_id=$1',[evaluation.id])).rows[0].count,0);
+});
 test('POST /comparisons/:comparisonId/looks/:lookId preserves explicit positions',async()=>{
   const first=await createVersionedLookFixture(A);
   const second=await createVersionedLookFixture(A);

@@ -39,6 +39,47 @@ export async function createEvaluation(req,res) {
   res.status(201).json(evaluationDto(evaluation));
 }
 
+const criterionSchema=Joi.object({
+  criterionKey:Joi.string().trim().min(1).max(160).required(),
+  criterionLabel:Joi.string().trim().max(160).allow('',null),
+  position:Joi.number().integer().min(0).required()
+});
+const criterionDto=row=>({
+  id:row.id,
+  evaluationId:row.evaluation_id,
+  criterionKey:row.criterion_key,
+  criterionLabel:row.criterion_label,
+  position:row.position,
+  createdAt:row.created_at
+});
+export async function createEvaluationCriterion(req,res) {
+  const body=validate(criterionSchema,req.body||{});
+  const comparison=(await query('SELECT id,owner_person_id AS person_id FROM comparisons WHERE id=$1',[req.params.comparisonId])).rows[0];
+  authorizePersonal(req.auth,comparison);
+  const evaluation=(await query(`SELECT id,comparison_id,owner_person_id AS person_id,status FROM comparison_evaluations
+    WHERE id=$1 AND comparison_id=$2`,[req.params.evaluationId,comparison.id])).rows[0];
+  authorizePersonal(req.auth,evaluation);
+  if(evaluation.status!=='DRAFT') throw new HttpError(409,'Evaluation não aceita critérios fora de DRAFT');
+  if((await query(`SELECT id FROM comparison_evaluation_criteria
+    WHERE evaluation_id=$1 AND lower(criterion_key)=lower($2)`,[evaluation.id,body.criterionKey])).rows[0]) {
+    throw new HttpError(409,'criterionKey já existe nesta Evaluation');
+  }
+  if((await query('SELECT id FROM comparison_evaluation_criteria WHERE evaluation_id=$1 AND position=$2',[evaluation.id,body.position])).rows[0]) {
+    throw new HttpError(409,'position já existe nesta Evaluation');
+  }
+  try {
+    const criterion=(await query(`INSERT INTO comparison_evaluation_criteria(
+      evaluation_id,owner_person_id,criterion_key,criterion_label,position
+    ) VALUES($1,$2,$3,$4,$5) RETURNING id,evaluation_id,criterion_key,criterion_label,position,created_at`,[
+      evaluation.id,req.auth.personId,body.criterionKey,body.criterionLabel??null,body.position
+    ])).rows[0];
+    res.status(201).json(criterionDto(criterion));
+  } catch(error) {
+    if(error.code==='23505') throw new HttpError(409,'criterionKey ou position já existe nesta Evaluation');
+    throw error;
+  }
+}
+
 const linkSchema=Joi.object({position:Joi.number().integer().min(0).required()});
 const linkDto=row=>({comparisonId:row.comparison_id,lookId:row.look_id,position:row.position,linkedAt:row.created_at});
 export async function linkLook(req,res) {

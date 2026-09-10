@@ -768,6 +768,36 @@ components:
             createdAt:
               type: string
               format: date-time
+    ComparisonEvaluationCriterionInput:
+      type: object
+      required: [criterionKey, position]
+      properties:
+        criterionKey:
+          type: string
+          minLength: 1
+          maxLength: 160
+        criterionLabel:
+          type: string
+          maxLength: 160
+          nullable: true
+        position:
+          type: integer
+          minimum: 0
+    ComparisonEvaluationCriterion:
+      allOf:
+        - $ref: "#/components/schemas/ComparisonEvaluationCriterionInput"
+        - type: object
+          required: [id, evaluationId, createdAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            evaluationId:
+              type: string
+              format: uuid
+            createdAt:
+              type: string
+              format: date-time
     ComparisonLookLinkInput:
       type: object
       required: [position]
@@ -3996,6 +4026,63 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Comparison ou Context inexistente ou privado de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /comparisons/{comparisonId}/evaluations/{evaluationId}/criteria:
+    post:
+      summary: Adicionar critério declarado a uma Evaluation em DRAFT
+      description: Não cria resultados, pesos, ranking ou decisão.
+      operationId: post__comparisons_comparisonId_evaluations_evaluationId_criteria
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: comparisonId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: evaluationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComparisonEvaluationCriterionInput"
+      responses:
+        "201":
+          description: Critério declarado criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonEvaluationCriterion"
+        "400":
+          description: Dados inválidos ou campos não aceitos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Comparison ou Evaluation inexistente ou privada de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Evaluation fora de DRAFT, criterionKey duplicada ou posição ocupada.
           content:
             application/json:
               schema:
