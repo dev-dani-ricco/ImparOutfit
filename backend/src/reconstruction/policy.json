@@ -1,0 +1,16 @@
+{
+  "version": "cpu-sfm-sgbm-v1",
+  "minPhotos": 12,
+  "maxPhotos": 72,
+  "minAzimuthSectors": 6,
+  "minElevationLevels": 2,
+  "minImageSide": 480,
+  "minSharpness": 35,
+  "minRegisteredRatio": 0.8,
+  "maxReprojectionError": 2.5,
+  "minTriangles": 100,
+  "maxTriangles": 500000,
+  "minScaleConfidence": 0.5,
+  "maxOutputBytes": 67108864,
+  "maxProcessingMs": 1800000
+}

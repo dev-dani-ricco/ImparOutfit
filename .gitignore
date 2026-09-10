@@ -149,6 +149,7 @@ web-build/
 
 # Artefatos locais da demo
 frontend/.expo-demo-check/
+frontend/.tmp/
 frontend/src/contexts/AuthContext - Copia.js
 
 # O frontend usa npm/package-lock.json
@@ -267,3 +268,5 @@ private-conversations/
 .audit-local/
 audit-artifacts/
 security-reports/
+__pycache__/
+*.pyc

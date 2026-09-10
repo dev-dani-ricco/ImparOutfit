@@ -209,3 +209,53 @@ test('last administrator cannot be revoked and corrupted migration ledger is ref
   await assert.rejects(()=>migrate(db),/checksum mismatch/);
   await db.query("UPDATE schema_migrations SET checksum=$1 WHERE version='006_lookup_indexes.sql'",[prior]);
 });
+
+test('reconstruction inputs, jobs and outputs are isolated; fake success cannot reach READY',async()=>{
+ const {runOnce}=await import('../src/reconstruction/worker.js');
+ const j=(await auth('post','/reconstruction/jobs',A).send({itemId:owned.id,category:'TOP'}).expect(201)).body;
+ await auth('post','/reconstruction/jobs',marketing).send({itemId:owned.id,category:'TOP'}).expect(404);
+ await auth('get','/reconstruction/jobs/'+j.id,marketing).expect(404);
+ await request(app).get('/api/reconstruction/jobs/'+j.id).expect(401);
+ await auth('get','/reconstruction/jobs/'+j.id+'/output',marketing).expect(404);
+ const need=(await auth('post','/reconstruction/jobs/'+j.id+'/submit',A).expect(202)).body;
+ assert.equal(need.state,'NEEDS_MORE_INPUT');
+ for(let i=0;i<12;i++){
+  const png=await sharp({create:{width:4,height:4,channels:3,background:{r:i*19,g:70,b:90}}}).png().toBuffer();
+  await auth('post','/reconstruction/jobs/'+j.id+'/inputs',A).field('azimuth',String(i*30)).field('elevation',i<6?'LOW':'HIGH').attach('photos',png,'capture.png').expect(201);
+ }
+ const queued=(await auth('post','/reconstruction/jobs/'+j.id+'/submit',A).expect(202)).body;
+ assert.equal(queued.state,'QUEUED');
+ await auth('post','/reconstruction/jobs/'+j.id+'/submit',A).expect(409);
+ // This adapter is a hostile protocol test, never evidence of real reconstruction.
+ const {writeFile}=await import('node:fs/promises');const {dirname}=await import('node:path');
+ const result=await runOnce({execute:async path=>writeFile(join(dirname(path),'result.json'),JSON.stringify({status:'READY',metrics:{reconstruction_success:true}}))});
+ assert.equal(result.state,'FAILED');
+ assert.equal((await auth('get','/reconstruction/jobs/'+j.id,A)).body.state,'FAILED');
+ assert.equal((await db.query('SELECT count(*)::int n FROM reconstruction_outputs WHERE job_id=$1',[j.id])).rows[0].n,0);
+ await auth('post','/reconstruction/jobs/'+j.id+'/inspection',A).send({inspection:{complete:true,isolatedItem:true,colorFaithful:true,categoryConfirmed:true},dimension:{axis:'y',valueMeters:.4,source:'USER_DECLARED'}}).expect(409);
+ const foreign=(await db.query("SELECT id FROM media_assets WHERE person_id=$1 LIMIT 1",[A.user.person_id])).rows[0];
+ const other=(await auth('post','/wardrobe/items',marketing).send({name:'Other owner',category:'TOP',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+ const otherJob=(await auth('post','/reconstruction/jobs',marketing).send({itemId:other.id,category:'TOP'}).expect(201)).body;
+ await assert.rejects(()=>db.query("INSERT INTO reconstruction_inputs(job_id,person_id,media_id,azimuth,elevation) VALUES($1,$2,$3,0,'MID')",[otherJob.id,marketing.user.person_id,foreign.id]),e=>e.code==='23514');
+});
+
+test('worker output stays private and in QUALITY_CHECK until inspection; invalid quality cannot be overridden',async()=>{
+ const {runOnce}=await import('../src/reconstruction/worker.js');
+ const {syntheticGlb}=await import('../fixtures/syntheticGlb.js');
+ const {createHash}=await import('node:crypto');
+ const {writeFile}=await import('node:fs/promises');const {dirname}=await import('node:path');
+ const j=(await db.query("SELECT * FROM reconstruction_jobs WHERE person_id=$1 AND state='FAILED' ORDER BY created_at DESC LIMIT 1",[A.user.person_id])).rows[0];
+ await auth('post','/reconstruction/jobs/'+j.id+'/submit',A).expect(202);
+ const buffer=syntheticGlb();
+ const result=await runOnce({execute:async path=>{
+  const manifest=JSON.parse(await readFile(path,'utf8'));
+  await writeFile(join(dirname(path),'reconstruction.glb'),buffer);
+  await writeFile(join(dirname(path),'result.json'),JSON.stringify({status:'QUALITY_CHECK',output:'reconstruction.glb',sha256:createHash('sha256').update(buffer).digest('hex'),provenance:{pipelineVersion:manifest.pipelineVersion,inputHashes:manifest.inputs.map(i=>i.sha256).sort()},metrics:{registeredRatio:.3,reprojectionError:1,triangles:450,invalidGeometry:0,reconstruction_success:true}}));
+ }});
+ assert.equal(result.state,'QUALITY_CHECK');
+ await auth('get','/reconstruction/jobs/'+j.id+'/output',A).expect(200).expect('Content-Type',/model\/gltf-binary/);
+ await auth('get','/reconstruction/jobs/'+j.id+'/output',marketing).expect(404);
+ await request(app).get('/api/reconstruction/jobs/'+j.id+'/output').expect(401);
+ const inspected=(await auth('post','/reconstruction/jobs/'+j.id+'/inspection',A).send({inspection:{complete:true,isolatedItem:true,colorFaithful:true,categoryConfirmed:true},dimension:{axis:'y',valueMeters:.3,source:'USER_DECLARED'}}).expect(200)).body;
+ assert.equal(inspected.state,'NEEDS_MORE_INPUT');assert.equal(inspected.metrics.first_pass_success,false);
+});

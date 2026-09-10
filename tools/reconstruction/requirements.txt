@@ -1,0 +1,5 @@
+pycolmap==4.2.0
+numpy==2.5.3
+trimesh==5.1.0
+Pillow==12.3.0
+opencv-python-headless==5.0.0.93

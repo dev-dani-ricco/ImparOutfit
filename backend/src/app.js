@@ -22,7 +22,7 @@ export function createApp() {
   app.use(express.json({limit:'128kb'}));
   app.get('/health',(_req,res)=>res.json({ok:true,name:'UNIVERSO ÍMPAR API'}));
   app.get('/ready',async(_req,res)=>{
-    try { await query("SELECT 1 FROM schema_migrations WHERE version='006_lookup_indexes.sql'").then(r=>{if(!r.rows.length)throw new Error('schema');}); res.json({ok:true}); }
+    try { await query("SELECT 1 FROM schema_migrations WHERE version='009_reconstruction.sql'").then(r=>{if(!r.rows.length)throw new Error('schema');}); res.json({ok:true}); }
     catch { res.status(503).json({ok:false}); }
   });
   app.use('/api',(req,res,next)=>{ if(req.headers.authorization)res.set('Cache-Control','private, no-store'); next(); },routes);

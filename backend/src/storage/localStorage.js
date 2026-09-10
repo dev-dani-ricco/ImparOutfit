@@ -5,7 +5,7 @@ import { resolve, sep } from 'node:path';
 export class LocalStorage {
   constructor(root) { this.root = resolve(root); }
   path(key) {
-    if (!/^[0-9a-f-]{36}\.webp$/.test(key)) throw new Error('Invalid storage key');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(webp|glb)$/.test(key)) throw new Error('Invalid storage key');
     const target = resolve(this.root, key);
     if (!target.startsWith(this.root + sep)) throw new Error('Invalid storage path');
     return target;
