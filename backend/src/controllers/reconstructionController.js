@@ -6,10 +6,9 @@ import {HttpError} from '../utils/http.js';
 import {authorizePersonal,authorizeCapability} from '../services/authorizationService.js';
 import {withMedia,storage} from '../services/imageService.js';
 import {authorizedJob,transition,transaction,jobDto} from '../reconstruction/service.js';
-import {policy,validateCapture,qualityGate} from '../reconstruction/domain.js';
-const categories=['TOP','PANTS','DRESS','FOOTWEAR','BAG','ACCESSORY'];
+import {policy,validateCapture,qualityGate,categories,captureProtocol} from '../reconstruction/domain.js';
 export async function protocol(_req,res){
- res.json({version:policy.version,categories,minPhotos:policy.minPhotos,maxPhotos:policy.maxPhotos,
+ res.json({version:policy.version,categories,protocols:policy.captureProtocols,minPhotos:policy.minPhotos,maxPhotos:policy.maxPhotos,
  guidance:['Mantenha a peça imóvel em suporte; mova a câmera ao redor.','Use fundo contrastante e iluminação difusa constante, sem flash/reflexos.','Mantenha a peça inteira e nítida, ocupando a maior parte do quadro.','Faça 3 voltas de 12 fotos (30 graus), nas alturas baixa, média e alta, com sobreposição.','Inclua frente, costas, laterais e partes ocultas; não altere zoom/exposição entre fotos.','Meça uma dimensão real; a escala não será inferida como precisa.'],
  source:'MULTIVIEW_PHOTOS',videoSupported:false});
 }
@@ -27,19 +26,30 @@ export async function create(req,res){
   await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[req.auth.personId]);
   const n=(await c.query("SELECT count(*)::int n FROM reconstruction_jobs WHERE person_id=$1 AND state IN ('CAPTURED','QUEUED','PROCESSING','VALIDATING','QUALITY_CHECK')",[req.auth.personId])).rows[0].n;
   if(n>=5)throw new HttpError(429,'Conclua um dos jobs pendentes antes de iniciar outro');
-  const j=(await c.query(`INSERT INTO reconstruction_jobs(person_id,wardrobe_item_id,product_id,organization_id,category,pipeline_version,technique,capture_metadata)
-   VALUES($1,$2,$3,$4,$5,$6,'COLMAP_CPU_SGBM',$7) RETURNING *`,[req.auth.personId,b.itemId||null,b.productId||null,org,b.category,policy.version,b.captureMetadata])).rows[0];
+  const protocol=captureProtocol(b.category);
+  const expectedShots=Array.from({length:protocol.expectedShots},(_,i)=>({azimuth:(i%12)*protocol.azimuthStep,elevation:protocol.elevations[Math.floor(i/12)]}));
+  const session=(await c.query(`INSERT INTO capture_sessions(person_id,wardrobe_item_id,product_id,category,protocol_version,expected_shots)
+   VALUES($1,$2,$3,$4,$5,$6) RETURNING *`,[req.auth.personId,b.itemId||null,b.productId||null,b.category,protocol.version,expectedShots])).rows[0];
+  const j=(await c.query(`INSERT INTO reconstruction_jobs(person_id,wardrobe_item_id,product_id,organization_id,category,pipeline_version,technique,capture_metadata,capture_session_id)
+   VALUES($1,$2,$3,$4,$5,$6,'COLMAP_CPU_SGBM',$7,$8) RETURNING *`,[req.auth.personId,b.itemId||null,b.productId||null,org,b.category,policy.version,{...b.captureMetadata,captureSessionId:session.id,protocolVersion:protocol.version},session.id])).rows[0];
+  await c.query("INSERT INTO reconstruction_attempts(job_id,sequence,input_revision,pipeline_version,state) VALUES($1,1,0,$2,'CAPTURED')",[j.id,policy.version]);
   await c.query("INSERT INTO reconstruction_events(job_id,actor_person_id,to_state) VALUES($1,$2,'CAPTURED')",[j.id,req.auth.personId]);
   return j;
  });res.status(201).json(jobDto(result));
 }
 export async function list(req,res){res.set('Cache-Control','private, no-store').json((await query('SELECT id,wardrobe_item_id,product_id,category,state,created_at FROM reconstruction_jobs WHERE person_id=$1 ORDER BY created_at DESC LIMIT 100',[req.auth.personId])).rows);}
+export async function captureSession(req,res){
+ const session=(await query('SELECT * FROM capture_sessions WHERE id=$1',[req.params.id])).rows[0];
+ authorizePersonal(req.auth,session);
+ res.set('Cache-Control','private, no-store').json(session);
+}
 export async function get(req,res){
  const j=await authorizedJob(req.auth,req.params.id);
  const inputs=(await query('SELECT i.media_id,i.azimuth,i.elevation FROM reconstruction_inputs i WHERE job_id=$1',[j.id])).rows;
  const events=(await query('SELECT from_state,to_state,code,created_at FROM reconstruction_events WHERE job_id=$1 ORDER BY id',[j.id])).rows;
  const output=(await query('SELECT id,metadata FROM reconstruction_outputs WHERE job_id=$1 ORDER BY created_at DESC LIMIT 1',[j.id])).rows[0];
- res.set('Cache-Control','private, no-store').json({...jobDto(j),inputs,events,output:output?{...output,url:'/api/reconstruction/jobs/'+j.id+'/output'}:null});
+ const session=j.capture_session_id?(await query('SELECT id,protocol_version,expected_shots,received_shots,validation_status,validation FROM capture_sessions WHERE id=$1',[j.capture_session_id])).rows[0]:null;
+ res.set('Cache-Control','private, no-store').json({...jobDto(j),inputs,events,captureSession:session,output:output?{...output,url:'/api/reconstruction/jobs/'+j.id+'/output'}:null});
 }
 export async function inputs(req,res){
  const b=validate(Joi.object({azimuth:Joi.number().integer().min(0).max(359).required(),elevation:Joi.string().valid('LOW','MID','HIGH').required()}),req.body);
@@ -52,6 +62,7 @@ export async function inputs(req,res){
   if(count+ids.length>policy.maxPhotos)throw new HttpError(413,'Limite de fotos por experimento atingido');
   for(const id of ids)await c.query('INSERT INTO reconstruction_inputs(job_id,person_id,media_id,azimuth,elevation) VALUES($1,$2,$3,$4,$5)',[j.id,req.auth.personId,id,b.azimuth,b.elevation]);
   await c.query('UPDATE reconstruction_jobs SET input_revision=input_revision+1 WHERE id=$1',[j.id]);
+  if(j.capture_session_id)await c.query(`UPDATE capture_sessions SET received_shots=(SELECT COALESCE(jsonb_agg(jsonb_build_object('mediaId',i.media_id,'azimuth',i.azimuth,'elevation',i.elevation) ORDER BY i.created_at),'[]') FROM reconstruction_inputs i WHERE i.job_id=$1) WHERE id=$2`,[j.id,j.capture_session_id]);
   return {count:count+ids.length};
  });res.status(201).json(out);
 }
@@ -62,6 +73,7 @@ export async function removeInput(req,res){
   const r=await c.query('DELETE FROM reconstruction_inputs WHERE job_id=$1 AND media_id=$2 RETURNING media_id',[j.id,req.params.mediaId]);
   if(!r.rows.length)throw new HttpError(404,'Captura não encontrada');
   await c.query('UPDATE reconstruction_jobs SET input_revision=input_revision+1 WHERE id=$1',[j.id]);
+  if(j.capture_session_id)await c.query(`UPDATE capture_sessions SET received_shots=(SELECT COALESCE(jsonb_agg(jsonb_build_object('mediaId',i.media_id,'azimuth',i.azimuth,'elevation',i.elevation) ORDER BY i.created_at),'[]') FROM reconstruction_inputs i WHERE i.job_id=$1) WHERE id=$2`,[j.id,j.capture_session_id]);
  });res.status(204).end();
 }
 export async function submit(req,res){
@@ -70,6 +82,13 @@ export async function submit(req,res){
   j=await transition(c,j,'VALIDATING',{actor:req.auth.personId});
   const data=(await c.query('SELECT i.azimuth,i.elevation,m.sha256 FROM reconstruction_inputs i JOIN media_assets m ON m.id=i.media_id WHERE job_id=$1',[j.id])).rows;
   const guidance=validateCapture(data);
+  if(j.capture_session_id){
+   const session=(await c.query('SELECT expected_shots FROM capture_sessions WHERE id=$1 FOR UPDATE',[j.capture_session_id])).rows[0];
+   const seen=new Set(data.map(v=>v.azimuth+':'+v.elevation));
+   const missing=guidance.length?session.expected_shots.filter(v=>!seen.has(v.azimuth+':'+v.elevation)):[];
+   if(missing.length)guidance.push({code:'MISSING_POSITIONS',message:'Capture somente as posições indicadas.',positions:missing});
+   await c.query('UPDATE capture_sessions SET validation_status=$2,validation=$3 WHERE id=$1',[j.capture_session_id,guidance.length?'NEEDS_MORE_INPUT':'READY_FOR_RECONSTRUCTION',{guidance,missingPositions:missing}]);
+  }
   return transition(c,j,guidance.length?'NEEDS_MORE_INPUT':'QUEUED',{actor:req.auth.personId,code:guidance.length?'CAPTURE_INCOMPLETE':null,guidance});
  });res.status(202).json(jobDto(j));
 }

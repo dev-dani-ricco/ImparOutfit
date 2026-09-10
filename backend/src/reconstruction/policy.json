@@ -12,5 +12,13 @@
   "maxTriangles": 500000,
   "minScaleConfidence": 0.5,
   "maxOutputBytes": 67108864,
-  "maxProcessingMs": 1800000
+  "maxProcessingMs": 1800000,
+  "captureProtocols": {
+    "TOP": {"version":"TOP_CAPTURE_V1","expectedShots":36,"azimuthStep":30,"elevations":["MID","HIGH","LOW"],"readiness":"PHYSICAL_VALIDATION_PENDING","strategy":"COLMAP_CPU_SGBM","dimensionRequired":true,"composition":"UNIFORM_VISUAL"},
+    "PANTS": {"version":"PANTS_CAPTURE_V1","expectedShots":36,"azimuthStep":30,"elevations":["MID","HIGH","LOW"],"readiness":"NOT_RUN","strategy":"COLMAP_CPU_SGBM","dimensionRequired":true,"composition":"UNIFORM_VISUAL"},
+    "DRESS": {"version":"DRESS_CAPTURE_V1","expectedShots":36,"azimuthStep":30,"elevations":["MID","HIGH","LOW"],"readiness":"NOT_RUN","strategy":"COLMAP_CPU_SGBM","dimensionRequired":true,"composition":"UNIFORM_VISUAL"},
+    "FOOTWEAR": {"version":"FOOTWEAR_CAPTURE_V1","expectedShots":36,"azimuthStep":30,"elevations":["MID","HIGH","LOW"],"readiness":"NOT_RUN","strategy":"COLMAP_CPU_SGBM","dimensionRequired":true,"composition":"UNIFORM_VISUAL"},
+    "BAG": {"version":"BAG_CAPTURE_V1","expectedShots":36,"azimuthStep":30,"elevations":["MID","HIGH","LOW"],"readiness":"NOT_RUN","strategy":"COLMAP_CPU_SGBM","dimensionRequired":true,"composition":"UNIFORM_VISUAL"},
+    "ACCESSORY": {"version":"ACCESSORY_CAPTURE_V1","expectedShots":36,"azimuthStep":30,"elevations":["MID","HIGH","LOW"],"readiness":"NOT_RUN","strategy":"COLMAP_CPU_SGBM","dimensionRequired":true,"composition":"UNIFORM_VISUAL"}
+  }
 }

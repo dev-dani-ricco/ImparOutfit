@@ -1,5 +1,11 @@
 import policy from './policy.json' with {type:'json'};
 export {policy};
+export const categories=['TOP','PANTS','DRESS','FOOTWEAR','BAG','ACCESSORY'];
+export function captureProtocol(category){
+ const p=policy.captureProtocols?.[category];
+ if(!p)throw new Error('CAPTURE_PROTOCOL_UNSUPPORTED');
+ return p;
+}
 export const transitions={
  CAPTURED:['VALIDATING'],VALIDATING:['QUEUED','NEEDS_MORE_INPUT','FAILED'],
  QUEUED:['PROCESSING','FAILED'],PROCESSING:['QUALITY_CHECK','NEEDS_MORE_INPUT','FAILED'],

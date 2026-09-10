@@ -4822,3 +4822,22 @@ paths:
                       enum:
                         - USER_DECLARED
                         - MERCHANT_DECLARED
+  /reconstruction/sessions/{id}:
+    get:
+      summary: Sessão privada de captura e recuperação parcial
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Posições esperadas, recebidas e validação da sessão
+        "401":
+          description: Sem sessão
+        "404":
+          description: Sessão privada indisponível

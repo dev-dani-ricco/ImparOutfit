@@ -52,18 +52,21 @@ export async function runOnce({execute=executePython}={}){
   await transaction(async c=>{
    const current=(await c.query('SELECT * FROM reconstruction_jobs WHERE id=$1 FOR UPDATE',[job.id])).rows[0];
    if(current.state!=='PROCESSING'||current.input_revision!==job.input_revision)throw new Error('STALE_JOB');
-   if(buffer)await c.query('INSERT INTO reconstruction_outputs(job_id,person_id,storage_key,mime,bytes,sha256,metadata) VALUES($1,$2,$3,$4,$5,$6,$7)',
-    [job.id,job.person_id,stagedKey,'model/gltf-binary',buffer.length,result.sha256,metadata]);
+   let output;
+   if(buffer){output=(await c.query('INSERT INTO reconstruction_outputs(job_id,person_id,storage_key,mime,bytes,sha256,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+    [job.id,job.person_id,stagedKey,'model/gltf-binary',buffer.length,result.sha256,metadata])).rows[0];
+    await c.query("INSERT INTO asset_versions(person_id,reconstruction_output_id,version,asset_type,provenance,quality,lifecycle) VALUES($1,$2,(SELECT COALESCE(max(version),0)+1 FROM asset_versions WHERE person_id=$1 AND asset_type='RECONSTRUCTION_GLB'),'RECONSTRUCTION_GLB',$3,$4,'DERIVED')",[job.person_id,output.id,result.provenance,{}]);}
    const metrics={...result.metrics,...(metadata?{triangles:metadata.triangles,vertices:metadata.vertices,invalidGeometry:metadata.invalidGeometry}:{}),
     processing_duration:(Date.now()-started)/1000,first_pass_success:false,category:job.category};
-   await transition(c,current,result.status,{metrics,code:result.error_code||null,guidance:result.guidance||['Inspecione geometria, completude, cor e dimensão antes de compor.']});
+   const updated=await transition(c,current,result.status,{metrics,code:result.error_code||null,guidance:result.guidance||['Inspecione geometria, completude, cor e dimensão antes de compor.']});
+   await c.query('UPDATE reconstruction_attempts SET state=$3,metrics=$4,completed_at=CASE WHEN $3 IN (\'QUALITY_CHECK\',\'NEEDS_MORE_INPUT\',\'FAILED\') THEN now() ELSE NULL END WHERE job_id=$1 AND sequence=$2',[job.id,current.attempt,updated.state,metrics]);
   });
   return {id:job.id,state:result.status};
  }catch(error){
   if(stagedKey)await storage.delete(stagedKey);
   await transaction(async c=>{
    const current=(await c.query('SELECT * FROM reconstruction_jobs WHERE id=$1 FOR UPDATE',[job.id])).rows[0];
-   if(current.state==='PROCESSING')await transition(c,current,'FAILED',{code:knownFailure(error.message),metrics:{reconstruction_success:false,first_pass_success:false,processing_duration:(Date.now()-started)/1000,failure_reason:knownFailure(error.message),category:job.category}});
+   if(current.state==='PROCESSING'){const metrics={reconstruction_success:false,first_pass_success:false,processing_duration:(Date.now()-started)/1000,failure_reason:knownFailure(error.message),category:job.category};await transition(c,current,'FAILED',{code:knownFailure(error.message),metrics});await c.query("UPDATE reconstruction_attempts SET state='FAILED',metrics=$3,completed_at=now() WHERE job_id=$1 AND sequence=$2",[job.id,current.attempt,metrics]);}
   });
   return {id:job.id,state:'FAILED',code:knownFailure(error.message)};
  }

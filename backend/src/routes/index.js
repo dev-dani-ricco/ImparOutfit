@@ -22,6 +22,7 @@ const authLimit=rateLimit({windowMs:15*60*1000,limit:30,standardHeaders:'draft-7
 const photos=[uploadBudget,upload.array('photos',4),validateImages];
 r.get('/reconstruction/protocol',requireAuth,wrap(reconstruction.protocol));
 r.get('/reconstruction/jobs',requireAuth,wrap(reconstruction.list));
+r.get('/reconstruction/sessions/:id',requireAuth,wrap(reconstruction.captureSession));
 r.post('/reconstruction/jobs',requireAuth,wrap(reconstruction.create));
 r.get('/reconstruction/jobs/:id',requireAuth,wrap(reconstruction.get));
 r.post('/reconstruction/jobs/:id/inputs',requireAuth,...photos,wrap(reconstruction.inputs));

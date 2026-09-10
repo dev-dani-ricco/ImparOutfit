@@ -30,6 +30,8 @@ export async function claimJob(db){
  // Atomic claim; separate workers cannot take the same queued job.
  const j=(await db.query(`SELECT * FROM reconstruction_jobs WHERE state='QUEUED' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1`)).rows[0];
  if(!j)return null;
- await db.query("UPDATE reconstruction_jobs SET attempt=attempt+1,started_at=now(),lease_until=now()+($2::int*interval '1 millisecond') WHERE id=$1",[j.id,policy.maxProcessingMs+60000]);
- return transition(db,j,'PROCESSING');
+ const claimed=(await db.query("UPDATE reconstruction_jobs SET attempt=attempt+1,started_at=now(),lease_until=now()+($2::int*interval '1 millisecond') WHERE id=$1 RETURNING *",[j.id,policy.maxProcessingMs+60000])).rows[0];
+ const processing=await transition(db,{...j,attempt:claimed.attempt},'PROCESSING');
+ await db.query("INSERT INTO reconstruction_attempts(job_id,sequence,input_revision,pipeline_version,state) VALUES($1,$2,$3,$4,'PROCESSING') ON CONFLICT(job_id,sequence) DO NOTHING",[j.id,claimed.attempt,claimed.input_revision,claimed.pipeline_version]);
+ return processing;
 }

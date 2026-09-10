@@ -213,6 +213,10 @@ test('last administrator cannot be revoked and corrupted migration ledger is ref
 test('reconstruction inputs, jobs and outputs are isolated; fake success cannot reach READY',async()=>{
  const {runOnce}=await import('../src/reconstruction/worker.js');
  const j=(await auth('post','/reconstruction/jobs',A).send({itemId:owned.id,category:'TOP'}).expect(201)).body;
+ assert.ok(j.capture_session_id);
+ const session=(await auth('get','/reconstruction/sessions/'+j.capture_session_id,A).expect(200)).body;
+ assert.equal(session.protocol_version,'TOP_CAPTURE_V1');assert.equal(session.expected_shots.length,36);
+ await auth('get','/reconstruction/sessions/'+j.capture_session_id,marketing).expect(404);
  await auth('post','/reconstruction/jobs',marketing).send({itemId:owned.id,category:'TOP'}).expect(404);
  await auth('get','/reconstruction/jobs/'+j.id,marketing).expect(404);
  await request(app).get('/api/reconstruction/jobs/'+j.id).expect(401);
