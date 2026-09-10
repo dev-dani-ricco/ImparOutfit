@@ -75,6 +75,7 @@ r.get('/looks/:id',requireAuth,wrap(looks.get));
 r.post('/looks/:id/versions',requireAuth,wrap(looks.addVersion));
 r.post('/looks/:id/variations',requireAuth,wrap(looks.createVariation));
 r.get('/looks/:id/variations',requireAuth,wrap(looks.listVariations));
+r.post('/looks/:lookId/contexts/:contextId',requireAuth,wrap(contexts.linkLook));
 r.post('/stores/:id/follow',requireAuth,wrap(social.followStore));
 r.delete('/stores/:id/follow',requireAuth,wrap(social.unfollowStore));
 const retired=(_req,res)=>res.set('Deprecation','true').status(410).json({error:'Fluxo social descontinuado',code:'ENDPOINT_RETIRED'});

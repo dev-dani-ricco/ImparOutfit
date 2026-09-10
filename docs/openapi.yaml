@@ -671,6 +671,19 @@ components:
             createdAt:
               type: string
               format: date-time
+    LookContextLink:
+      type: object
+      required: [lookId, contextId, linkedAt]
+      properties:
+        lookId:
+          type: string
+          format: uuid
+        contextId:
+          type: string
+          format: uuid
+        linkedAt:
+          type: string
+          format: date-time
     Profile:
       type: object
       properties:
@@ -3898,6 +3911,51 @@ paths:
           description: "Erro sanitizado. 401: sessão ausente/inválida; 403:
             capacidade/contexto negado; 404: recurso ausente ou privado de outra
             pessoa."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /looks/{lookId}/contexts/{contextId}:
+    post:
+      summary: Vincular um Look privado a um Context privado
+      description: Look e Context devem pertencer à mesma pessoa autenticada. Repetições retornam o vínculo existente.
+      operationId: post__looks_lookId_contexts_contextId
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: lookId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: contextId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "201":
+          description: Vínculo criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookContextLink"
+        "200":
+          description: Vínculo já existente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookContextLink"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Look ou Context inexistente ou privado de outra pessoa.
           content:
             application/json:
               schema:

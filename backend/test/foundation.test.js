@@ -195,6 +195,27 @@ test('POST /contexts creates only private progressive Context records',async()=>
   assert.equal((await db.query('SELECT count(*)::int AS count FROM contexts WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count,countBeforeInvalid);
   assert.equal((await db.query('SELECT count(*)::int AS count FROM contexts WHERE owner_person_id=$1',[B.user.person_id])).rows[0].count,countBeforeOwnerInjection);
 });
+test('POST /looks/:lookId/contexts/:contextId links only same-person resources once',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const contextA=(await auth('post','/contexts',A).send({occasion:'Context A'}).expect(201)).body;
+  const contextB=(await auth('post','/contexts',B).send({occasion:'Context B'}).expect(201)).body;
+  const linked=(await auth('post','/looks/'+fixture.lookId+'/contexts/'+contextA.id,A).send({}).expect(201)).body;
+  assert.equal(linked.lookId,fixture.lookId);
+  assert.equal(linked.contextId,contextA.id);
+  assert.ok(linked.linkedAt);
+  assert.deepEqual((await db.query('SELECT look_id,context_id,owner_person_id FROM look_contexts WHERE look_id=$1 AND context_id=$2',[fixture.lookId,contextA.id])).rows[0],{
+    look_id:fixture.lookId,context_id:contextA.id,owner_person_id:A.user.person_id
+  });
+  const repeated=(await auth('post','/looks/'+fixture.lookId+'/contexts/'+contextA.id,A).send({}).expect(200)).body;
+  assert.deepEqual(repeated,linked);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM look_contexts WHERE look_id=$1 AND context_id=$2',[fixture.lookId,contextA.id])).rows[0].count,1);
+  await auth('post','/looks/'+fixture.lookId+'/contexts/'+contextB.id,B).send({}).expect(404);
+  await auth('post','/looks/'+fixture.lookId+'/contexts/'+contextB.id,A).send({}).expect(404);
+  await auth('post','/looks/00000000-0000-4000-8000-000000000001/contexts/'+contextA.id,A).send({}).expect(404);
+  await auth('post','/looks/'+fixture.lookId+'/contexts/00000000-0000-4000-8000-000000000002',A).send({}).expect(404);
+  assert.deepEqual((await db.query('SELECT current_version_id FROM looks WHERE id=$1',[fixture.lookId])).rows[0],{current_version_id:fixture.version2Id});
+  assert.deepEqual((await db.query('SELECT owner_person_id,occasion FROM contexts WHERE id=$1',[contextA.id])).rows[0],{owner_person_id:A.user.person_id,occasion:'Context A'});
+});
 test('createLookVariation copies the current source snapshot into an independent Look',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const result=await createLookVariation({
