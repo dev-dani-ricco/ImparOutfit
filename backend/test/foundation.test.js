@@ -391,6 +391,38 @@ test('ÍMPAR Analysis Result schema preserves private versioned structured outpu
     VALUES($1,$2,3,'INVALID')`,[analysis.id,A.user.person_id]));
   assert.deepEqual((await db.query('SELECT look_id,look_version_id,context_id,status,origin,methodology_version_ref FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],before);
 });
+test('ÍMPAR Analysis schema anchors an explicit final Result from the same Analysis and Person',async()=>{
+  const first=await createVersionedLookFixture(A);
+  const second=await createVersionedLookFixture(A);
+  const contextA=(await db.query("INSERT INTO contexts(owner_person_id,provenance) VALUES($1,'USER_DECLARED') RETURNING id",[A.user.person_id])).rows[0];
+  const analysisA=(await db.query(`INSERT INTO impar_analyses(owner_person_id,look_id,look_version_id,context_id,origin)
+    VALUES($1,$2,$3,$4,'SYSTEM') RETURNING id,final_result_id`,[A.user.person_id,first.lookId,first.version2Id,contextA.id])).rows[0];
+  const analysisSamePerson=(await db.query(`INSERT INTO impar_analyses(owner_person_id,look_id,look_version_id,context_id,origin)
+    VALUES($1,$2,$3,$4,'SYSTEM') RETURNING id`,[A.user.person_id,second.lookId,second.version2Id,contextA.id])).rows[0];
+  assert.equal(analysisA.final_result_id,null);
+  const resultA1=(await db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status,payload)
+    VALUES($1,$2,1,'FINAL',$3::jsonb) RETURNING id,status,payload`,[analysisA.id,A.user.person_id,JSON.stringify({synthetic:'a-v1'})])).rows[0];
+  const resultOtherAnalysis=(await db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status)
+    VALUES($1,$2,1,'FINAL') RETURNING id`,[analysisSamePerson.id,A.user.person_id])).rows[0];
+  await db.query('UPDATE impar_analyses SET final_result_id=$1 WHERE id=$2',[resultA1.id,analysisA.id]);
+  assert.deepEqual((await db.query('SELECT final_result_id FROM impar_analyses WHERE id=$1',[analysisA.id])).rows[0],{final_result_id:resultA1.id});
+  const resultA2=(await db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status)
+    VALUES($1,$2,2,'FINAL') RETURNING id`,[analysisA.id,A.user.person_id])).rows[0];
+  assert.ok(resultA2.id);
+  assert.deepEqual((await db.query('SELECT final_result_id FROM impar_analyses WHERE id=$1',[analysisA.id])).rows[0],{final_result_id:resultA1.id});
+  await assert.rejects(()=>db.query('UPDATE impar_analyses SET final_result_id=$1 WHERE id=$2',[resultOtherAnalysis.id,analysisA.id]));
+  const ownedB=(await auth('post','/wardrobe/items',B).send({name:'B final result shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+  const lookB=(await auth('post','/looks',B).send({title:'B final result Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:ownedB.id}]}).expect(201)).body;
+  const contextB=(await db.query("INSERT INTO contexts(owner_person_id,provenance) VALUES($1,'USER_DECLARED') RETURNING id",[B.user.person_id])).rows[0];
+  const analysisB=(await db.query(`INSERT INTO impar_analyses(owner_person_id,look_id,look_version_id,context_id,origin)
+    VALUES($1,$2,$3,$4,'SYSTEM') RETURNING id`,[B.user.person_id,lookB.id,lookB.versionId,contextB.id])).rows[0];
+  const resultB=(await db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status)
+    VALUES($1,$2,1,'FINAL') RETURNING id`,[analysisB.id,B.user.person_id])).rows[0];
+  await assert.rejects(()=>db.query('UPDATE impar_analyses SET final_result_id=$1 WHERE id=$2',[resultB.id,analysisA.id]));
+  assert.deepEqual((await db.query('SELECT status,payload,result_version,owner_person_id FROM impar_analysis_results WHERE id=$1',[resultA1.id])).rows[0],{
+    status:'FINAL',payload:{synthetic:'a-v1'},result_version:1,owner_person_id:A.user.person_id
+  });
+});
 test('GET /impar-analyses/:analysisId returns only the private persisted structural references',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const context=(await auth('post','/contexts',A).send({occasion:'Readable analysis context'}).expect(201)).body;
