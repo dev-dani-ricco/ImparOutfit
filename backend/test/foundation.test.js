@@ -443,6 +443,38 @@ test('POST /impar-analyses/:analysisId/results creates immutable private DRAFT v
   assert.deepEqual((await db.query('SELECT status,origin,methodology_version_ref FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{...before.analysis,status:'COMPLETED'});
   assert.deepEqual((await db.query('SELECT result_version,payload FROM impar_analysis_results WHERE analysis_id=$1 ORDER BY result_version',[analysis.id])).rows,before.versions);
 });
+test('GET /impar-analyses/:analysisId/results returns the complete private version history in semantic order',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const context=(await auth('post','/contexts',A).send({occasion:'Read Result history context'}).expect(201)).body;
+  const analysis=(await auth('post','/impar-analyses',A).send({
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'
+  }).expect(201)).body;
+  const empty=(await auth('post','/impar-analyses',A).send({
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'
+  }).expect(201)).body;
+  assert.deepEqual((await auth('get','/impar-analyses/'+empty.id+'/results',A).expect(200)).body,[]);
+  const create=payload=>auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload});
+  const version1=(await create({version:'one'}).expect(201)).body;
+  const version2=(await create({version:'two'}).expect(201)).body;
+  const version3=(await create({version:'three'}).expect(201)).body;
+  await db.query("UPDATE impar_analysis_results SET created_at='2026-09-11T12:00:00.000Z' WHERE id=$1",[version1.id]);
+  await db.query("UPDATE impar_analysis_results SET created_at='2026-09-11T08:00:00.000Z',status='FINAL' WHERE id=$1",[version2.id]);
+  await db.query("UPDATE impar_analysis_results SET created_at='2026-09-11T10:00:00.000Z' WHERE id=$1",[version3.id]);
+  const before={
+    analysis:(await db.query('SELECT status,look_version_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],
+    results:(await db.query('SELECT id,result_version,status,payload,created_at FROM impar_analysis_results WHERE analysis_id=$1 ORDER BY result_version',[analysis.id])).rows
+  };
+  const listed=(await auth('get','/impar-analyses/'+analysis.id+'/results',A).expect(200)).body;
+  assert.deepEqual(listed.map(result=>({id:result.id,resultVersion:result.resultVersion,status:result.status,payload:result.payload})),[
+    {id:version1.id,resultVersion:1,status:'DRAFT',payload:{version:'one'}},
+    {id:version2.id,resultVersion:2,status:'FINAL',payload:{version:'two'}},
+    {id:version3.id,resultVersion:3,status:'DRAFT',payload:{version:'three'}}
+  ]);
+  await auth('get','/impar-analyses/'+analysis.id+'/results',B).expect(404);
+  await auth('get','/impar-analyses/00000000-0000-4000-8000-000000000019/results',A).expect(404);
+  assert.deepEqual((await db.query('SELECT status,look_version_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],before.analysis);
+  assert.deepEqual((await db.query('SELECT id,result_version,status,payload,created_at FROM impar_analysis_results WHERE analysis_id=$1 ORDER BY result_version',[analysis.id])).rows,before.results);
+});
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({
     occasion:'Synthetic dinner',startsAt:'2026-09-10T19:30:00.000Z',locationText:'Synthetic location',

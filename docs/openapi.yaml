@@ -4688,6 +4688,59 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+    get:
+      summary: Listar histórico privado de Results da Analysis
+      description: Retorna todas as versões existentes em resultVersion crescente. Analysis sem Results retorna array vazio.
+      operationId: get__impar_analyses_analysisId_results
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: analysisId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Histórico privado completo, ordenado por resultVersion ascendente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, analysisId, resultVersion, status, payload, createdAt]
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    analysisId:
+                      type: string
+                      format: uuid
+                    resultVersion:
+                      type: integer
+                      minimum: 1
+                    status:
+                      type: string
+                      enum: [DRAFT, FINAL]
+                    payload:
+                      type: object
+                    createdAt:
+                      type: string
+                      format: date-time
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Analysis inexistente ou privada de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /contexts/{contextId}:
     get:
       summary: Obter Context privado

@@ -88,3 +88,12 @@ export async function createResult(req,res) {
     throw error;
   } finally { client.release(); }
 }
+
+export async function listResults(req,res) {
+  const analysis=(await query('SELECT id,owner_person_id AS person_id FROM impar_analyses WHERE id=$1',[req.params.analysisId])).rows[0];
+  authorizePersonal(req.auth,analysis);
+  const results=(await query(`SELECT id,analysis_id,result_version,status,payload,created_at
+    FROM impar_analysis_results WHERE analysis_id=$1 AND owner_person_id=$2
+    ORDER BY result_version ASC,id ASC`,[analysis.id,req.auth.personId])).rows;
+  res.json(results.map(toResult));
+}
