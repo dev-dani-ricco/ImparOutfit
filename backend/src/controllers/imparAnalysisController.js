@@ -19,6 +19,7 @@ const toAnalysis=row=>({
   status:row.status,
   origin:row.origin,
   methodologyVersionRef:row.methodology_version_ref,
+  finalResultId:row.final_result_id,
   createdAt:row.created_at
 });
 
@@ -35,14 +36,14 @@ export async function create(req,res) {
   const analysis=(await query(`INSERT INTO impar_analyses(
     owner_person_id,look_id,look_version_id,context_id,status,origin,methodology_version_ref
   ) VALUES($1,$2,$3,$4,'DRAFT',$5,$6)
-  RETURNING id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,created_at`,[
+  RETURNING id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,final_result_id,created_at`,[
     req.auth.personId,look.id,lookVersion.id,context.id,body.origin,body.methodologyVersionRef??null
   ])).rows[0];
   res.status(201).json(toAnalysis(analysis));
 }
 
 export async function get(req,res) {
-  const analysis=(await query(`SELECT id,owner_person_id AS person_id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,created_at
+  const analysis=(await query(`SELECT id,owner_person_id AS person_id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,final_result_id,created_at
     FROM impar_analyses WHERE id=$1`,[req.params.analysisId])).rows[0];
   authorizePersonal(req.auth,analysis);
   res.json(toAnalysis(analysis));
@@ -122,6 +123,40 @@ export async function finalizeResult(req,res) {
     if(!finalized) throw new HttpError(409,'Result não pode ser finalizado neste estado');
     await client.query('COMMIT');
     res.json(toResult(finalized));
+  } catch(error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
+}
+
+const completeSchema=Joi.object({resultId:uuid.required()});
+export async function complete(req,res) {
+  const body=validate(completeSchema,req.body||{});
+  const client=await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const analysis=(await client.query(`SELECT id,owner_person_id AS person_id,look_id,look_version_id,context_id,status,origin,
+      methodology_version_ref,final_result_id,created_at FROM impar_analyses WHERE id=$1 FOR UPDATE`,[req.params.analysisId])).rows[0];
+    authorizePersonal(req.auth,analysis);
+    const result=(await client.query(`SELECT id,analysis_id,owner_person_id AS person_id,status
+      FROM impar_analysis_results WHERE id=$1 AND analysis_id=$2 AND owner_person_id=$3 FOR UPDATE`,[
+      body.resultId,analysis.id,req.auth.personId
+    ])).rows[0];
+    authorizePersonal(req.auth,result);
+    if(analysis.status==='COMPLETED') {
+      if(analysis.final_result_id!==result.id) throw new HttpError(409,'Analysis já possui Result final diferente');
+      await client.query('COMMIT');
+      return res.json(toAnalysis(analysis));
+    }
+    if(result.status!=='FINAL') throw new HttpError(409,'Result precisa estar FINAL para concluir a Analysis');
+    const completed=(await client.query(`UPDATE impar_analyses SET status='COMPLETED',final_result_id=$1
+      WHERE id=$2 AND owner_person_id=$3 AND status='DRAFT'
+      RETURNING id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,final_result_id,created_at`,[
+      result.id,analysis.id,req.auth.personId
+    ])).rows[0];
+    if(!completed) throw new HttpError(409,'Analysis não pode ser concluída neste estado');
+    await client.query('COMMIT');
+    res.json(toAnalysis(completed));
   } catch(error) {
     await client.query('ROLLBACK');
     throw error;

@@ -900,14 +900,18 @@ components:
       allOf:
         - $ref: "#/components/schemas/ImparAnalysisInput"
         - type: object
-          required: [id, status, createdAt]
+          required: [id, status, finalResultId, createdAt]
           properties:
             id:
               type: string
               format: uuid
             status:
               type: string
-              enum: [DRAFT]
+              enum: [DRAFT, COMPLETED]
+            finalResultId:
+              type: string
+              format: uuid
+              nullable: true
             createdAt:
               type: string
               format: date-time
@@ -4600,7 +4604,7 @@ paths:
   /impar-analyses/{analysisId}:
     get:
       summary: Obter ÍMPAR Analysis privada
-      description: Retorna apenas referências estruturais persistidas. lookVersionId é histórico e methodologyVersionRef é um identificador opaco.
+      description: Retorna apenas referências estruturais persistidas. lookVersionId é histórico, methodologyVersionRef é um identificador opaco e finalResultId é a âncora explícita quando a Analysis está COMPLETED.
       operationId: get__impar_analyses_analysisId
       security:
         - bearerAuth: []
@@ -4626,6 +4630,63 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Analysis inexistente ou privada de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /impar-analyses/{analysisId}/complete:
+    post:
+      summary: Concluir ÍMPAR Analysis com Result FINAL explícito
+      description: Requer Analysis DRAFT e um Result FINAL privado pertencente à própria Analysis. A operação atualiza status e finalResultId atomicamente. Repetir com o mesmo Result é idempotente; um Result final diferente gera conflito.
+      operationId: post__impar_analyses_analysisId_complete
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: analysisId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resultId]
+              additionalProperties: false
+              properties:
+                resultId:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Analysis COMPLETED com Result final explícito, inclusive resposta idempotente com o mesmo Result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImparAnalysis"
+        "400":
+          description: resultId ausente, inválido ou campos não aceitos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Analysis ou Result inexistente, incompatível ou privado de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Result ainda DRAFT, Analysis já concluída com outro Result ou estado incompatível.
           content:
             application/json:
               schema:

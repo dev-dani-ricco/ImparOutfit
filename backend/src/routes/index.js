@@ -73,6 +73,7 @@ r.post('/contexts',requireAuth,wrap(contexts.create));
 r.get('/contexts/:contextId',requireAuth,wrap(contexts.get));
 r.post('/impar-analyses',requireAuth,wrap(imparAnalyses.create));
 r.get('/impar-analyses/:analysisId',requireAuth,wrap(imparAnalyses.get));
+r.post('/impar-analyses/:analysisId/complete',requireAuth,wrap(imparAnalyses.complete));
 r.post('/impar-analyses/:analysisId/results',requireAuth,wrap(imparAnalyses.createResult));
 r.get('/impar-analyses/:analysisId/results',requireAuth,wrap(imparAnalyses.listResults));
 r.post('/impar-analyses/:analysisId/results/:resultId/finalize',requireAuth,wrap(imparAnalyses.finalizeResult));

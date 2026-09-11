@@ -563,6 +563,66 @@ test('POST /impar-analyses/:analysisId/results/:resultId/finalize finalizes only
   assert.deepEqual((await db.query('SELECT status,origin,methodology_version_ref FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{...before.analysis,status:'COMPLETED'});
   assert.deepEqual((await db.query('SELECT status,payload FROM impar_analysis_results WHERE id=$1',[draftForCompleted.id])).rows[0],{status:'DRAFT',payload:{version:'three'}});
 });
+test('POST /impar-analyses/:analysisId/complete anchors one explicit FINAL Result atomically',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const context=(await auth('post','/contexts',A).send({occasion:'Complete Analysis context'}).expect(201)).body;
+  const createAnalysis=()=>auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'});
+  const analysis=(await createAnalysis().expect(201)).body;
+  const otherAnalysis=(await createAnalysis().expect(201)).body;
+  const create=(target,payload)=>auth('post','/impar-analyses/'+target.id+'/results',A).send({payload});
+  const finalize=(target,result)=>auth('post','/impar-analyses/'+target.id+'/results/'+result.id+'/finalize',A).send({});
+  const complete=(target,result,user=A,body={resultId:result.id})=>auth('post','/impar-analyses/'+target.id+'/complete',user).send(body);
+  const errorCode=async(response,status,code)=>{
+    const reply=await response.expect(status);
+    assert.equal(reply.body.error.code,code);
+    return reply;
+  };
+  assert.equal((await auth('get','/impar-analyses/'+analysis.id,A).expect(200)).body.finalResultId,null);
+  const version1=(await create(analysis,{version:'one'}).expect(201)).body;
+  const version2=(await create(analysis,{version:'two'}).expect(201)).body;
+  const version3=(await create(analysis,{version:'three'}).expect(201)).body;
+  await finalize(analysis,version1).expect(200);
+  await finalize(analysis,version2).expect(200);
+  await finalize(analysis,version3).expect(200);
+  const otherResult=(await create(otherAnalysis,{version:'other'}).expect(201)).body;
+  await finalize(otherAnalysis,otherResult).expect(200);
+  const draftAnalysis=(await createAnalysis().expect(201)).body;
+  const draftResult=(await create(draftAnalysis,{version:'draft'}).expect(201)).body;
+  await errorCode(auth('post','/impar-analyses/'+analysis.id+'/complete',A).send({}),400,'VALIDATION_ERROR');
+  await errorCode(auth('post','/impar-analyses/'+analysis.id+'/complete',A).send({resultId:'not-a-uuid'}),400,'VALIDATION_ERROR');
+  await errorCode(complete(draftAnalysis,draftResult),409,'STATE_CONFLICT');
+  assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[draftAnalysis.id])).rows[0],{status:'DRAFT',final_result_id:null});
+  await errorCode(complete(analysis,otherResult),404,'RESOURCE_NOT_FOUND');
+  await errorCode(complete(analysis,version1,B),404,'RESOURCE_NOT_FOUND');
+  const ownedB=(await auth('post','/wardrobe/items',B).send({name:'B complete analysis shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+  const lookB=(await auth('post','/looks',B).send({title:'B complete analysis Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:ownedB.id}]}).expect(201)).body;
+  const contextB=(await auth('post','/contexts',B).send({occasion:'B complete analysis context'}).expect(201)).body;
+  const analysisB=(await auth('post','/impar-analyses',B).send({lookId:lookB.id,lookVersionId:lookB.versionId,contextId:contextB.id,origin:'SYSTEM'}).expect(201)).body;
+  const resultB=(await auth('post','/impar-analyses/'+analysisB.id+'/results',B).send({payload:{version:'b'}}).expect(201)).body;
+  await auth('post','/impar-analyses/'+analysisB.id+'/results/'+resultB.id+'/finalize',B).send({}).expect(200);
+  await errorCode(complete(analysis,resultB),404,'RESOURCE_NOT_FOUND');
+  await errorCode(complete(analysis,version1,A,{resultId:version1.id,status:'COMPLETED'}),400,'VALIDATION_ERROR');
+  const beforeResults=(await db.query(`SELECT id,result_version,status,payload,analysis_id,owner_person_id,created_at
+    FROM impar_analysis_results WHERE analysis_id=$1 ORDER BY result_version`,[analysis.id])).rows;
+  const completed=(await complete(analysis,version1).expect(200)).body;
+  assert.deepEqual({id:completed.id,lookId:completed.lookId,lookVersionId:completed.lookVersionId,contextId:completed.contextId,
+    status:completed.status,origin:completed.origin,finalResultId:completed.finalResultId},{
+    id:analysis.id,lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,
+    status:'COMPLETED',origin:'SYSTEM',finalResultId:version1.id
+  });
+  assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{
+    status:'COMPLETED',final_result_id:version1.id
+  });
+  assert.deepEqual((await auth('get','/impar-analyses/'+analysis.id,A).expect(200)).body.finalResultId,version1.id);
+  assert.deepEqual((await db.query(`SELECT id,result_version,status,payload,analysis_id,owner_person_id,created_at
+    FROM impar_analysis_results WHERE analysis_id=$1 ORDER BY result_version`,[analysis.id])).rows,beforeResults);
+  const repeated=(await complete(analysis,version1).expect(200)).body;
+  assert.deepEqual(repeated,completed);
+  await errorCode(complete(analysis,version2),409,'STATE_CONFLICT');
+  assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{
+    status:'COMPLETED',final_result_id:version1.id
+  });
+});
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({
     occasion:'Synthetic dinner',startsAt:'2026-09-10T19:30:00.000Z',locationText:'Synthetic location',
