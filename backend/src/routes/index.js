@@ -74,6 +74,7 @@ r.post('/impar-analyses',requireAuth,wrap(imparAnalyses.create));
 r.get('/impar-analyses/:analysisId',requireAuth,wrap(imparAnalyses.get));
 r.post('/impar-analyses/:analysisId/results',requireAuth,wrap(imparAnalyses.createResult));
 r.get('/impar-analyses/:analysisId/results',requireAuth,wrap(imparAnalyses.listResults));
+r.post('/impar-analyses/:analysisId/results/:resultId/finalize',requireAuth,wrap(imparAnalyses.finalizeResult));
 r.post('/collections',requireAuth,wrap(collections.create));
 r.post('/collections/:collectionId/looks/:lookId',requireAuth,wrap(collections.linkLook));
 r.get('/collections/:collectionId',requireAuth,wrap(collections.get));

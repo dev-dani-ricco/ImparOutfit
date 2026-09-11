@@ -97,3 +97,33 @@ export async function listResults(req,res) {
     ORDER BY result_version ASC,id ASC`,[analysis.id,req.auth.personId])).rows;
   res.json(results.map(toResult));
 }
+
+export async function finalizeResult(req,res) {
+  validate(Joi.object({}),req.body||{});
+  const client=await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const analysis=(await client.query(`SELECT id,owner_person_id AS person_id,status
+      FROM impar_analyses WHERE id=$1 FOR UPDATE`,[req.params.analysisId])).rows[0];
+    authorizePersonal(req.auth,analysis);
+    if(analysis.status!=='DRAFT') throw new HttpError(409,'Analysis não aceita finalização de Results fora de DRAFT');
+    const result=(await client.query(`SELECT id,analysis_id,owner_person_id AS person_id,result_version,status,payload,created_at
+      FROM impar_analysis_results WHERE id=$1 AND analysis_id=$2 FOR UPDATE`,[req.params.resultId,analysis.id])).rows[0];
+    authorizePersonal(req.auth,result);
+    if(result.status==='FINAL') {
+      await client.query('COMMIT');
+      return res.status(200).json(toResult(result));
+    }
+    const finalized=(await client.query(`UPDATE impar_analysis_results SET status='FINAL'
+      WHERE id=$1 AND analysis_id=$2 AND owner_person_id=$3 AND status='DRAFT'
+      RETURNING id,analysis_id,result_version,status,payload,created_at`,[
+      result.id,analysis.id,req.auth.personId
+    ])).rows[0];
+    if(!finalized) throw new HttpError(409,'Result não pode ser finalizado neste estado');
+    await client.query('COMMIT');
+    res.json(toResult(finalized));
+  } catch(error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
+}

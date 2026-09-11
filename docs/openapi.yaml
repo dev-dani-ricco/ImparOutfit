@@ -4741,6 +4741,83 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /impar-analyses/{analysisId}/results/{resultId}/finalize:
+    post:
+      summary: Finalizar um Result privado específico
+      description: Requer Analysis em DRAFT e Result pertencente à Analysis. A transição DRAFT para FINAL é idempotente e preserva payload e versão.
+      operationId: post__impar_analyses_analysisId_results_resultId_finalize
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: analysisId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: resultId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        "200":
+          description: Result FINAL, incluindo resposta idempotente para Result já finalizado.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, analysisId, resultVersion, status, payload, createdAt]
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  analysisId:
+                    type: string
+                    format: uuid
+                  resultVersion:
+                    type: integer
+                    minimum: 1
+                  status:
+                    type: string
+                    enum: [FINAL]
+                  payload:
+                    type: object
+                  createdAt:
+                    type: string
+                    format: date-time
+        "400":
+          description: Campos de negócio não são aceitos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Analysis ou Result inexistente, incompatível ou privado de outra pessoa.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Analysis fora de DRAFT ou estado incompatível.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /contexts/{contextId}:
     get:
       summary: Obter Context privado
