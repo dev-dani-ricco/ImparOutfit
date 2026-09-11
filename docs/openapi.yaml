@@ -4637,7 +4637,7 @@ paths:
   /impar-analyses/{analysisId}/complete:
     post:
       summary: Concluir ÍMPAR Analysis com Result FINAL explícito
-      description: Requer Analysis DRAFT e um Result FINAL privado pertencente à própria Analysis. A operação atualiza status e finalResultId atomicamente. Repetir com o mesmo Result é idempotente; um Result final diferente gera conflito.
+      description: Requer ownership privado e capability institucional impar.analysis.execute, além de Analysis DRAFT e Result FINAL pertencente à própria Analysis. A operação atualiza status e finalResultId atomicamente. Repetir com o mesmo Result é idempotente; um Result final diferente gera conflito.
       operationId: post__impar_analyses_analysisId_complete
       security:
         - bearerAuth: []
@@ -4679,6 +4679,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          description: Capability institucional de execução não concedida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           description: Analysis ou Result inexistente, incompatível ou privado de outra pessoa.
           content:
@@ -4694,7 +4700,7 @@ paths:
   /impar-analyses/{analysisId}/results:
     post:
       summary: Criar Result privado versionado em DRAFT
-      description: A Analysis deve estar em DRAFT. O servidor controla resultVersion e status; payload é um objeto estrutural e não aceita internals de prompt ou RAG.
+      description: Requer ownership privado e capability institucional impar.analysis.execute. A Analysis deve estar em DRAFT. O servidor controla resultVersion e status; payload é um objeto estrutural e não aceita internals de prompt ou RAG.
       operationId: post__impar_analyses_analysisId_results
       security:
         - bearerAuth: []
@@ -4751,6 +4757,12 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Capability institucional de execução não concedida.
           content:
             application/json:
               schema:
@@ -4823,7 +4835,7 @@ paths:
   /impar-analyses/{analysisId}/results/{resultId}/finalize:
     post:
       summary: Finalizar um Result privado específico
-      description: Requer Analysis em DRAFT e Result pertencente à Analysis. A transição DRAFT para FINAL é idempotente e preserva payload e versão.
+      description: Requer ownership privado e capability institucional impar.analysis.execute, além de Analysis em DRAFT e Result pertencente à Analysis. A transição DRAFT para FINAL é idempotente e preserva payload e versão.
       operationId: post__impar_analyses_analysisId_results_resultId_finalize
       security:
         - bearerAuth: []
@@ -4881,6 +4893,12 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Capability institucional de execução não concedida.
           content:
             application/json:
               schema:

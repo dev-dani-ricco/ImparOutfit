@@ -37,6 +37,14 @@ async function register(label,store=false) {
   }
   return r.body;
 }
+async function grantInstitutionalCapability(user,capability='impar.analysis.execute') {
+  let membership=(await db.query(`SELECT id FROM memberships
+    WHERE person_id=$1 AND organization_id=$2 AND status='ACTIVE'`,[user.user.person_id,institution])).rows[0];
+  if(!membership) membership=(await db.query(`INSERT INTO memberships(person_id,organization_id,created_by_person_id)
+    VALUES($1,$2,$3) RETURNING id`,[user.user.person_id,institution,reviewer.user.person_id])).rows[0];
+  await db.query(`INSERT INTO grants(membership_id,capability_code,granted_by_person_id)
+    VALUES($1,$2,$3) ON CONFLICT DO NOTHING`,[membership.id,capability,reviewer.user.person_id]);
+}
 async function createVersionedLookFixture(user=A) {
   if(!owned) owned=(await auth('post','/wardrobe/items',user).send({name:'Fixture owned shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
   if(!product) product=(await auth('post','/stores/items',storeA).send({name:'Fixture commercial shirt',category:'tops'}).expect(201)).body;
@@ -76,6 +84,8 @@ before(async()=>{
   await db.query("INSERT INTO grants(membership_id,capability_code,granted_by_person_id) VALUES($1,'store_requests.review',$2)",[reviewerMember.id,reviewer.user.person_id]);
   A=await register('client-a'); B=await register('client-b');
   storeA=await register('store-a',true);storeB=await register('store-b',true);marketing=await register('marketing');
+  await grantInstitutionalCapability(A);
+  await grantInstitutionalCapability(B);
 });
 after(async()=>{await db?.close();await pool.end();await rm(process.env.MEDIA_ROOT,{recursive:true,force:true});});
 
@@ -622,6 +632,34 @@ test('POST /impar-analyses/:analysisId/complete anchors one explicit FINAL Resul
   assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{
     status:'COMPLETED',final_result_id:version1.id
   });
+});
+test('ÍMPAR Analysis execution requires institutional capability after private ownership',async()=>{
+  const owner=await register('analysis-owner-without-execution-capability');
+  const ownerItem=(await auth('post','/wardrobe/items',owner).send({name:'No capability analysis shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+  const ownerLook=(await auth('post','/looks',owner).send({title:'No capability analysis Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:ownerItem.id}]}).expect(201)).body;
+  const ownerContext=(await auth('post','/contexts',owner).send({occasion:'No capability analysis context'}).expect(201)).body;
+  const analysis=(await auth('post','/impar-analyses',owner).send({lookId:ownerLook.id,lookVersionId:ownerLook.versionId,contextId:ownerContext.id,origin:'SYSTEM'}).expect(201)).body;
+  const assertError=async(response,status,code)=>{
+    const reply=await response.expect(status);
+    assert.equal(reply.body.error.code,code);
+  };
+  await auth('get','/impar-analyses/'+analysis.id,owner).expect(200);
+  await auth('get','/impar-analyses/'+analysis.id+'/results',owner).expect(200,[]);
+  await assertError(auth('post','/impar-analyses/'+analysis.id+'/results',owner).send({payload:{origin:'SYSTEM'}}),403,'FORBIDDEN');
+  const draft=(await db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status,payload)
+    VALUES($1,$2,1,'DRAFT',$3::jsonb) RETURNING id`,[analysis.id,owner.user.person_id,JSON.stringify({synthetic:'draft'})])).rows[0];
+  const final=(await db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status,payload)
+    VALUES($1,$2,2,'FINAL',$3::jsonb) RETURNING id`,[analysis.id,owner.user.person_id,JSON.stringify({synthetic:'final'})])).rows[0];
+  await assertError(auth('post','/impar-analyses/'+analysis.id+'/results/'+draft.id+'/finalize',owner).send({}),403,'FORBIDDEN');
+  await assertError(auth('post','/impar-analyses/'+analysis.id+'/complete',owner).send({resultId:final.id}),403,'FORBIDDEN');
+  await grantInstitutionalCapability(reviewer);
+  await assertError(auth('post','/impar-analyses/'+analysis.id+'/results',reviewer).send({payload:{}}),404,'RESOURCE_NOT_FOUND');
+  await grantInstitutionalCapability(owner);
+  const executable=(await auth('post','/impar-analyses/'+analysis.id+'/results',owner).send({payload:{synthetic:'authorized'}}).expect(201)).body;
+  await auth('post','/impar-analyses/'+analysis.id+'/results/'+executable.id+'/finalize',owner).send({}).expect(200);
+  const completed=(await auth('post','/impar-analyses/'+analysis.id+'/complete',owner).send({resultId:executable.id}).expect(200)).body;
+  assert.equal(completed.status,'COMPLETED');
+  assert.equal(completed.finalResultId,executable.id);
 });
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({

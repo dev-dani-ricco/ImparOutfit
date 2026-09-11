@@ -17,6 +17,17 @@ export async function authorizeCapability(auth, organizationId, capability, reso
   if (!grant) throw new HttpError(403, 'Capacidade não concedida neste contexto');
 }
 
+export async function authorizeInstitutionalCapability(auth, capability, db = { query }) {
+  if (!auth?.personId) throw new HttpError(401, 'Autenticação necessária');
+  const grant = (await db.query(`SELECT g.id FROM memberships m JOIN grants g ON g.membership_id=m.id
+    JOIN organizations o ON o.id=m.organization_id AND o.kind='INSTITUTIONAL' AND o.status='ACTIVE'
+    WHERE m.person_id=$1 AND m.status='ACTIVE' AND g.capability_code=$2
+      AND g.resource_id IS NULL AND g.revoked_at IS NULL AND (g.expires_at IS NULL OR g.expires_at>now()) LIMIT 1`,[
+    auth.personId,capability
+  ])).rows[0];
+  if (!grant) throw new HttpError(403, 'Capacidade institucional não concedida');
+}
+
 export const requireCapability = capability => async (req, _res, next) => {
   try {
     const requested = req.params.storeId || req.get('X-Organization-Id');

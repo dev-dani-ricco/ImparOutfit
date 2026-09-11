@@ -1,7 +1,7 @@
 import Joi from 'joi';
 import { pool, query } from '../config/db.js';
 import { uuid, validate } from '../utils/validation.js';
-import { authorizePersonal } from '../services/authorizationService.js';
+import { authorizeInstitutionalCapability, authorizePersonal } from '../services/authorizationService.js';
 import { HttpError } from '../utils/http.js';
 
 const schema=Joi.object({
@@ -72,6 +72,7 @@ export async function createResult(req,res) {
     const analysis=(await client.query(`SELECT id,owner_person_id AS person_id,status
       FROM impar_analyses WHERE id=$1 FOR UPDATE`,[req.params.analysisId])).rows[0];
     authorizePersonal(req.auth,analysis);
+    await authorizeInstitutionalCapability(req.auth,'impar.analysis.execute',client);
     if(analysis.status!=='DRAFT') throw new HttpError(409,'Analysis não aceita Results fora de DRAFT');
     const versions=(await client.query(`SELECT result_version FROM impar_analysis_results
       WHERE analysis_id=$1 ORDER BY result_version DESC FOR SHARE`,[analysis.id])).rows;
@@ -107,10 +108,11 @@ export async function finalizeResult(req,res) {
     const analysis=(await client.query(`SELECT id,owner_person_id AS person_id,status
       FROM impar_analyses WHERE id=$1 FOR UPDATE`,[req.params.analysisId])).rows[0];
     authorizePersonal(req.auth,analysis);
-    if(analysis.status!=='DRAFT') throw new HttpError(409,'Analysis não aceita finalização de Results fora de DRAFT');
     const result=(await client.query(`SELECT id,analysis_id,owner_person_id AS person_id,result_version,status,payload,created_at
       FROM impar_analysis_results WHERE id=$1 AND analysis_id=$2 FOR UPDATE`,[req.params.resultId,analysis.id])).rows[0];
     authorizePersonal(req.auth,result);
+    await authorizeInstitutionalCapability(req.auth,'impar.analysis.execute',client);
+    if(analysis.status!=='DRAFT') throw new HttpError(409,'Analysis não aceita finalização de Results fora de DRAFT');
     if(result.status==='FINAL') {
       await client.query('COMMIT');
       return res.status(200).json(toResult(result));
@@ -143,6 +145,7 @@ export async function complete(req,res) {
       body.resultId,analysis.id,req.auth.personId
     ])).rows[0];
     authorizePersonal(req.auth,result);
+    await authorizeInstitutionalCapability(req.auth,'impar.analysis.execute',client);
     if(analysis.status==='COMPLETED') {
       if(analysis.final_result_id!==result.id) throw new HttpError(409,'Analysis já possui Result final diferente');
       await client.query('COMMIT');
