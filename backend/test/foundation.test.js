@@ -661,6 +661,49 @@ test('ÍMPAR Analysis execution requires institutional capability after private 
   assert.equal(completed.status,'COMPLETED');
   assert.equal(completed.finalResultId,executable.id);
 });
+test('ÍMPAR Analysis execution records immutable authenticated Person provenance',async()=>{
+  const fixture=await createVersionedLookFixture(A);
+  const context=(await auth('post','/contexts',A).send({occasion:'Execution provenance context'}).expect(201)).body;
+  const analysis=(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'}).expect(201)).body;
+  const result=(await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{synthetic:'provenance'}}).expect(201)).body;
+  assert.deepEqual((await db.query('SELECT created_by_person_id,finalized_by_person_id FROM impar_analysis_results WHERE id=$1',[result.id])).rows[0],{
+    created_by_person_id:A.user.person_id,finalized_by_person_id:null
+  });
+  await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{},createdBy:B.user.person_id}).expect(400);
+  await auth('post','/impar-analyses/'+analysis.id+'/results/'+result.id+'/finalize',A).send({actorId:B.user.person_id}).expect(400);
+  const finalized=(await auth('post','/impar-analyses/'+analysis.id+'/results/'+result.id+'/finalize',A).send({}).expect(200)).body;
+  assert.equal(finalized.status,'FINAL');
+  assert.deepEqual((await db.query('SELECT created_by_person_id,finalized_by_person_id,status,payload FROM impar_analysis_results WHERE id=$1',[result.id])).rows[0],{
+    created_by_person_id:A.user.person_id,finalized_by_person_id:A.user.person_id,status:'FINAL',payload:{synthetic:'provenance'}
+  });
+  await auth('post','/impar-analyses/'+analysis.id+'/results/'+result.id+'/finalize',A).send({}).expect(200);
+  assert.deepEqual((await db.query('SELECT finalized_by_person_id FROM impar_analysis_results WHERE id=$1',[result.id])).rows[0],{
+    finalized_by_person_id:A.user.person_id
+  });
+  await auth('post','/impar-analyses/'+analysis.id+'/complete',A).send({resultId:result.id,completedBy:B.user.person_id}).expect(400);
+  const completed=(await auth('post','/impar-analyses/'+analysis.id+'/complete',A).send({resultId:result.id}).expect(200)).body;
+  assert.equal(completed.status,'COMPLETED');
+  assert.deepEqual((await db.query('SELECT completed_by_person_id,status,final_result_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{
+    completed_by_person_id:A.user.person_id,status:'COMPLETED',final_result_id:result.id
+  });
+  await auth('post','/impar-analyses/'+analysis.id+'/complete',A).send({resultId:result.id}).expect(200);
+  assert.deepEqual((await db.query('SELECT completed_by_person_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{
+    completed_by_person_id:A.user.person_id
+  });
+  const expertAnalysis=(await db.query(`INSERT INTO impar_analyses(owner_person_id,look_id,look_version_id,context_id,origin)
+    VALUES($1,$2,$3,$4,'EXPERT') RETURNING id`,[A.user.person_id,fixture.lookId,fixture.version2Id,context.id])).rows[0];
+  const expertResult=(await auth('post','/impar-analyses/'+expertAnalysis.id+'/results',A).send({payload:{synthetic:'expert-origin'}}).expect(201)).body;
+  assert.deepEqual((await db.query('SELECT created_by_person_id FROM impar_analysis_results WHERE id=$1',[expertResult.id])).rows[0],{
+    created_by_person_id:A.user.person_id
+  });
+  const historical=(await db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status,payload)
+    VALUES($1,$2,2,'DRAFT',$3::jsonb) RETURNING id,created_by_person_id,finalized_by_person_id`,[
+    expertAnalysis.id,A.user.person_id,JSON.stringify({synthetic:'historical'})
+  ])).rows[0];
+  assert.deepEqual({created_by_person_id:historical.created_by_person_id,finalized_by_person_id:historical.finalized_by_person_id},{
+    created_by_person_id:null,finalized_by_person_id:null
+  });
+});
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({
     occasion:'Synthetic dinner',startsAt:'2026-09-10T19:30:00.000Z',locationText:'Synthetic location',

@@ -78,10 +78,10 @@ export async function createResult(req,res) {
       WHERE analysis_id=$1 ORDER BY result_version DESC FOR SHARE`,[analysis.id])).rows;
     const next=(versions[0]?.result_version??0)+1;
     const result=(await client.query(`INSERT INTO impar_analysis_results(
-      analysis_id,owner_person_id,result_version,status,payload
-    ) VALUES($1,$2,$3,'DRAFT',$4)
+      analysis_id,owner_person_id,result_version,status,payload,created_by_person_id
+    ) VALUES($1,$2,$3,'DRAFT',$4,$5)
     RETURNING id,analysis_id,result_version,status,payload,created_at`,[
-      analysis.id,req.auth.personId,next,body.payload
+      analysis.id,req.auth.personId,next,body.payload,req.auth.personId
     ])).rows[0];
     await client.query('COMMIT');
     res.status(201).json(toResult(result));
@@ -117,10 +117,10 @@ export async function finalizeResult(req,res) {
       await client.query('COMMIT');
       return res.status(200).json(toResult(result));
     }
-    const finalized=(await client.query(`UPDATE impar_analysis_results SET status='FINAL'
+    const finalized=(await client.query(`UPDATE impar_analysis_results SET status='FINAL',finalized_by_person_id=$4
       WHERE id=$1 AND analysis_id=$2 AND owner_person_id=$3 AND status='DRAFT'
       RETURNING id,analysis_id,result_version,status,payload,created_at`,[
-      result.id,analysis.id,req.auth.personId
+      result.id,analysis.id,req.auth.personId,req.auth.personId
     ])).rows[0];
     if(!finalized) throw new HttpError(409,'Result não pode ser finalizado neste estado');
     await client.query('COMMIT');
@@ -152,10 +152,10 @@ export async function complete(req,res) {
       return res.json(toAnalysis(analysis));
     }
     if(result.status!=='FINAL') throw new HttpError(409,'Result precisa estar FINAL para concluir a Analysis');
-    const completed=(await client.query(`UPDATE impar_analyses SET status='COMPLETED',final_result_id=$1
+    const completed=(await client.query(`UPDATE impar_analyses SET status='COMPLETED',final_result_id=$1,completed_by_person_id=$4
       WHERE id=$2 AND owner_person_id=$3 AND status='DRAFT'
       RETURNING id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,final_result_id,created_at`,[
-      result.id,analysis.id,req.auth.personId
+      result.id,analysis.id,req.auth.personId,req.auth.personId
     ])).rows[0];
     if(!completed) throw new HttpError(409,'Analysis não pode ser concluída neste estado');
     await client.query('COMMIT');
