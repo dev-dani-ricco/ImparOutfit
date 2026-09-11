@@ -163,6 +163,27 @@ test('E/F: save/preview does not create ownership or use wardrobe capacity; mixe
   assert.equal(v.version,2);
   assert.equal((await auth('get','/looks/'+look.id,A).expect(200)).body.versions.length,2);
 });
+test('HTTP errors use a private canonical envelope with safe validation details',async()=>{
+  const assertError=(response,status,code)=>{
+    assert.equal(response.status,status);
+    assert.equal(response.body.error.code,code);
+    assert.equal(typeof response.body.error.message,'string');
+    assert.match(response.body.error.requestId,/^req_[0-9a-f]{32}$/);
+    assert.ok(Object.hasOwn(response.body.error,'details'));
+  };
+  assertError(await request(app).get('/api/wardrobe/items'),401,'AUTHENTICATION_REQUIRED');
+  assertError(await request(app).get('/api/not-a-route'),404,'RESOURCE_NOT_FOUND');
+  const validation=await auth('post','/impar-analyses',A).send({status:'COMPLETED'});
+  assertError(validation,400,'VALIDATION_ERROR');
+  assert.ok(validation.body.error.details.fields.some(field=>field.field==='status'&&field.code==='FIELD_NOT_ALLOWED'));
+  const fixture=await createVersionedLookFixture(A);
+  const context=(await auth('post','/contexts',A).send({occasion:'Error contract context'}).expect(201)).body;
+  const analysis=(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'}).expect(201)).body;
+  assertError(await auth('get','/impar-analyses/'+analysis.id,B),404,'RESOURCE_NOT_FOUND');
+  assertError(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'EXPERT'}),403,'FORBIDDEN');
+  await db.query("UPDATE impar_analyses SET status='COMPLETED' WHERE id=$1",[analysis.id]);
+  assertError(await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{}}),409,'STATE_CONFLICT');
+});
 test('Context schema keeps progressive fields independent and prevents cross-person Look links',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const contextA=(await db.query(`INSERT INTO contexts(owner_person_id,occasion,starts_at,location_text,provenance)

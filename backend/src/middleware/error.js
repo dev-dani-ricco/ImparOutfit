@@ -1,13 +1,25 @@
 import multer from 'multer';
-import { HttpError } from '../utils/http.js';
+import { defaultErrorCode, ERROR_CODES, HttpError } from '../utils/http.js';
 
-export function errorHandler(err, _req, res, _next) {
-  if (err instanceof multer.MulterError) return res.status(413).json({ error: 'Limite ou formato multipart inválido', code: 'UPLOAD_LIMIT' });
-  if (['Unexpected end of form','Multipart: Boundary not found','Unexpected end of multipart data'].includes(err.message)) return res.status(400).json({error:'Multipart inválido'});
-  if (err instanceof HttpError) return res.status(err.status).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
-  if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Corpo muito grande' });
-  if (err.type === 'entity.parse.failed' || ['22P02', '23502', '23514'].includes(err.code)) return res.status(400).json({ error: 'Dados inválidos' });
-  if (err.code === '23505') return res.status(409).json({ error: 'Registro já existe' });
-  if (err.code === '23503') return res.status(400).json({ error: 'Referência inválida' });
-  res.status(500).json({ error: 'Erro interno', code: 'INTERNAL_ERROR' });
+const messages={
+  VALIDATION_ERROR:'Request validation failed.',AUTHENTICATION_REQUIRED:'Authentication is required.',
+  FORBIDDEN:'You are not authorized to perform this action.',RESOURCE_NOT_FOUND:'Resource not found.',
+  STATE_CONFLICT:'The resource state does not allow this operation.',DUPLICATE_RESOURCE:'The resource already exists.',
+  POSITION_CONFLICT:'The requested position is unavailable.',INCOMPLETE_DATA:'The operation requires additional data.',
+  VERSION_CONFLICT:'The requested version conflicts with the current state.',PAYLOAD_TOO_LARGE:'The submitted payload exceeds the allowed size.',
+  UNSUPPORTED_MEDIA_TYPE:'The submitted media type is not supported.',RATE_LIMITED:'Too many requests.',
+  INTERNAL_ERROR:'An unexpected error occurred.',UPSTREAM_ERROR:'An upstream dependency failed.',
+  SERVICE_UNAVAILABLE:'The service is temporarily unavailable.',UPSTREAM_TIMEOUT:'An upstream dependency timed out.'
+};
+const envelope=(req,status,code,details=null)=>({error:{code,message:messages[code]||messages.INTERNAL_ERROR,requestId:req.requestId,details}});
+export function errorHandler(err, req, res, _next) {
+  let status=500,code='INTERNAL_ERROR',details=null;
+  if (err instanceof multer.MulterError) { status=413;code='PAYLOAD_TOO_LARGE'; }
+  else if (['Unexpected end of form','Multipart: Boundary not found','Unexpected end of multipart data'].includes(err.message)) { status=400;code='VALIDATION_ERROR'; }
+  else if (err instanceof HttpError) { status=err.status;code=ERROR_CODES.has(err.code)?err.code:defaultErrorCode(status);details=err.details||null; }
+  else if (err.type === 'entity.too.large') { status=413;code='PAYLOAD_TOO_LARGE'; }
+  else if (err.type === 'entity.parse.failed' || ['22P02','23502','23514'].includes(err.code)) { status=400;code='VALIDATION_ERROR'; }
+  else if (err.code === '23505') { status=409;code='DUPLICATE_RESOURCE'; }
+  else if (err.code === '23503') { status=404;code='RESOURCE_NOT_FOUND'; }
+  res.status(status).json(envelope(req,status,code,details));
 }

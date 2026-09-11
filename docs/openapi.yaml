@@ -19,13 +19,31 @@ components:
   schemas:
     Error:
       type: object
-      properties:
-        error:
-          type: string
-        code:
-          type: string
       required:
         - error
+      properties:
+        error:
+          description: Canonical private error envelope.
+          type: object
+          required:
+            - code
+            - message
+            - requestId
+            - details
+          properties:
+            code:
+              type: string
+              description: Stable UPPER_SNAKE_CASE error code.
+            message:
+              type: string
+              description: Safe client-facing message. Do not use as a programmatic contract.
+            requestId:
+              type: string
+              description: Non-personal request correlation identifier.
+            details:
+              nullable: true
+              type: object
+              description: Optional safe structured correction information.
     Person:
       type: object
       properties:

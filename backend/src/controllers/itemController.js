@@ -62,8 +62,9 @@ export async function removeSave(req,res) {
   await query('DELETE FROM commercial_saved_items WHERE person_id=$1 AND product_id=$2',[req.auth.personId,req.params.id]);
   res.status(204).end();
 }
-export async function legacyCopy(_req,res) {
-  res.set('Deprecation','true').status(410).json({error:'Cópia para o armário removida. Salve como referência comercial.',code:'OWNERSHIP_NOT_IMPLIED',replacement:'POST /api/products/{id}/save'});
+export async function legacyCopy(_req,res,next) {
+  res.set('Deprecation','true');
+  next(new HttpError(410,'Endpoint retired',{code:'STATE_CONFLICT'}));
 }
 export async function legacyReviews(req,res) {
   res.json((await query(`SELECT r.legacy_item_id,r.reason,r.status,i.name,i.category FROM legacy_item_reviews r

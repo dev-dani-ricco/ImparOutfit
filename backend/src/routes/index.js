@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import { HttpError } from '../utils/http.js';
 import { asyncHandler } from '../utils/http.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireCapability } from '../services/authorizationService.js';
@@ -22,7 +23,7 @@ import * as media from '../services/imageService.js';
 import * as reconstruction from '../controllers/reconstructionController.js';
 
 const r=Router(), wrap=asyncHandler, cap=requireCapability;
-const authLimit=rateLimit({windowMs:15*60*1000,limit:30,standardHeaders:'draft-7',legacyHeaders:false});
+const authLimit=rateLimit({windowMs:15*60*1000,limit:30,standardHeaders:'draft-7',legacyHeaders:false,handler:(_req,_res,next)=>next(new HttpError(429,'Rate limited'))});
 const photos=[uploadBudget,upload.array('photos',4),validateImages];
 r.get('/reconstruction/protocol',requireAuth,wrap(reconstruction.protocol));
 r.get('/reconstruction/jobs',requireAuth,wrap(reconstruction.list));
@@ -101,7 +102,10 @@ r.post('/looks/:lookId/contexts/:contextId',requireAuth,wrap(contexts.linkLook))
 r.get('/looks/:lookId/contexts',requireAuth,wrap(contexts.listForLook));
 r.post('/stores/:id/follow',requireAuth,wrap(social.followStore));
 r.delete('/stores/:id/follow',requireAuth,wrap(social.unfollowStore));
-const retired=(_req,res)=>res.set('Deprecation','true').status(410).json({error:'Fluxo social descontinuado',code:'ENDPOINT_RETIRED'});
+const retired=(_req,res,next)=>{
+  res.set('Deprecation','true');
+  next(new HttpError(410,'Endpoint retired',{code:'STATE_CONFLICT'}));
+};
 r.post('/users/:id/follow',requireAuth,retired);
 r.get('/feed',requireAuth,wrap(social.feed));
 r.get('/showcases',wrap(showcases.listShowcases));
