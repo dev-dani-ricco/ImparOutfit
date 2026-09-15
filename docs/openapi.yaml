@@ -6547,3 +6547,9 @@ paths:
       security: [{bearerAuth: []}]
       parameters: [{name: versionId, in: path, required: true, schema: {type: string, format: uuid}}]
       responses: {"200": {description: Vínculo explícito criado}}
+  /authorized-knowledge-versions/{versionId}/retire:
+    post:
+      summary: Retirar knowledge autorizado sem apagar histórico
+      security: [{bearerAuth: []}]
+      parameters: [{name: versionId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {"200": {description: Retirement idempotente}}

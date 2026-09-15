@@ -86,6 +86,7 @@ r.get('/methodology-versions/:versionId',requireAuth,wrap(methodologies.get));
 r.post('/methodology-versions/:versionId/publish',requireAuth,wrap(methodologies.publish));
 r.post('/methodology-versions/:versionId/retire',requireAuth,wrap(methodologies.retire));
 r.post('/knowledge-sources',requireAuth,wrap(knowledge.source));r.post('/knowledge-sources/:sourceId/candidates',requireAuth,wrap(knowledge.candidate));r.post('/knowledge-candidates/:candidateId/submit',requireAuth,wrap(knowledge.submit));r.post('/knowledge-candidates/:candidateId/review',requireAuth,wrap(knowledge.review));r.post('/knowledge-candidates/:candidateId/publish',requireAuth,wrap(knowledge.publish));r.post('/methodology-versions/:versionId/knowledge',requireAuth,wrap(knowledge.bind));
+r.post('/authorized-knowledge-versions/:versionId/retire',requireAuth,wrap(knowledge.retire));
 r.post('/collections',requireAuth,wrap(collections.create));
 r.post('/collections/:collectionId/looks/:lookId',requireAuth,wrap(collections.linkLook));
 r.get('/collections/:collectionId',requireAuth,wrap(collections.get));
