@@ -6140,7 +6140,15 @@ paths:
           description: MIME/decode inválido
         "429":
           description: Limite operacional
-      parameters: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Chave opaca por Pessoa para repetir a mesma criação sem duplicar CaptureSession ou Job.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
       requestBody:
         required: true
         content:
@@ -6315,6 +6323,27 @@ paths:
           description: MIME/decode inválido
         "429":
           description: Limite operacional
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+  /reconstruction/jobs/{id}/retry:
+    post:
+      summary: Reenfileirar uma reconstrução técnica que falhou dentro do limite de retry
+      security:
+        - bearerAuth: []
+      responses:
+        "202":
+          description: Job reenfileirado; a próxima execução cria nova tentativa técnica.
+        "401":
+          description: Sem sessão
+        "404":
+          description: Job privado indisponível
+        "409":
+          description: Estado incompatível ou limite de retry atingido
       parameters:
         - name: id
           in: path

@@ -35,6 +35,7 @@ r.get('/reconstruction/jobs/:id',requireAuth,wrap(reconstruction.get));
 r.post('/reconstruction/jobs/:id/inputs',requireAuth,...photos,wrap(reconstruction.inputs));
 r.delete('/reconstruction/jobs/:id/inputs/:mediaId',requireAuth,wrap(reconstruction.removeInput));
 r.post('/reconstruction/jobs/:id/submit',requireAuth,wrap(reconstruction.submit));
+r.post('/reconstruction/jobs/:id/retry',requireAuth,wrap(reconstruction.retry));
 r.get('/reconstruction/jobs/:id/output',requireAuth,wrap(reconstruction.output));
 r.post('/reconstruction/jobs/:id/inspection',requireAuth,wrap(reconstruction.inspect));
 r.post('/auth/register',authLimit,wrap(auth.register));

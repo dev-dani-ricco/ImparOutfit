@@ -5,7 +5,7 @@ import {validate,uuid} from '../utils/validation.js';
 import {HttpError} from '../utils/http.js';
 import {authorizePersonal,authorizeCapability} from '../services/authorizationService.js';
 import {withMedia,storage} from '../services/imageService.js';
-import {authorizedJob,transition,transaction,jobDto} from '../reconstruction/service.js';
+import {authorizedJob,transition,transaction,jobDto,retryAvailable} from '../reconstruction/service.js';
 import {policy,validateCapture,qualityGate,categories,captureProtocol} from '../reconstruction/domain.js';
 function idempotencyKey(req){
  const key=req.get('Idempotency-Key');
@@ -111,6 +111,15 @@ export async function submit(req,res){
   }
   return transition(c,j,guidance.length?'NEEDS_MORE_INPUT':'QUEUED',{actor:req.auth.personId,code:guidance.length?'CAPTURE_INCOMPLETE':null,guidance});
  });res.status(202).json(jobDto(j));
+}
+export async function retry(req,res){
+ const j=await transaction(async c=>{
+  const current=await authorizedJob(req.auth,req.params.id,c,true);
+  if(current.state!=='FAILED')throw new HttpError(409,'Job não pode ser reenfileirado neste estado');
+  if(!retryAvailable(current))throw new HttpError(409,'Limite de retries de reconstrução atingido');
+  return transition(c,current,'QUEUED',{actor:req.auth.personId});
+ });
+ res.status(202).json(jobDto(j));
 }
 export async function output(req,res){
  const j=await authorizedJob(req.auth,req.params.id);

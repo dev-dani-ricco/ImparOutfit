@@ -1443,3 +1443,29 @@ test('reconstruction creation idempotency is private, scoped to the owner, and c
  assert.equal(one.body.id,two.body.id);
  assert.equal((await db.query('SELECT count(*)::int n FROM reconstruction_jobs WHERE person_id=$1 AND idempotency_key=$2',[A.user.person_id,concurrentKey])).rows[0].n,1);
 });
+
+test('failed reconstruction jobs retry once per governed worker attempt without crossing private ownership',async()=>{
+ const {transaction,claimJob}=await import('../src/reconstruction/service.js');
+ const retryJob=(await auth('post','/reconstruction/jobs',A).send({itemId:owned.id,category:'TOP'}).expect(201)).body;
+ await db.query("UPDATE reconstruction_jobs SET state='FAILED',attempt=1,error_code='PROCESSING_FAILED',lease_until=NULL WHERE id=$1",[retryJob.id]);
+ await db.query("UPDATE reconstruction_attempts SET state='FAILED',completed_at=now() WHERE job_id=$1 AND sequence=1",[retryJob.id]);
+ await auth('post','/reconstruction/jobs/'+retryJob.id+'/retry',marketing).expect(404);
+ const retried=await auth('post','/reconstruction/jobs/'+retryJob.id+'/retry',A).expect(202);
+ assert.equal(retried.body.state,'QUEUED');
+ assert.equal((await db.query('SELECT attempt FROM reconstruction_jobs WHERE id=$1',[retryJob.id])).rows[0].attempt,1);
+ const claimed=await transaction(claimJob);
+ assert.equal(claimed.id,retryJob.id);
+ assert.deepEqual((await db.query('SELECT sequence,state FROM reconstruction_attempts WHERE job_id=$1 ORDER BY sequence',[retryJob.id])).rows,[{sequence:1,state:'FAILED'},{sequence:2,state:'PROCESSING'}]);
+ await auth('post','/reconstruction/jobs/'+retryJob.id+'/retry',A).expect(409);
+ await db.query("UPDATE reconstruction_jobs SET state='FAILED',attempt=3,lease_until=NULL WHERE id=$1",[retryJob.id]);
+ await db.query("UPDATE reconstruction_attempts SET state='FAILED',completed_at=now() WHERE job_id=$1 AND sequence=2",[retryJob.id]);
+ await auth('post','/reconstruction/jobs/'+retryJob.id+'/retry',A).expect(409);
+ const concurrent=(await auth('post','/reconstruction/jobs',A).send({itemId:owned.id,category:'TOP'}).expect(201)).body;
+ await db.query("UPDATE reconstruction_jobs SET state='FAILED',attempt=1,error_code='PROCESSING_FAILED' WHERE id=$1",[concurrent.id]);
+ const [one,two]=await Promise.all([
+  auth('post','/reconstruction/jobs/'+concurrent.id+'/retry',A),
+  auth('post','/reconstruction/jobs/'+concurrent.id+'/retry',A)
+ ]);
+ assert.deepEqual([one.status,two.status].sort(),[202,409]);
+ assert.equal((await db.query("SELECT state FROM reconstruction_jobs WHERE id=$1",[concurrent.id])).rows[0].state,'QUEUED');
+});

@@ -1,6 +1,11 @@
 import policy from './policy.json' with {type:'json'};
 export {policy};
 export const categories=['TOP','PANTS','DRESS','FOOTWEAR','BAG','ACCESSORY'];
+export const DEFAULT_RECONSTRUCTION_MAX_RETRIES=2;
+export function reconstructionMaxRetries(){
+ const value=Number.parseInt(process.env.RECONSTRUCTION_MAX_RETRIES??String(DEFAULT_RECONSTRUCTION_MAX_RETRIES),10);
+ return Number.isSafeInteger(value)&&value>=0?value:DEFAULT_RECONSTRUCTION_MAX_RETRIES;
+}
 export function captureProtocol(category){
  const p=policy.captureProtocols?.[category];
  if(!p)throw new Error('CAPTURE_PROTOCOL_UNSUPPORTED');
@@ -10,7 +15,7 @@ export const transitions={
  CAPTURED:['VALIDATING'],VALIDATING:['QUEUED','NEEDS_MORE_INPUT','FAILED'],
  QUEUED:['PROCESSING','FAILED'],PROCESSING:['QUALITY_CHECK','NEEDS_MORE_INPUT','FAILED'],
  QUALITY_CHECK:['READY','NEEDS_MORE_INPUT','FAILED'],
- NEEDS_MORE_INPUT:['VALIDATING'],FAILED:['VALIDATING'],READY:[]
+ NEEDS_MORE_INPUT:['VALIDATING'],FAILED:['VALIDATING','QUEUED'],READY:[]
 };
 export function canTransition(from,to){return transitions[from]?.includes(to)===true;}
 export function validateCapture(inputs,p=policy){
