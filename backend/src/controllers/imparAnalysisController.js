@@ -18,6 +18,7 @@ const toAnalysis=row=>({
   status:row.status,
   origin:row.origin,
   methodologyVersionRef:row.methodology_version_ref,
+  methodologyVersionId:row.methodology_version_id,
   finalResultId:row.final_result_id,
   createdAt:row.created_at
 });
@@ -34,14 +35,14 @@ export async function create(req,res) {
   const analysis=(await query(`INSERT INTO impar_analyses(
     owner_person_id,look_id,look_version_id,context_id,status,origin,methodology_version_ref
   ) VALUES($1,$2,$3,$4,'DRAFT',NULL,NULL)
-  RETURNING id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,final_result_id,created_at`,[
+  RETURNING id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,methodology_version_id,final_result_id,created_at`,[
     req.auth.personId,look.id,lookVersion.id,context.id
   ])).rows[0];
   res.status(201).json(toAnalysis(analysis));
 }
 
 export async function get(req,res) {
-  const analysis=(await query(`SELECT id,owner_person_id AS person_id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,final_result_id,created_at
+  const analysis=(await query(`SELECT id,owner_person_id AS person_id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,methodology_version_id,final_result_id,created_at
     FROM impar_analyses WHERE id=$1`,[req.params.analysisId])).rows[0];
   authorizePersonal(req.auth,analysis);
   res.json(toAnalysis(analysis));
@@ -96,6 +97,26 @@ export async function listResults(req,res) {
   res.json(results.map(toResult));
 }
 
+export async function assignMethodology(req,res) {
+  const body=validate(Joi.object({methodologyVersionId:uuid.required()}),req.body||{});
+  const client=await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const analysis=(await client.query(`SELECT id,owner_person_id AS person_id,status,methodology_version_id FROM impar_analyses WHERE id=$1 FOR UPDATE`,[req.params.analysisId])).rows[0];
+    authorizePersonal(req.auth,analysis);
+    await authorizeInstitutionalCapability(req.auth,'impar.analysis.methodology.assign',client);
+    if(analysis.status!=='DRAFT') throw new HttpError(409,'Analysis não aceita metodologia fora de DRAFT');
+    const version=(await client.query("SELECT id,status FROM methodology_versions WHERE id=$1 FOR UPDATE",[body.methodologyVersionId])).rows[0];
+    if(!version) throw new HttpError(404,'MethodologyVersion não encontrada');
+    if(version.status!=='PUBLISHED') throw new HttpError(409,'MethodologyVersion não está publicada');
+    const resultCount=(await client.query('SELECT count(*)::int count FROM impar_analysis_results WHERE analysis_id=$1',[analysis.id])).rows[0].count;
+    if(analysis.methodology_version_id && analysis.methodology_version_id!==version.id && resultCount>0) throw new HttpError(409,'Metodologia está congelada após Results');
+    const row=(await client.query(`UPDATE impar_analyses SET methodology_version_id=$1 WHERE id=$2
+      RETURNING id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,methodology_version_id,final_result_id,created_at`,[version.id,analysis.id])).rows[0];
+    await client.query('COMMIT');res.json(toAnalysis(row));
+  } catch(e){await client.query('ROLLBACK');throw e;} finally{client.release();}
+}
+
 export async function finalizeResult(req,res) {
   validate(Joi.object({}),req.body||{});
   const client=await pool.connect();
@@ -134,7 +155,7 @@ export async function complete(req,res) {
   try {
     await client.query('BEGIN');
     const analysis=(await client.query(`SELECT id,owner_person_id AS person_id,look_id,look_version_id,context_id,status,origin,
-      methodology_version_ref,final_result_id,created_at FROM impar_analyses WHERE id=$1 FOR UPDATE`,[req.params.analysisId])).rows[0];
+      methodology_version_ref,methodology_version_id,final_result_id,created_at FROM impar_analyses WHERE id=$1 FOR UPDATE`,[req.params.analysisId])).rows[0];
     authorizePersonal(req.auth,analysis);
     const result=(await client.query(`SELECT id,analysis_id,owner_person_id AS person_id,status
       FROM impar_analysis_results WHERE id=$1 AND analysis_id=$2 AND owner_person_id=$3 FOR UPDATE`,[
@@ -150,7 +171,7 @@ export async function complete(req,res) {
     if(result.status!=='FINAL') throw new HttpError(409,'Result precisa estar FINAL para concluir a Analysis');
     const completed=(await client.query(`UPDATE impar_analyses SET status='COMPLETED',final_result_id=$1,completed_by_person_id=$4,completed_by_principal_id=$5
       WHERE id=$2 AND owner_person_id=$3 AND status='DRAFT'
-      RETURNING id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,final_result_id,created_at`,[
+      RETURNING id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,methodology_version_id,final_result_id,created_at`,[
       result.id,analysis.id,req.auth.personId,req.auth.personId,req.auth.principalId
     ])).rows[0];
     if(!completed) throw new HttpError(409,'Analysis não pode ser concluída neste estado');

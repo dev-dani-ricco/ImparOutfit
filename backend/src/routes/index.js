@@ -19,6 +19,7 @@ import * as contexts from '../controllers/contextController.js';
 import * as collections from '../controllers/collectionController.js';
 import * as comparisons from '../controllers/comparisonController.js';
 import * as imparAnalyses from '../controllers/imparAnalysisController.js';
+import * as methodologies from '../controllers/methodologyController.js';
 import * as media from '../services/imageService.js';
 import * as reconstruction from '../controllers/reconstructionController.js';
 
@@ -77,6 +78,12 @@ r.post('/impar-analyses/:analysisId/complete',requireAuth,wrap(imparAnalyses.com
 r.post('/impar-analyses/:analysisId/results',requireAuth,wrap(imparAnalyses.createResult));
 r.get('/impar-analyses/:analysisId/results',requireAuth,wrap(imparAnalyses.listResults));
 r.post('/impar-analyses/:analysisId/results/:resultId/finalize',requireAuth,wrap(imparAnalyses.finalizeResult));
+r.post('/impar-analyses/:analysisId/methodology',requireAuth,wrap(imparAnalyses.assignMethodology));
+r.post('/methodologies',requireAuth,wrap(methodologies.create));
+r.post('/methodologies/:methodologyId/versions',requireAuth,wrap(methodologies.createVersion));
+r.get('/methodology-versions/:versionId',requireAuth,wrap(methodologies.get));
+r.post('/methodology-versions/:versionId/publish',requireAuth,wrap(methodologies.publish));
+r.post('/methodology-versions/:versionId/retire',requireAuth,wrap(methodologies.retire));
 r.post('/collections',requireAuth,wrap(collections.create));
 r.post('/collections/:collectionId/looks/:lookId',requireAuth,wrap(collections.linkLook));
 r.get('/collections/:collectionId',requireAuth,wrap(collections.get));

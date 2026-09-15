@@ -6458,3 +6458,57 @@ paths:
           description: Sem sessão
         "404":
           description: Sessão privada indisponível
+  /methodologies:
+    post:
+      summary: Criar definição metodológica institucional sanitizada
+      security: [{bearerAuth: []}]
+      responses:
+        "201": {description: Methodology criada}
+        "400": {description: Dados inválidos}
+        "403": {description: Capability institucional ausente}
+  /methodologies/{methodologyId}/versions:
+    post:
+      summary: Criar versão metodológica DRAFT com referência opaca
+      security: [{bearerAuth: []}]
+      parameters: [{name: methodologyId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "201": {description: Versão DRAFT criada sem conteúdo exposto}
+        "403": {description: Capability institucional ausente}
+  /methodology-versions/{versionId}:
+    get:
+      summary: Ler metadados sanitizados de MethodologyVersion
+      security: [{bearerAuth: []}]
+      parameters: [{name: versionId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200": {description: Metadados sem contentRef ou conteúdo proprietário}
+        "403": {description: Capability institucional ausente}
+        "404": {description: Versão inexistente}
+  /methodology-versions/{versionId}/publish:
+    post:
+      summary: Publicar MethodologyVersion DRAFT
+      security: [{bearerAuth: []}]
+      parameters: [{name: versionId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200": {description: Versão publicada de modo idempotente}
+        "403": {description: Capability institucional ausente}
+        "409": {description: Estado incompatível}
+  /methodology-versions/{versionId}/retire:
+    post:
+      summary: Retirar MethodologyVersion publicada
+      security: [{bearerAuth: []}]
+      parameters: [{name: versionId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200": {description: Versão retirada e preservada historicamente}
+        "403": {description: Capability institucional ausente}
+        "409": {description: Estado incompatível}
+  /impar-analyses/{analysisId}/methodology:
+    post:
+      summary: Atribuir MethodologyVersion PUBLISHED explícita a Analysis DRAFT
+      security: [{bearerAuth: []}]
+      parameters: [{name: analysisId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200": {description: Vínculo explícito e idempotente}
+        "403": {description: Capability institucional ausente}
+        "404": {description: Analysis privada ou versão inexistente}
+        "409":
+          description: Estado de atribuição metodológica incompatível
