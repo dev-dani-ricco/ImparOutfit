@@ -877,7 +877,7 @@ components:
                     format: date-time
     ImparAnalysisInput:
       type: object
-      required: [lookId, lookVersionId, contextId, origin]
+      required: [lookId, lookVersionId, contextId]
       properties:
         lookId:
           type: string
@@ -888,9 +888,6 @@ components:
         contextId:
           type: string
           format: uuid
-        origin:
-          type: string
-          enum: [SYSTEM, EXPERT]
     ImparAnalysis:
       allOf:
         - $ref: "#/components/schemas/ImparAnalysisInput"
@@ -903,6 +900,10 @@ components:
             status:
               type: string
               enum: [DRAFT, COMPLETED]
+            origin:
+              type: string
+              nullable: true
+              description: Opaque institutional origin when assigned; absent for newly requested Analyses.
             finalResultId:
               type: string
               format: uuid
@@ -4559,7 +4560,7 @@ paths:
   /impar-analyses:
     post:
       summary: Criar ÍMPAR Analysis privada em DRAFT
-      description: Exige LookVersion e Context explícitos. O servidor cria a Analysis sem referência metodológica atribuída; quando disponível, methodologyVersionRef é uma referência opaca atribuída por execução institucional. EXPERT exige futura autorização institucional de análise e é bloqueado neste fluxo atual.
+      description: Exige LookVersion e Context explícitos. O servidor cria a Analysis sem origem ou referência metodológica atribuídas; quando disponíveis, são referências opacas atribuídas por execução institucional.
       operationId: post__impar_analyses
       security:
         - bearerAuth: []
@@ -4699,7 +4700,7 @@ paths:
   /impar-analyses/{analysisId}/results:
     post:
       summary: Criar Result privado versionado em DRAFT
-      description: Requer ownership privado e capability institucional impar.analysis.execute. A Analysis deve estar em DRAFT. O servidor controla resultVersion e status; payload é um objeto estrutural e não aceita internals de prompt ou RAG.
+      description: Requer ownership privado e capability institucional impar.analysis.execute. A Analysis deve estar em DRAFT. O servidor controla resultVersion, resultSchemaVersion e status; payload é um objeto estrutural e não aceita internals de prompt ou RAG.
       operationId: post__impar_analyses_analysisId_results
       security:
         - bearerAuth: []
@@ -4729,7 +4730,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [id, analysisId, resultVersion, status, payload, createdAt]
+                required: [id, analysisId, resultVersion, resultSchemaVersion, status, payload, createdAt]
                 properties:
                   id:
                     type: string
@@ -4740,6 +4741,10 @@ paths:
                   resultVersion:
                     type: integer
                     minimum: 1
+                  resultSchemaVersion:
+                    type: integer
+                    minimum: 1
+                    description: Server-controlled structural payload contract version.
                   status:
                     type: string
                     enum: [DRAFT]
@@ -4800,7 +4805,7 @@ paths:
                 type: array
                 items:
                   type: object
-                  required: [id, analysisId, resultVersion, status, payload, createdAt]
+                  required: [id, analysisId, resultVersion, resultSchemaVersion, status, payload, createdAt]
                   properties:
                     id:
                       type: string
@@ -4811,6 +4816,11 @@ paths:
                     resultVersion:
                       type: integer
                       minimum: 1
+                    resultSchemaVersion:
+                      type: integer
+                      minimum: 1
+                      nullable: true
+                      description: Structural payload contract version; null denotes a historical Result with unknown schema version.
                     status:
                       type: string
                       enum: [DRAFT, FINAL]
@@ -4865,7 +4875,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [id, analysisId, resultVersion, status, payload, createdAt]
+                required: [id, analysisId, resultVersion, resultSchemaVersion, status, payload, createdAt]
                 properties:
                   id:
                     type: string
@@ -4876,6 +4886,10 @@ paths:
                   resultVersion:
                     type: integer
                     minimum: 1
+                  resultSchemaVersion:
+                    type: integer
+                    minimum: 1
+                    description: Server-controlled structural payload contract version.
                   status:
                     type: string
                     enum: [FINAL]

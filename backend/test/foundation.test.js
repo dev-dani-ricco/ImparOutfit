@@ -188,10 +188,11 @@ test('HTTP errors use a private canonical envelope with safe validation details'
   assert.ok(validation.body.error.details.fields.some(field=>field.field==='status'&&field.code==='FIELD_NOT_ALLOWED'));
   const fixture=await createVersionedLookFixture(A);
   const context=(await auth('post','/contexts',A).send({occasion:'Error contract context'}).expect(201)).body;
-  const analysis=(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'}).expect(201)).body;
+  const analysis=(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id}).expect(201)).body;
   assertError(await auth('get','/impar-analyses/'+analysis.id,B),404,'RESOURCE_NOT_FOUND');
-  assertError(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'EXPERT'}),403,'FORBIDDEN');
-  await db.query("UPDATE impar_analyses SET status='COMPLETED' WHERE id=$1",[analysis.id]);
+  assertError(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'EXPERT'}),400,'VALIDATION_ERROR');
+  const completedResult=(await db.query("INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status) VALUES($1,$2,1,'FINAL') RETURNING id",[analysis.id,A.user.person_id])).rows[0];
+  await db.query("UPDATE impar_analyses SET status='COMPLETED',final_result_id=$1 WHERE id=$2",[completedResult.id,analysis.id]);
   assertError(await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{}}),409,'STATE_CONFLICT');
 });
 test('Context schema keeps progressive fields independent and prevents cross-person Look links',async()=>{
@@ -204,6 +205,8 @@ test('Context schema keeps progressive fields independent and prevents cross-per
   await assert.rejects(()=>db.query('INSERT INTO look_contexts(look_id,context_id,owner_person_id) VALUES($1,$2,$3)',[fixture.lookId,contextA.id,A.user.person_id]));
   await assert.rejects(()=>db.query('INSERT INTO look_contexts(look_id,context_id,owner_person_id) VALUES($1,$2,$3)',[fixture.lookId,contextB.id,A.user.person_id]));
   await assert.rejects(()=>db.query("INSERT INTO contexts(owner_person_id,provenance) VALUES($1,'INVALID')",[A.user.person_id]));
+  await auth('put','/contexts/'+contextA.id,A).send({occasion:'Changed'}).expect(404);
+  assert.equal((await auth('get','/contexts/'+contextA.id,A).expect(200)).body.occasion,'Synthetic occasion');
 });
 test('Collection schema organizes Looks without trip fields or cross-person links',async()=>{
   const first=await createVersionedLookFixture(A);
@@ -330,58 +333,62 @@ test('POST /impar-analyses creates only private SYSTEM DRAFT identity records',a
   const contextA=(await auth('post','/contexts',A).send({occasion:'Analysis API Context'}).expect(201)).body;
   const contextB=(await auth('post','/contexts',B).send({occasion:'Other Analysis API Context'}).expect(201)).body;
   const created=(await auth('post','/impar-analyses',A).send({
-    lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM'
+    lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id
   }).expect(201)).body;
   assert.deepEqual({lookId:created.lookId,lookVersionId:created.lookVersionId,contextId:created.contextId,status:created.status,origin:created.origin,methodologyVersionRef:created.methodologyVersionRef},{
-    lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,status:'DRAFT',origin:'SYSTEM',methodologyVersionRef:null
+    lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,status:'DRAFT',origin:null,methodologyVersionRef:null
   });
   assert.deepEqual((await db.query(`SELECT owner_person_id,look_id,look_version_id,context_id,status,origin,methodology_version_ref
     FROM impar_analyses WHERE id=$1`,[created.id])).rows[0],{
-    owner_person_id:A.user.person_id,look_id:first.lookId,look_version_id:first.version2Id,context_id:contextA.id,status:'DRAFT',origin:'SYSTEM',methodology_version_ref:null
+    owner_person_id:A.user.person_id,look_id:first.lookId,look_version_id:first.version2Id,context_id:contextA.id,status:'DRAFT',origin:null,methodology_version_ref:null
   });
   const version3=(await auth('post','/looks/'+first.lookId+'/versions',A)
     .send({title:'Analysis API v3',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
   assert.ok(version3.versionId);
   assert.deepEqual((await db.query('SELECT look_version_id FROM impar_analyses WHERE id=$1',[created.id])).rows[0],{look_version_id:first.version2Id});
-  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:second.version2Id,contextId:contextA.id,origin:'SYSTEM'}).expect(404);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:second.version2Id,contextId:contextA.id}).expect(404);
   const ownedB=(await auth('post','/wardrobe/items',B).send({name:'B API analysis shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
   const lookB=(await auth('post','/looks',B).send({title:'B API analysis Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:ownedB.id}]}).expect(201)).body;
-  await auth('post','/impar-analyses',A).send({lookId:lookB.id,lookVersionId:lookB.versionId,contextId:contextA.id,origin:'SYSTEM'}).expect(404);
-  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextB.id,origin:'SYSTEM'}).expect(404);
-  await auth('post','/impar-analyses',A).send({lookId:first.lookId,contextId:contextA.id,origin:'SYSTEM'}).expect(400);
-  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,origin:'SYSTEM'}).expect(400);
+  await auth('post','/impar-analyses',A).send({lookId:lookB.id,lookVersionId:lookB.versionId,contextId:contextA.id}).expect(404);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextB.id}).expect(404);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,contextId:contextA.id}).expect(400);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id}).expect(400);
   const countBeforeRejected=(await db.query('SELECT count(*)::int AS count FROM impar_analyses WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count;
-  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',status:'COMPLETED'}).expect(400);
-  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',owner_person_id:B.user.person_id}).expect(400);
-  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'EXPERT'}).expect(403);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,status:'COMPLETED'}).expect(400);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,owner_person_id:B.user.person_id}).expect(400);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM'}).expect(400);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:null}).expect(400);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'EXPERT'}).expect(400);
   for(const origin of ['DANI','AI','MERCHANT','SPONSORED']) {
     await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin}).expect(400);
   }
-  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',methodologyVersionRef:'method-v1'}).expect(400);
-  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',methodologyVersionRef:null}).expect(400);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,methodologyVersionRef:'method-v1'}).expect(400);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,methodologyVersionRef:null}).expect(400);
   await auth('post','/impar-analyses',A).send({
     lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',
     prompt:'private',reasoning:'private',knowledge:'private',recommendation:'private'
   }).expect(400);
   assert.equal((await db.query('SELECT count(*)::int AS count FROM impar_analyses WHERE owner_person_id=$1',[A.user.person_id])).rows[0].count,countBeforeRejected);
   const withoutReference=(await auth('post','/impar-analyses',A).send({
-    lookId:first.lookId,lookVersionId:version3.versionId,contextId:contextA.id,origin:'SYSTEM'
+    lookId:first.lookId,lookVersionId:version3.versionId,contextId:contextA.id
   }).expect(201)).body;
   assert.deepEqual({status:withoutReference.status,methodologyVersionRef:withoutReference.methodologyVersionRef,lookVersionId:withoutReference.lookVersionId},{
     status:'DRAFT',methodologyVersionRef:null,lookVersionId:version3.versionId
   });
   const historical=(await db.query(`INSERT INTO impar_analyses(
     owner_person_id,look_id,look_version_id,context_id,origin,methodology_version_ref
-  ) VALUES($1,$2,$3,$4,'SYSTEM','legacy-ref') RETURNING id`,[
+  ) VALUES($1,$2,$3,$4,'EXPERT','legacy-ref') RETURNING id`,[
     A.user.person_id,first.lookId,first.version2Id,contextA.id
   ])).rows[0];
-  assert.equal((await auth('get','/impar-analyses/'+historical.id,A).expect(200)).body.methodologyVersionRef,'legacy-ref');
+  const historicalRead=(await auth('get','/impar-analyses/'+historical.id,A).expect(200)).body;
+  assert.equal(historicalRead.methodologyVersionRef,'legacy-ref');
+  assert.equal(historicalRead.origin,'EXPERT');
 });
 test('ÍMPAR Analysis Result schema preserves private versioned structured outputs separately from Analysis',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const context=(await auth('post','/contexts',A).send({occasion:'Result persistence context'}).expect(201)).body;
   const analysis=(await auth('post','/impar-analyses',A).send({
-    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id
   }).expect(201)).body;
   const before=(await db.query('SELECT look_id,look_version_id,context_id,status,origin,methodology_version_ref FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0];
   const version1=(await db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status,payload)
@@ -421,7 +428,8 @@ test('ÍMPAR Analysis schema anchors an explicit final Result from the same Anal
     VALUES($1,$2,1,'FINAL',$3::jsonb) RETURNING id,status,payload`,[analysisA.id,A.user.person_id,JSON.stringify({synthetic:'a-v1'})])).rows[0];
   const resultOtherAnalysis=(await db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status)
     VALUES($1,$2,1,'FINAL') RETURNING id`,[analysisSamePerson.id,A.user.person_id])).rows[0];
-  await db.query('UPDATE impar_analyses SET final_result_id=$1 WHERE id=$2',[resultA1.id,analysisA.id]);
+  await assert.rejects(()=>db.query('UPDATE impar_analyses SET final_result_id=$1 WHERE id=$2',[resultA1.id,analysisA.id]));
+  await db.query("UPDATE impar_analyses SET status='COMPLETED',final_result_id=$1 WHERE id=$2",[resultA1.id,analysisA.id]);
   assert.deepEqual((await db.query('SELECT final_result_id FROM impar_analyses WHERE id=$1',[analysisA.id])).rows[0],{final_result_id:resultA1.id});
   const resultA2=(await db.query(`INSERT INTO impar_analysis_results(analysis_id,owner_person_id,result_version,status)
     VALUES($1,$2,2,'FINAL') RETURNING id`,[analysisA.id,A.user.person_id])).rows[0];
@@ -444,7 +452,7 @@ test('GET /impar-analyses/:analysisId returns only the private persisted structu
   const fixture=await createVersionedLookFixture(A);
   const context=(await auth('post','/contexts',A).send({occasion:'Readable analysis context'}).expect(201)).body;
   const created=(await auth('post','/impar-analyses',A).send({
-    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id
   }).expect(201)).body;
   const version3=(await auth('post','/looks/'+fixture.lookId+'/versions',A)
     .send({title:'Readable analysis v3',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
@@ -455,7 +463,7 @@ test('GET /impar-analyses/:analysisId returns only the private persisted structu
   };
   const read=(await auth('get','/impar-analyses/'+created.id,A).expect(200)).body;
   assert.deepEqual({id:read.id,lookId:read.lookId,lookVersionId:read.lookVersionId,contextId:read.contextId,status:read.status,origin:read.origin,methodologyVersionRef:read.methodologyVersionRef},{
-    id:created.id,lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,status:'DRAFT',origin:'SYSTEM',methodologyVersionRef:null
+    id:created.id,lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,status:'DRAFT',origin:null,methodologyVersionRef:null
   });
   assert.notEqual(read.lookVersionId,version3.versionId);
   assert.equal(read.prompt,undefined);
@@ -463,7 +471,7 @@ test('GET /impar-analyses/:analysisId returns only the private persisted structu
   assert.equal(read.reasoning,undefined);
   assert.equal(read.recommendation,undefined);
   const withoutReference=(await auth('post','/impar-analyses',A).send({
-    lookId:fixture.lookId,lookVersionId:version3.versionId,contextId:context.id,origin:'SYSTEM'
+    lookId:fixture.lookId,lookVersionId:version3.versionId,contextId:context.id
   }).expect(201)).body;
   assert.equal((await auth('get','/impar-analyses/'+withoutReference.id,A).expect(200)).body.methodologyVersionRef,null);
   await auth('get','/impar-analyses/'+created.id,B).expect(404);
@@ -476,13 +484,14 @@ test('POST /impar-analyses/:analysisId/results creates immutable private DRAFT v
   const fixture=await createVersionedLookFixture(A);
   const context=(await auth('post','/contexts',A).send({occasion:'Draft Result context'}).expect(201)).body;
   const analysis=(await auth('post','/impar-analyses',A).send({
-    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id
   }).expect(201)).body;
   const create=payload=>auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload});
   const version1=(await create({}).expect(201)).body;
   const version2=(await create({schema:'synthetic-v2'}).expect(201)).body;
   const version3=(await create({schema:'synthetic-v3'}).expect(201)).body;
   assert.deepEqual([version1.resultVersion,version2.resultVersion,version3.resultVersion],[1,2,3]);
+  assert.deepEqual([version1.resultSchemaVersion,version2.resultSchemaVersion,version3.resultSchemaVersion],[1,1,1]);
   assert.equal(version1.status,'DRAFT');
   assert.deepEqual(version1.payload,{});
   assert.deepEqual((await db.query('SELECT result_version,status,payload FROM impar_analysis_results WHERE id=$1',[version1.id])).rows[0],{result_version:1,status:'DRAFT',payload:{}});
@@ -493,13 +502,15 @@ test('POST /impar-analyses/:analysisId/results creates immutable private DRAFT v
   await auth('post','/impar-analyses/'+analysis.id+'/results',B).send({payload:{}}).expect(404);
   const countBeforeRejected=(await db.query('SELECT count(*)::int AS count FROM impar_analysis_results WHERE analysis_id=$1',[analysis.id])).rows[0].count;
   await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{},resultVersion:99}).expect(400);
+  await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{},resultSchemaVersion:99}).expect(400);
+  await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{},schemaVersion:99}).expect(400);
   await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{},status:'FINAL'}).expect(400);
   for(const payload of [null,[], 'string',1]) await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload}).expect(400);
   await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{chainOfThought:'private'}}).expect(400);
   await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{systemPrompt:'private'}}).expect(400);
   assert.equal((await db.query('SELECT count(*)::int AS count FROM impar_analysis_results WHERE analysis_id=$1',[analysis.id])).rows[0].count,countBeforeRejected);
   const concurrentAnalysis=(await auth('post','/impar-analyses',A).send({
-    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id
   }).expect(201)).body;
   const [parallelOne,parallelTwo]=await Promise.all([
     auth('post','/impar-analyses/'+concurrentAnalysis.id+'/results',A).send({payload:{request:'one'}}),
@@ -508,7 +519,8 @@ test('POST /impar-analyses/:analysisId/results creates immutable private DRAFT v
   assert.equal(parallelOne.status,201);
   assert.equal(parallelTwo.status,201);
   assert.deepEqual([parallelOne.body.resultVersion,parallelTwo.body.resultVersion].sort((a,b)=>a-b),[1,2]);
-  await db.query("UPDATE impar_analyses SET status='COMPLETED' WHERE id=$1",[analysis.id]);
+  await db.query("UPDATE impar_analysis_results SET status='FINAL' WHERE id=$1",[version1.id]);
+  await db.query("UPDATE impar_analyses SET status='COMPLETED',final_result_id=$1 WHERE id=$2",[version1.id,analysis.id]);
   await create({after:'completed'}).expect(409);
   assert.deepEqual((await db.query('SELECT status,origin,methodology_version_ref FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{...before.analysis,status:'COMPLETED'});
   assert.deepEqual((await db.query('SELECT result_version,payload FROM impar_analysis_results WHERE analysis_id=$1 ORDER BY result_version',[analysis.id])).rows,before.versions);
@@ -517,10 +529,10 @@ test('GET /impar-analyses/:analysisId/results returns the complete private versi
   const fixture=await createVersionedLookFixture(A);
   const context=(await auth('post','/contexts',A).send({occasion:'Read Result history context'}).expect(201)).body;
   const analysis=(await auth('post','/impar-analyses',A).send({
-    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id
   }).expect(201)).body;
   const empty=(await auth('post','/impar-analyses',A).send({
-    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id
   }).expect(201)).body;
   assert.deepEqual((await auth('get','/impar-analyses/'+empty.id+'/results',A).expect(200)).body,[]);
   const create=payload=>auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload});
@@ -548,8 +560,8 @@ test('GET /impar-analyses/:analysisId/results returns the complete private versi
 test('POST /impar-analyses/:analysisId/results/:resultId/finalize finalizes only the selected private Result',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const context=(await auth('post','/contexts',A).send({occasion:'Finalize Result context'}).expect(201)).body;
-  const analysis=(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'}).expect(201)).body;
-  const otherAnalysis=(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'}).expect(201)).body;
+  const analysis=(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id}).expect(201)).body;
+  const otherAnalysis=(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id}).expect(201)).body;
   const create=(target,payload)=>auth('post','/impar-analyses/'+target.id+'/results',A).send({payload});
   const version1=(await create(analysis,{version:'one'}).expect(201)).body;
   const version2=(await create(analysis,{version:'two'}).expect(201)).body;
@@ -573,8 +585,9 @@ test('POST /impar-analyses/:analysisId/results/:resultId/finalize finalizes only
   assert.equal(finalized1.status,'FINAL');
   const repeated=(await finalize(analysis,version1,A).expect(200)).body;
   assert.deepEqual(repeated,finalized1);
+  await auth('put','/impar-analyses/'+analysis.id+'/results/'+version1.id,A).send({payload:{changed:true}}).expect(404);
   const draftForCompleted=(await create(analysis,{version:'three'}).expect(201)).body;
-  await db.query("UPDATE impar_analyses SET status='COMPLETED' WHERE id=$1",[analysis.id]);
+  await db.query("UPDATE impar_analyses SET status='COMPLETED',final_result_id=$1 WHERE id=$2",[version1.id,analysis.id]);
   await finalize(analysis,draftForCompleted,A).expect(409);
   assert.deepEqual((await db.query('SELECT result_version,status,payload,created_at FROM impar_analysis_results WHERE id=$1',[version2.id])).rows[0],{...before.version2,status:'FINAL'});
   assert.deepEqual((await db.query('SELECT status,origin,methodology_version_ref FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{...before.analysis,status:'COMPLETED'});
@@ -583,7 +596,7 @@ test('POST /impar-analyses/:analysisId/results/:resultId/finalize finalizes only
 test('POST /impar-analyses/:analysisId/complete anchors one explicit FINAL Result atomically',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const context=(await auth('post','/contexts',A).send({occasion:'Complete Analysis context'}).expect(201)).body;
-  const createAnalysis=()=>auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'});
+  const createAnalysis=()=>auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id});
   const analysis=(await createAnalysis().expect(201)).body;
   const otherAnalysis=(await createAnalysis().expect(201)).body;
   const create=(target,payload)=>auth('post','/impar-analyses/'+target.id+'/results',A).send({payload});
@@ -614,7 +627,7 @@ test('POST /impar-analyses/:analysisId/complete anchors one explicit FINAL Resul
   const ownedB=(await auth('post','/wardrobe/items',B).send({name:'B complete analysis shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
   const lookB=(await auth('post','/looks',B).send({title:'B complete analysis Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:ownedB.id}]}).expect(201)).body;
   const contextB=(await auth('post','/contexts',B).send({occasion:'B complete analysis context'}).expect(201)).body;
-  const analysisB=(await auth('post','/impar-analyses',B).send({lookId:lookB.id,lookVersionId:lookB.versionId,contextId:contextB.id,origin:'SYSTEM'}).expect(201)).body;
+  const analysisB=(await auth('post','/impar-analyses',B).send({lookId:lookB.id,lookVersionId:lookB.versionId,contextId:contextB.id}).expect(201)).body;
   const resultB=(await auth('post','/impar-analyses/'+analysisB.id+'/results',B).send({payload:{version:'b'}}).expect(201)).body;
   await auth('post','/impar-analyses/'+analysisB.id+'/results/'+resultB.id+'/finalize',B).send({}).expect(200);
   await errorCode(complete(analysis,resultB),404,'RESOURCE_NOT_FOUND');
@@ -625,7 +638,7 @@ test('POST /impar-analyses/:analysisId/complete anchors one explicit FINAL Resul
   assert.deepEqual({id:completed.id,lookId:completed.lookId,lookVersionId:completed.lookVersionId,contextId:completed.contextId,
     status:completed.status,origin:completed.origin,finalResultId:completed.finalResultId},{
     id:analysis.id,lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,
-    status:'COMPLETED',origin:'SYSTEM',finalResultId:version1.id
+    status:'COMPLETED',origin:null,finalResultId:version1.id
   });
   assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{
     status:'COMPLETED',final_result_id:version1.id
@@ -635,6 +648,7 @@ test('POST /impar-analyses/:analysisId/complete anchors one explicit FINAL Resul
     FROM impar_analysis_results WHERE analysis_id=$1 ORDER BY result_version`,[analysis.id])).rows,beforeResults);
   const repeated=(await complete(analysis,version1).expect(200)).body;
   assert.deepEqual(repeated,completed);
+  await auth('put','/impar-analyses/'+analysis.id,A).send({origin:'SYSTEM'}).expect(404);
   await errorCode(complete(analysis,version2),409,'STATE_CONFLICT');
   assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{
     status:'COMPLETED',final_result_id:version1.id
@@ -645,7 +659,7 @@ test('ÍMPAR Analysis execution requires institutional capability after private 
   const ownerItem=(await auth('post','/wardrobe/items',owner).send({name:'No capability analysis shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
   const ownerLook=(await auth('post','/looks',owner).send({title:'No capability analysis Look',items:[{kind:'OWNED_ITEM',wardrobeItemId:ownerItem.id}]}).expect(201)).body;
   const ownerContext=(await auth('post','/contexts',owner).send({occasion:'No capability analysis context'}).expect(201)).body;
-  const analysis=(await auth('post','/impar-analyses',owner).send({lookId:ownerLook.id,lookVersionId:ownerLook.versionId,contextId:ownerContext.id,origin:'SYSTEM'}).expect(201)).body;
+  const analysis=(await auth('post','/impar-analyses',owner).send({lookId:ownerLook.id,lookVersionId:ownerLook.versionId,contextId:ownerContext.id}).expect(201)).body;
   const assertError=async(response,status,code)=>{
     const reply=await response.expect(status);
     assert.equal(reply.body.error.code,code);
@@ -671,7 +685,7 @@ test('ÍMPAR Analysis execution requires institutional capability after private 
 test('ÍMPAR Analysis execution records immutable authenticated Person provenance',async()=>{
   const fixture=await createVersionedLookFixture(A);
   const context=(await auth('post','/contexts',A).send({occasion:'Execution provenance context'}).expect(201)).body;
-  const analysis=(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'}).expect(201)).body;
+  const analysis=(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id}).expect(201)).body;
   const result=(await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{synthetic:'provenance'}}).expect(201)).body;
   assert.deepEqual((await db.query('SELECT created_by_person_id,finalized_by_person_id FROM impar_analysis_results WHERE id=$1',[result.id])).rows[0],{
     created_by_person_id:A.user.person_id,finalized_by_person_id:null
@@ -710,6 +724,7 @@ test('ÍMPAR Analysis execution records immutable authenticated Person provenanc
   assert.deepEqual({created_by_person_id:historical.created_by_person_id,finalized_by_person_id:historical.finalized_by_person_id},{
     created_by_person_id:null,finalized_by_person_id:null
   });
+  assert.equal((await auth('get','/impar-analyses/'+expertAnalysis.id+'/results',A).expect(200)).body.find(result=>result.id===historical.id).resultSchemaVersion,null);
 });
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({
