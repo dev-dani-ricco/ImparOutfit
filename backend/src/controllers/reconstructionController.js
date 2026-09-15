@@ -121,6 +121,15 @@ export async function retry(req,res){
  });
  res.status(202).json(jobDto(j));
 }
+export async function cancel(req,res){
+ const j=await transaction(async c=>{
+  const current=await authorizedJob(req.auth,req.params.id,c,true);
+  if(current.state==='CANCELLED')return current;
+  if(current.state!=='QUEUED')throw new HttpError(409,'Job não pode ser cancelado neste estado');
+  return transition(c,current,'CANCELLED',{actor:req.auth.personId});
+ });
+ res.json(jobDto(j));
+}
 export async function output(req,res){
  const j=await authorizedJob(req.auth,req.params.id);
  const asset=(await query('SELECT * FROM reconstruction_outputs WHERE job_id=$1 ORDER BY created_at DESC LIMIT 1',[j.id])).rows[0];

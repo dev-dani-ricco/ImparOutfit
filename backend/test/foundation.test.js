@@ -1492,3 +1492,15 @@ test('expired reconstruction leases close the historical attempt and recover exa
  assert.equal(await recoverExpired(),1);
  assert.equal((await db.query('SELECT state,error_code FROM reconstruction_jobs WHERE id=$1',[recovery.id])).rows[0].state,'FAILED');
 });
+
+test('only queued private reconstruction jobs can be cancelled without erasing attempt history',async()=>{
+ const cancelled=(await auth('post','/reconstruction/jobs',A).send({itemId:owned.id,category:'TOP'}).expect(201)).body;
+ await db.query("UPDATE reconstruction_jobs SET state='QUEUED' WHERE id=$1",[cancelled.id]);
+ await auth('post','/reconstruction/jobs/'+cancelled.id+'/cancel',marketing).expect(404);
+ assert.equal((await auth('post','/reconstruction/jobs/'+cancelled.id+'/cancel',A).expect(200)).body.state,'CANCELLED');
+ assert.equal((await auth('post','/reconstruction/jobs/'+cancelled.id+'/cancel',A).expect(200)).body.state,'CANCELLED');
+ assert.equal((await db.query('SELECT count(*)::int n FROM reconstruction_attempts WHERE job_id=$1',[cancelled.id])).rows[0].n,1);
+ const processing=(await auth('post','/reconstruction/jobs',A).send({itemId:owned.id,category:'TOP'}).expect(201)).body;
+ await db.query("UPDATE reconstruction_jobs SET state='PROCESSING',attempt=1,lease_until=now()+interval '1 hour' WHERE id=$1",[processing.id]);
+ await auth('post','/reconstruction/jobs/'+processing.id+'/cancel',A).expect(409);
+});

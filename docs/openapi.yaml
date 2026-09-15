@@ -6351,6 +6351,27 @@ paths:
           schema:
             type: string
             format: uuid
+  /reconstruction/jobs/{id}/cancel:
+    post:
+      summary: Cancelar um Job que ainda está apenas enfileirado
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Job cancelado ou confirmação idempotente de cancelamento anterior.
+        "401":
+          description: Sem sessão
+        "404":
+          description: Job privado indisponível
+        "409":
+          description: Job não está enfileirado; processamento não é interrompido artificialmente.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
   /reconstruction/jobs/{id}/output:
     get:
       summary: Ler GLB privado para inspeção; composição exige READY

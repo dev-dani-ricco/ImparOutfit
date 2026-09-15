@@ -13,9 +13,9 @@ export function captureProtocol(category){
 }
 export const transitions={
  CAPTURED:['VALIDATING'],VALIDATING:['QUEUED','NEEDS_MORE_INPUT','FAILED'],
- QUEUED:['PROCESSING','FAILED'],PROCESSING:['QUALITY_CHECK','NEEDS_MORE_INPUT','FAILED'],
+ QUEUED:['PROCESSING','FAILED','CANCELLED'],PROCESSING:['QUALITY_CHECK','NEEDS_MORE_INPUT','FAILED'],
  QUALITY_CHECK:['READY','NEEDS_MORE_INPUT','FAILED'],
- NEEDS_MORE_INPUT:['VALIDATING'],FAILED:['VALIDATING','QUEUED'],READY:[]
+ NEEDS_MORE_INPUT:['VALIDATING'],FAILED:['VALIDATING','QUEUED'],READY:[],CANCELLED:[]
 };
 export function canTransition(from,to){return transitions[from]?.includes(to)===true;}
 export function validateCapture(inputs,p=policy){
