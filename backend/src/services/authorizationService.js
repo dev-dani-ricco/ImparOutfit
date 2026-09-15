@@ -1,6 +1,14 @@
 import { query } from '../config/db.js';
 import { HttpError } from '../utils/http.js';
 
+async function authenticatedPrincipalId(auth, db) {
+  if (!auth?.personId) throw new HttpError(401, 'Autenticação necessária');
+  if (auth.principalId) return auth.principalId;
+  const principal=(await db.query("SELECT id FROM principals WHERE person_id=$1 AND principal_type='HUMAN' AND status='ACTIVE'",[auth.personId])).rows[0];
+  if (!principal) throw new HttpError(401, 'Autenticação necessária');
+  return principal.id;
+}
+
 export function authorizePersonal(auth, resource, { conceal = true } = {}) {
   if (!auth?.personId) throw new HttpError(401, 'Autenticação necessária');
   if (!resource || resource.person_id !== auth.personId) throw new HttpError(conceal ? 404 : 403, conceal ? 'Recurso não encontrado' : 'Acesso negado');
@@ -8,22 +16,22 @@ export function authorizePersonal(auth, resource, { conceal = true } = {}) {
 }
 
 export async function authorizeCapability(auth, organizationId, capability, resourceId = null, db = { query }) {
-  if (!auth?.personId) throw new HttpError(401, 'Autenticação necessária');
-  const grant = (await db.query(`SELECT g.id FROM memberships m JOIN grants g ON g.membership_id=m.id
+  const principalId=await authenticatedPrincipalId(auth,db);
+  const grant = (await db.query(`SELECT g.id FROM principals p JOIN memberships m ON m.person_id=p.person_id JOIN grants g ON g.membership_id=m.id
     JOIN organizations o ON o.id=m.organization_id AND o.status='ACTIVE'
-    WHERE m.person_id=$1 AND m.organization_id=$2 AND m.status='ACTIVE'
+    WHERE p.id=$1 AND p.principal_type='HUMAN' AND p.status='ACTIVE' AND m.organization_id=$2 AND m.status='ACTIVE'
       AND g.capability_code=$3 AND g.revoked_at IS NULL AND (g.expires_at IS NULL OR g.expires_at>now())
-      AND (g.resource_id IS NULL OR g.resource_id=$4) LIMIT 1`, [auth.personId, organizationId, capability, resourceId])).rows[0];
+      AND (g.resource_id IS NULL OR g.resource_id=$4) LIMIT 1`, [principalId, organizationId, capability, resourceId])).rows[0];
   if (!grant) throw new HttpError(403, 'Capacidade não concedida neste contexto');
 }
 
 export async function authorizeInstitutionalCapability(auth, capability, db = { query }) {
-  if (!auth?.personId) throw new HttpError(401, 'Autenticação necessária');
-  const grant = (await db.query(`SELECT g.id FROM memberships m JOIN grants g ON g.membership_id=m.id
+  const principalId=await authenticatedPrincipalId(auth,db);
+  const grant = (await db.query(`SELECT g.id FROM principals p JOIN memberships m ON m.person_id=p.person_id JOIN grants g ON g.membership_id=m.id
     JOIN organizations o ON o.id=m.organization_id AND o.kind='INSTITUTIONAL' AND o.status='ACTIVE'
-    WHERE m.person_id=$1 AND m.status='ACTIVE' AND g.capability_code=$2
+    WHERE p.id=$1 AND p.principal_type='HUMAN' AND p.status='ACTIVE' AND m.status='ACTIVE' AND g.capability_code=$2
       AND g.resource_id IS NULL AND g.revoked_at IS NULL AND (g.expires_at IS NULL OR g.expires_at>now()) LIMIT 1`,[
-    auth.personId,capability
+    principalId,capability
   ])).rows[0];
   if (!grant) throw new HttpError(403, 'Capacidade institucional não concedida');
 }

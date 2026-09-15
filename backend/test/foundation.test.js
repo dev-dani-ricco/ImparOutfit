@@ -687,29 +687,30 @@ test('ÍMPAR Analysis execution records immutable authenticated Person provenanc
   const context=(await auth('post','/contexts',A).send({occasion:'Execution provenance context'}).expect(201)).body;
   const analysis=(await auth('post','/impar-analyses',A).send({lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id}).expect(201)).body;
   const result=(await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{synthetic:'provenance'}}).expect(201)).body;
-  assert.deepEqual((await db.query('SELECT created_by_person_id,finalized_by_person_id FROM impar_analysis_results WHERE id=$1',[result.id])).rows[0],{
-    created_by_person_id:A.user.person_id,finalized_by_person_id:null
+  const principal=(await db.query("SELECT id FROM principals WHERE person_id=$1 AND principal_type='HUMAN'",[A.user.person_id])).rows[0];
+  assert.deepEqual((await db.query('SELECT created_by_person_id,created_by_principal_id,finalized_by_person_id,finalized_by_principal_id FROM impar_analysis_results WHERE id=$1',[result.id])).rows[0],{
+    created_by_person_id:A.user.person_id,created_by_principal_id:principal.id,finalized_by_person_id:null,finalized_by_principal_id:null
   });
   await auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload:{},createdBy:B.user.person_id}).expect(400);
   await auth('post','/impar-analyses/'+analysis.id+'/results/'+result.id+'/finalize',A).send({actorId:B.user.person_id}).expect(400);
   const finalized=(await auth('post','/impar-analyses/'+analysis.id+'/results/'+result.id+'/finalize',A).send({}).expect(200)).body;
   assert.equal(finalized.status,'FINAL');
-  assert.deepEqual((await db.query('SELECT created_by_person_id,finalized_by_person_id,status,payload FROM impar_analysis_results WHERE id=$1',[result.id])).rows[0],{
-    created_by_person_id:A.user.person_id,finalized_by_person_id:A.user.person_id,status:'FINAL',payload:{synthetic:'provenance'}
+  assert.deepEqual((await db.query('SELECT created_by_person_id,created_by_principal_id,finalized_by_person_id,finalized_by_principal_id,status,payload FROM impar_analysis_results WHERE id=$1',[result.id])).rows[0],{
+    created_by_person_id:A.user.person_id,created_by_principal_id:principal.id,finalized_by_person_id:A.user.person_id,finalized_by_principal_id:principal.id,status:'FINAL',payload:{synthetic:'provenance'}
   });
   await auth('post','/impar-analyses/'+analysis.id+'/results/'+result.id+'/finalize',A).send({}).expect(200);
-  assert.deepEqual((await db.query('SELECT finalized_by_person_id FROM impar_analysis_results WHERE id=$1',[result.id])).rows[0],{
-    finalized_by_person_id:A.user.person_id
+  assert.deepEqual((await db.query('SELECT finalized_by_person_id,finalized_by_principal_id FROM impar_analysis_results WHERE id=$1',[result.id])).rows[0],{
+    finalized_by_person_id:A.user.person_id,finalized_by_principal_id:principal.id
   });
   await auth('post','/impar-analyses/'+analysis.id+'/complete',A).send({resultId:result.id,completedBy:B.user.person_id}).expect(400);
   const completed=(await auth('post','/impar-analyses/'+analysis.id+'/complete',A).send({resultId:result.id}).expect(200)).body;
   assert.equal(completed.status,'COMPLETED');
-  assert.deepEqual((await db.query('SELECT completed_by_person_id,status,final_result_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{
-    completed_by_person_id:A.user.person_id,status:'COMPLETED',final_result_id:result.id
+  assert.deepEqual((await db.query('SELECT completed_by_person_id,completed_by_principal_id,status,final_result_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{
+    completed_by_person_id:A.user.person_id,completed_by_principal_id:principal.id,status:'COMPLETED',final_result_id:result.id
   });
   await auth('post','/impar-analyses/'+analysis.id+'/complete',A).send({resultId:result.id}).expect(200);
-  assert.deepEqual((await db.query('SELECT completed_by_person_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{
-    completed_by_person_id:A.user.person_id
+  assert.deepEqual((await db.query('SELECT completed_by_person_id,completed_by_principal_id FROM impar_analyses WHERE id=$1',[analysis.id])).rows[0],{
+    completed_by_person_id:A.user.person_id,completed_by_principal_id:principal.id
   });
   const expertAnalysis=(await db.query(`INSERT INTO impar_analyses(owner_person_id,look_id,look_version_id,context_id,origin)
     VALUES($1,$2,$3,$4,'EXPERT') RETURNING id`,[A.user.person_id,fixture.lookId,fixture.version2Id,context.id])).rows[0];
@@ -725,6 +726,15 @@ test('ÍMPAR Analysis execution records immutable authenticated Person provenanc
     created_by_person_id:null,finalized_by_person_id:null
   });
   assert.equal((await auth('get','/impar-analyses/'+expertAnalysis.id+'/results',A).expect(200)).body.find(result=>result.id===historical.id).resultSchemaVersion,null);
+});
+test('each Person resolves to one active HUMAN Principal without enabling machine authentication',async()=>{
+  const created=await register('principal-human');
+  const rows=(await db.query("SELECT id,principal_type,status FROM principals WHERE person_id=$1",[created.user.person_id])).rows;
+  assert.deepEqual(rows.length,1);
+  assert.deepEqual({principal_type:rows[0].principal_type,status:rows[0].status},{principal_type:'HUMAN',status:'ACTIVE'});
+  await assert.rejects(()=>db.query("INSERT INTO principals(principal_type,person_id) VALUES('HUMAN',$1)",[created.user.person_id]));
+  await assert.rejects(()=>db.query("INSERT INTO principals(principal_type,person_id) VALUES('MACHINE',NULL)"));
+  await auth('get','/auth/me',created).expect(200);
 });
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({

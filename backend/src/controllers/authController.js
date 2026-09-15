@@ -37,6 +37,7 @@ export async function register(req,res) {
     await client.query('BEGIN');
     user=(await client.query('INSERT INTO users(name,email,password_hash,profile_type) VALUES($1,$2,$3,$4) RETURNING id',[value.name,value.email,hash,value.profileType])).rows[0];
     const person=(await client.query('INSERT INTO persons(display_name) VALUES($1) RETURNING id',[value.name])).rows[0];
+    await client.query("INSERT INTO principals(principal_type,person_id) VALUES('HUMAN',$1)",[person.id]);
     account=(await client.query('INSERT INTO accounts(id,person_id) VALUES($1,$2) RETURNING *',[user.id,person.id])).rows[0];
     await client.query("INSERT INTO identifiers(person_id,kind,value) VALUES($1,'EMAIL',$2)",[person.id,value.email]);
     await client.query('INSERT INTO customer_profiles(user_id) VALUES($1)',[user.id]);

@@ -15,9 +15,11 @@ export async function requireAuth(req, _res, next) {
     if (typeof claims.sub !== 'string' || !/^[0-9a-f-]{36}$/i.test(claims.sub) || !Number.isInteger(claims.ver)) throw new Error('claims');
   } catch { return next(new HttpError(401, 'Token inválido')); }
   try {
-    const account = (await query("SELECT id,person_id,token_version FROM accounts WHERE id=$1 AND status='ACTIVE'", [claims.sub])).rows[0];
+    const account = (await query(`SELECT a.id,a.person_id,a.token_version,p.id AS principal_id FROM accounts a
+      JOIN principals p ON p.person_id=a.person_id AND p.principal_type='HUMAN' AND p.status='ACTIVE'
+      WHERE a.id=$1 AND a.status='ACTIVE'`, [claims.sub])).rows[0];
     if (!account || account.token_version !== claims.ver) throw new HttpError(401, 'Sessão expirada');
-    req.auth = { accountId: account.id, personId: account.person_id };
+    req.auth = { accountId: account.id, personId: account.person_id, principalId: account.principal_id };
     req.user = { id: account.id }; // Temporary adapter for profile/plans/follows. No role claim.
     next();
   } catch (error) { next(error); }
