@@ -1469,3 +1469,26 @@ test('failed reconstruction jobs retry once per governed worker attempt without 
  assert.deepEqual([one.status,two.status].sort(),[202,409]);
  assert.equal((await db.query("SELECT state FROM reconstruction_jobs WHERE id=$1",[concurrent.id])).rows[0].state,'QUEUED');
 });
+
+test('expired reconstruction leases close the historical attempt and recover exactly once within budget',async()=>{
+ const {recoverExpired}=await import('../src/reconstruction/worker.js');
+ const recovery=(await auth('post','/reconstruction/jobs',A).send({itemId:owned.id,category:'TOP'}).expect(201)).body;
+ await db.query("UPDATE reconstruction_jobs SET state='PROCESSING',attempt=1,lease_until=now()+interval '1 hour' WHERE id=$1",[recovery.id]);
+ await db.query("UPDATE reconstruction_attempts SET state='PROCESSING',completed_at=NULL WHERE job_id=$1 AND sequence=1",[recovery.id]);
+ assert.equal(await recoverExpired(),0);
+ assert.equal((await db.query('SELECT state FROM reconstruction_jobs WHERE id=$1',[recovery.id])).rows[0].state,'PROCESSING');
+ await db.query("UPDATE reconstruction_jobs SET lease_until=now()-interval '1 second' WHERE id=$1",[recovery.id]);
+ assert.equal(await recoverExpired(),1);
+ assert.equal((await db.query('SELECT state FROM reconstruction_jobs WHERE id=$1',[recovery.id])).rows[0].state,'QUEUED');
+ const expired=(await db.query('SELECT sequence,state,metrics,completed_at FROM reconstruction_attempts WHERE job_id=$1 AND sequence=1',[recovery.id])).rows[0];
+ assert.equal(expired.state,'FAILED');assert.equal(expired.metrics.failure_reason,'WORKER_LEASE_EXPIRED');assert.ok(expired.completed_at);
+ await db.query("UPDATE reconstruction_jobs SET state='PROCESSING',attempt=2,lease_until=now()-interval '1 second' WHERE id=$1",[recovery.id]);
+ await db.query("INSERT INTO reconstruction_attempts(job_id,sequence,input_revision,pipeline_version,state) SELECT id,2,input_revision,pipeline_version,'PROCESSING' FROM reconstruction_jobs WHERE id=$1",[recovery.id]);
+ const recovered=await Promise.all([recoverExpired(),recoverExpired()]);
+ assert.deepEqual(recovered.sort(),[0,1]);
+ assert.equal((await db.query('SELECT state FROM reconstruction_jobs WHERE id=$1',[recovery.id])).rows[0].state,'QUEUED');
+ await db.query("UPDATE reconstruction_jobs SET state='PROCESSING',attempt=3,lease_until=now()-interval '1 second' WHERE id=$1",[recovery.id]);
+ await db.query("INSERT INTO reconstruction_attempts(job_id,sequence,input_revision,pipeline_version,state) SELECT id,3,input_revision,pipeline_version,'PROCESSING' FROM reconstruction_jobs WHERE id=$1",[recovery.id]);
+ assert.equal(await recoverExpired(),1);
+ assert.equal((await db.query('SELECT state,error_code FROM reconstruction_jobs WHERE id=$1',[recovery.id])).rows[0].state,'FAILED');
+});

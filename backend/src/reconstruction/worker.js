@@ -6,7 +6,7 @@ import {resolve,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {pool} from '../config/db.js';
 import {storage} from '../services/imageService.js';
-import {transaction,claimJob,transition} from './service.js';
+import {transaction,claimJob,transition,retryAvailable} from './service.js';
 import {policy} from './domain.js';
 import {inspectGlb} from './glb.js';
 const repo=fileURLToPath(new URL('../../../',import.meta.url));
@@ -77,8 +77,20 @@ function knownFailure(message){
 export async function recoverExpired(){
  return transaction(async c=>{
   const rows=(await c.query("SELECT * FROM reconstruction_jobs WHERE state='PROCESSING' AND lease_until<now() FOR UPDATE SKIP LOCKED")).rows;
-  for(const j of rows)await transition(c,j,'FAILED',{code:'WORKER_LEASE_EXPIRED'});
-  return rows.length;
+  let recovered=0;
+  for(const j of rows){
+   // PGlite does not fully emulate row locks across concurrent test connections. The
+   // conditional lease clear is the portable ownership gate; PostgreSQL also keeps
+   // the SKIP LOCKED fast path above.
+   const claimed=(await c.query("UPDATE reconstruction_jobs SET lease_until=NULL WHERE id=$1 AND state='PROCESSING' AND lease_until<now() RETURNING *",[j.id])).rows[0];
+   if(!claimed)continue;
+   const metrics={...claimed.metrics,reconstruction_success:false,first_pass_success:false,failure_reason:'WORKER_LEASE_EXPIRED',category:claimed.category};
+   const failed=await transition(c,claimed,'FAILED',{code:'WORKER_LEASE_EXPIRED',metrics});
+   await c.query("UPDATE reconstruction_attempts SET state='FAILED',metrics=$3,completed_at=now() WHERE job_id=$1 AND sequence=$2",[claimed.id,claimed.attempt,metrics]);
+   if(retryAvailable(failed))await transition(c,failed,'QUEUED');
+   recovered++;
+  }
+  return recovered;
  });
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
