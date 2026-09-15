@@ -29,11 +29,13 @@ export function jobDto(j){
  const {lease_until,requested_by_principal_id,idempotency_key,idempotency_fingerprint,...safe}=j;return safe;
 }
 export async function claimJob(db){
- // Atomic claim; separate workers cannot take the same queued job.
+ // SKIP LOCKED is the PostgreSQL fast path; the conditional update also makes
+ // ownership atomic under PGlite's lighter lock emulation.
  const j=(await db.query(`SELECT * FROM reconstruction_jobs WHERE state='QUEUED' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1`)).rows[0];
  if(!j)return null;
- const claimed=(await db.query("UPDATE reconstruction_jobs SET attempt=attempt+1,started_at=now(),lease_until=now()+($2::int*interval '1 millisecond') WHERE id=$1 RETURNING *",[j.id,policy.maxProcessingMs+60000])).rows[0];
- const processing=await transition(db,{...j,attempt:claimed.attempt},'PROCESSING');
- await db.query("INSERT INTO reconstruction_attempts(job_id,sequence,input_revision,pipeline_version,state) VALUES($1,$2,$3,$4,'PROCESSING') ON CONFLICT(job_id,sequence) DO NOTHING",[j.id,claimed.attempt,claimed.input_revision,claimed.pipeline_version]);
- return processing;
+ const claimed=(await db.query("UPDATE reconstruction_jobs SET state='PROCESSING',attempt=attempt+1,started_at=now(),lease_until=now()+($2::int*interval '1 millisecond'),completed_at=NULL WHERE id=$1 AND state='QUEUED' RETURNING *",[j.id,policy.maxProcessingMs+60000])).rows[0];
+ if(!claimed)return null;
+ await db.query("INSERT INTO reconstruction_events(job_id,from_state,to_state) VALUES($1,'QUEUED','PROCESSING')",[claimed.id]);
+ await db.query("INSERT INTO reconstruction_attempts(job_id,sequence,input_revision,pipeline_version,state) VALUES($1,$2,$3,$4,'PROCESSING') ON CONFLICT(job_id,sequence) DO NOTHING",[claimed.id,claimed.attempt,claimed.input_revision,claimed.pipeline_version]);
+ return claimed;
 }

@@ -1504,3 +1504,21 @@ test('only queued private reconstruction jobs can be cancelled without erasing a
  await db.query("UPDATE reconstruction_jobs SET state='PROCESSING',attempt=1,lease_until=now()+interval '1 hour' WHERE id=$1",[processing.id]);
  await auth('post','/reconstruction/jobs/'+processing.id+'/cancel',A).expect(409);
 });
+
+test('concurrent workers claim exactly one queued reconstruction job and preserve attempt uniqueness',async()=>{
+ const {transaction,claimJob}=await import('../src/reconstruction/service.js');
+ const queued=(await db.query("SELECT id FROM reconstruction_jobs WHERE person_id=$1 AND state='QUEUED' ORDER BY created_at LIMIT 2",[A.user.person_id])).rows;
+ assert.equal(queued.length,1);
+ const target=queued[0].id;
+ const claims=await Promise.all([transaction(claimJob),transaction(claimJob)]);
+ const winners=claims.filter(Boolean);
+ assert.equal(winners.length,1);
+ assert.equal(winners[0].id,target);
+ assert.equal(winners[0].state,'PROCESSING');
+ assert.ok(winners[0].lease_until);
+ assert.equal((await db.query("SELECT state FROM reconstruction_jobs WHERE id=$1",[target])).rows[0].state,'PROCESSING');
+ const attempts=(await db.query('SELECT sequence,state FROM reconstruction_attempts WHERE job_id=$1 ORDER BY sequence',[target])).rows;
+ assert.deepEqual(attempts,[{sequence:1,state:'CAPTURED'},{sequence:2,state:'PROCESSING'}]);
+ const nonQueued=await transaction(claimJob);
+ assert.equal(nonQueued,null);
+});
