@@ -6512,3 +6512,38 @@ paths:
         "404": {description: Analysis privada ou versão inexistente}
         "409":
           description: Estado de atribuição metodológica incompatível
+  /knowledge-sources:
+    post:
+      summary: Registrar metadados de fonte privada
+      security: [{bearerAuth: []}]
+      responses: {"201": {description: Fonte registrada}, "403": {description: Capability ausente}}
+  /knowledge-sources/{sourceId}/candidates:
+    post:
+      summary: Criar Candidate privado
+      security: [{bearerAuth: []}]
+      parameters: [{name: sourceId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {"201": {description: Candidate criado}}
+  /knowledge-candidates/{candidateId}/submit:
+    post:
+      summary: Enviar Candidate para review
+      security: [{bearerAuth: []}]
+      parameters: [{name: candidateId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {"200": {description: Candidate em review}}
+  /knowledge-candidates/{candidateId}/review:
+    post:
+      summary: Registrar decisão de review
+      security: [{bearerAuth: []}]
+      parameters: [{name: candidateId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {"200": {description: Review registrada}}
+  /knowledge-candidates/{candidateId}/publish:
+    post:
+      summary: Publicar conhecimento autorizado
+      security: [{bearerAuth: []}]
+      parameters: [{name: candidateId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {"200": {description: Versão autorizada publicada}}
+  /methodology-versions/{versionId}/knowledge:
+    post:
+      summary: Vincular knowledge autorizado exato
+      security: [{bearerAuth: []}]
+      parameters: [{name: versionId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {"200": {description: Vínculo explícito criado}}
