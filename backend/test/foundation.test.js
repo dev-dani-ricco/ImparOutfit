@@ -1362,6 +1362,9 @@ test('last administrator cannot be revoked and corrupted migration ledger is ref
 test('reconstruction inputs, jobs and outputs are isolated; fake success cannot reach READY',async()=>{
  const {runOnce}=await import('../src/reconstruction/worker.js');
  const j=(await auth('post','/reconstruction/jobs',A).send({itemId:owned.id,category:'TOP'}).expect(201)).body;
+ const requester=(await db.query("SELECT person_id,requested_by_principal_id FROM reconstruction_jobs WHERE id=$1",[j.id])).rows[0];
+ const principal=(await db.query("SELECT id FROM principals WHERE person_id=$1 AND principal_type='HUMAN'",[A.user.person_id])).rows[0];
+ assert.deepEqual(requester,{person_id:A.user.person_id,requested_by_principal_id:principal.id});
  assert.ok(j.capture_session_id);
  const session=(await auth('get','/reconstruction/sessions/'+j.capture_session_id,A).expect(200)).body;
  assert.equal(session.protocol_version,'TOP_CAPTURE_V1');assert.equal(session.expected_shots.length,36);

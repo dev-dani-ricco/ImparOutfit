@@ -30,8 +30,8 @@ export async function create(req,res){
   const expectedShots=Array.from({length:protocol.expectedShots},(_,i)=>({azimuth:(i%12)*protocol.azimuthStep,elevation:protocol.elevations[Math.floor(i/12)]}));
   const session=(await c.query(`INSERT INTO capture_sessions(person_id,wardrobe_item_id,product_id,category,protocol_version,expected_shots)
    VALUES($1,$2,$3,$4,$5,$6) RETURNING *`,[req.auth.personId,b.itemId||null,b.productId||null,b.category,protocol.version,expectedShots])).rows[0];
-  const j=(await c.query(`INSERT INTO reconstruction_jobs(person_id,wardrobe_item_id,product_id,organization_id,category,pipeline_version,technique,capture_metadata,capture_session_id)
-   VALUES($1,$2,$3,$4,$5,$6,'COLMAP_CPU_SGBM',$7,$8) RETURNING *`,[req.auth.personId,b.itemId||null,b.productId||null,org,b.category,policy.version,{...b.captureMetadata,captureSessionId:session.id,protocolVersion:protocol.version},session.id])).rows[0];
+  const j=(await c.query(`INSERT INTO reconstruction_jobs(person_id,requested_by_principal_id,wardrobe_item_id,product_id,organization_id,category,pipeline_version,technique,capture_metadata,capture_session_id)
+   VALUES($1,$2,$3,$4,$5,$6,$7,'COLMAP_CPU_SGBM',$8,$9) RETURNING *`,[req.auth.personId,req.auth.principalId,b.itemId||null,b.productId||null,org,b.category,policy.version,{...b.captureMetadata,captureSessionId:session.id,protocolVersion:protocol.version},session.id])).rows[0];
   await c.query("INSERT INTO reconstruction_attempts(job_id,sequence,input_revision,pipeline_version,state) VALUES($1,1,0,$2,'CAPTURED')",[j.id,policy.version]);
   await c.query("INSERT INTO reconstruction_events(job_id,actor_person_id,to_state) VALUES($1,$2,'CAPTURED')",[j.id,req.auth.personId]);
   return j;
