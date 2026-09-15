@@ -891,11 +891,6 @@ components:
         origin:
           type: string
           enum: [SYSTEM, EXPERT]
-        methodologyVersionRef:
-          type: string
-          minLength: 1
-          maxLength: 160
-          nullable: true
     ImparAnalysis:
       allOf:
         - $ref: "#/components/schemas/ImparAnalysisInput"
@@ -915,6 +910,10 @@ components:
             createdAt:
               type: string
               format: date-time
+            methodologyVersionRef:
+              type: string
+              nullable: true
+              description: Opaque methodology version reference assigned by institutional execution when available.
             results:
               type: array
               items:
@@ -4560,7 +4559,7 @@ paths:
   /impar-analyses:
     post:
       summary: Criar ÍMPAR Analysis privada em DRAFT
-      description: Exige LookVersion e Context explícitos. methodologyVersionRef é somente um identificador opaco; não recebe metodologia, prompts ou resultados. EXPERT exige futura autorização institucional de análise e é bloqueado neste fluxo atual.
+      description: Exige LookVersion e Context explícitos. O servidor cria a Analysis sem referência metodológica atribuída; quando disponível, methodologyVersionRef é uma referência opaca atribuída por execução institucional. EXPERT exige futura autorização institucional de análise e é bloqueado neste fluxo atual.
       operationId: post__impar_analyses
       security:
         - bearerAuth: []

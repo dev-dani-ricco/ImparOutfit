@@ -330,14 +330,14 @@ test('POST /impar-analyses creates only private SYSTEM DRAFT identity records',a
   const contextA=(await auth('post','/contexts',A).send({occasion:'Analysis API Context'}).expect(201)).body;
   const contextB=(await auth('post','/contexts',B).send({occasion:'Other Analysis API Context'}).expect(201)).body;
   const created=(await auth('post','/impar-analyses',A).send({
-    lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',methodologyVersionRef:'  met_opaque  '
+    lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM'
   }).expect(201)).body;
   assert.deepEqual({lookId:created.lookId,lookVersionId:created.lookVersionId,contextId:created.contextId,status:created.status,origin:created.origin,methodologyVersionRef:created.methodologyVersionRef},{
-    lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,status:'DRAFT',origin:'SYSTEM',methodologyVersionRef:'met_opaque'
+    lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,status:'DRAFT',origin:'SYSTEM',methodologyVersionRef:null
   });
   assert.deepEqual((await db.query(`SELECT owner_person_id,look_id,look_version_id,context_id,status,origin,methodology_version_ref
     FROM impar_analyses WHERE id=$1`,[created.id])).rows[0],{
-    owner_person_id:A.user.person_id,look_id:first.lookId,look_version_id:first.version2Id,context_id:contextA.id,status:'DRAFT',origin:'SYSTEM',methodology_version_ref:'met_opaque'
+    owner_person_id:A.user.person_id,look_id:first.lookId,look_version_id:first.version2Id,context_id:contextA.id,status:'DRAFT',origin:'SYSTEM',methodology_version_ref:null
   });
   const version3=(await auth('post','/looks/'+first.lookId+'/versions',A)
     .send({title:'Analysis API v3',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
@@ -357,7 +357,8 @@ test('POST /impar-analyses creates only private SYSTEM DRAFT identity records',a
   for(const origin of ['DANI','AI','MERCHANT','SPONSORED']) {
     await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin}).expect(400);
   }
-  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',methodologyVersionRef:'   '}).expect(400);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',methodologyVersionRef:'method-v1'}).expect(400);
+  await auth('post','/impar-analyses',A).send({lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',methodologyVersionRef:null}).expect(400);
   await auth('post','/impar-analyses',A).send({
     lookId:first.lookId,lookVersionId:first.version2Id,contextId:contextA.id,origin:'SYSTEM',
     prompt:'private',reasoning:'private',knowledge:'private',recommendation:'private'
@@ -369,6 +370,12 @@ test('POST /impar-analyses creates only private SYSTEM DRAFT identity records',a
   assert.deepEqual({status:withoutReference.status,methodologyVersionRef:withoutReference.methodologyVersionRef,lookVersionId:withoutReference.lookVersionId},{
     status:'DRAFT',methodologyVersionRef:null,lookVersionId:version3.versionId
   });
+  const historical=(await db.query(`INSERT INTO impar_analyses(
+    owner_person_id,look_id,look_version_id,context_id,origin,methodology_version_ref
+  ) VALUES($1,$2,$3,$4,'SYSTEM','legacy-ref') RETURNING id`,[
+    A.user.person_id,first.lookId,first.version2Id,contextA.id
+  ])).rows[0];
+  assert.equal((await auth('get','/impar-analyses/'+historical.id,A).expect(200)).body.methodologyVersionRef,'legacy-ref');
 });
 test('ÍMPAR Analysis Result schema preserves private versioned structured outputs separately from Analysis',async()=>{
   const fixture=await createVersionedLookFixture(A);
@@ -437,7 +444,7 @@ test('GET /impar-analyses/:analysisId returns only the private persisted structu
   const fixture=await createVersionedLookFixture(A);
   const context=(await auth('post','/contexts',A).send({occasion:'Readable analysis context'}).expect(201)).body;
   const created=(await auth('post','/impar-analyses',A).send({
-    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM',methodologyVersionRef:'met_opaque_read'
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'
   }).expect(201)).body;
   const version3=(await auth('post','/looks/'+fixture.lookId+'/versions',A)
     .send({title:'Readable analysis v3',items:[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}]}).expect(201)).body;
@@ -448,7 +455,7 @@ test('GET /impar-analyses/:analysisId returns only the private persisted structu
   };
   const read=(await auth('get','/impar-analyses/'+created.id,A).expect(200)).body;
   assert.deepEqual({id:read.id,lookId:read.lookId,lookVersionId:read.lookVersionId,contextId:read.contextId,status:read.status,origin:read.origin,methodologyVersionRef:read.methodologyVersionRef},{
-    id:created.id,lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,status:'DRAFT',origin:'SYSTEM',methodologyVersionRef:'met_opaque_read'
+    id:created.id,lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,status:'DRAFT',origin:'SYSTEM',methodologyVersionRef:null
   });
   assert.notEqual(read.lookVersionId,version3.versionId);
   assert.equal(read.prompt,undefined);
@@ -469,7 +476,7 @@ test('POST /impar-analyses/:analysisId/results creates immutable private DRAFT v
   const fixture=await createVersionedLookFixture(A);
   const context=(await auth('post','/contexts',A).send({occasion:'Draft Result context'}).expect(201)).body;
   const analysis=(await auth('post','/impar-analyses',A).send({
-    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM',methodologyVersionRef:'met_result_draft'
+    lookId:fixture.lookId,lookVersionId:fixture.version2Id,contextId:context.id,origin:'SYSTEM'
   }).expect(201)).body;
   const create=payload=>auth('post','/impar-analyses/'+analysis.id+'/results',A).send({payload});
   const version1=(await create({}).expect(201)).body;

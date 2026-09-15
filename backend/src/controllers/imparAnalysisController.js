@@ -8,8 +8,7 @@ const schema=Joi.object({
   lookId:uuid.required(),
   lookVersionId:uuid.required(),
   contextId:uuid.required(),
-  origin:Joi.string().valid('SYSTEM','EXPERT').required(),
-  methodologyVersionRef:Joi.string().trim().min(1).max(160).allow(null)
+  origin:Joi.string().valid('SYSTEM','EXPERT').required()
 });
 const toAnalysis=row=>({
   id:row.id,
@@ -35,9 +34,9 @@ export async function create(req,res) {
   authorizePersonal(req.auth,context);
   const analysis=(await query(`INSERT INTO impar_analyses(
     owner_person_id,look_id,look_version_id,context_id,status,origin,methodology_version_ref
-  ) VALUES($1,$2,$3,$4,'DRAFT',$5,$6)
+  ) VALUES($1,$2,$3,$4,'DRAFT',$5,NULL)
   RETURNING id,look_id,look_version_id,context_id,status,origin,methodology_version_ref,final_result_id,created_at`,[
-    req.auth.personId,look.id,lookVersion.id,context.id,body.origin,body.methodologyVersionRef??null
+    req.auth.personId,look.id,lookVersion.id,context.id,body.origin
   ])).rows[0];
   res.status(201).json(toAnalysis(analysis));
 }
