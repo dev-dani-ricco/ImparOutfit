@@ -7,6 +7,18 @@ import {authorizePersonal,authorizeCapability} from '../services/authorizationSe
 import {withMedia,storage} from '../services/imageService.js';
 import {authorizedJob,transition,transaction,jobDto} from '../reconstruction/service.js';
 import {policy,validateCapture,qualityGate,categories,captureProtocol} from '../reconstruction/domain.js';
+function idempotencyKey(req){
+ const key=req.get('Idempotency-Key');
+ if(key===undefined)return null;
+ if(!/^[\x21-\x7e]{1,128}$/.test(key))throw new HttpError(400,'Idempotency-Key inválida');
+ return key;
+}
+function creationFingerprint(body){
+ return createHash('sha256').update(JSON.stringify({
+  itemId:body.itemId??null,productId:body.productId??null,category:body.category,
+  captureMetadata:{background:body.captureMetadata.background??null,lighting:body.captureMetadata.lighting??null,support:body.captureMetadata.support??null}
+ })).digest('hex');
+}
 export async function protocol(_req,res){
  res.json({version:policy.version,categories,protocols:policy.captureProtocols,minPhotos:policy.minPhotos,maxPhotos:policy.maxPhotos,
  guidance:['Mantenha a peça imóvel em suporte; mova a câmera ao redor.','Use fundo contrastante e iluminação difusa constante, sem flash/reflexos.','Mantenha a peça inteira e nítida, ocupando a maior parte do quadro.','Faça 3 voltas de 12 fotos (30 graus), nas alturas baixa, média e alta, com sobreposição.','Inclua frente, costas, laterais e partes ocultas; não altere zoom/exposição entre fotos.','Meça uma dimensão real; a escala não será inferida como precisa.'],
@@ -15,7 +27,16 @@ export async function protocol(_req,res){
 export async function create(req,res){
  const b=validate(Joi.object({itemId:uuid,productId:uuid,category:Joi.string().valid(...categories).required(),
  captureMetadata:Joi.object({background:Joi.string().max(200),lighting:Joi.string().max(200),support:Joi.string().max(200)}).default({})}).xor('itemId','productId'),req.body);
+ const key=idempotencyKey(req),fingerprint=key?creationFingerprint(b):null;
  const result=await transaction(async c=>{
+  await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[req.auth.personId]);
+  if(key){
+   const existing=(await c.query('SELECT * FROM reconstruction_jobs WHERE person_id=$1 AND idempotency_key=$2 FOR UPDATE',[req.auth.personId,key])).rows[0];
+   if(existing){
+    if(existing.idempotency_fingerprint!==fingerprint)throw new HttpError(409,'Idempotency-Key já foi usada com outra solicitação',{code:'VERSION_CONFLICT'});
+    return {job:existing,replayed:true};
+   }
+  }
   let org=null;
   if(b.itemId)authorizePersonal(req.auth,(await c.query('SELECT person_id FROM wardrobe_items WHERE id=$1',[b.itemId])).rows[0]);
   else {
@@ -23,19 +44,18 @@ export async function create(req,res){
    if(!p)throw new HttpError(404,'Produto indisponível');
    org=p.organization_id;await authorizeCapability(req.auth,org,'catalog.write',p.id,c);
   }
-  await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[req.auth.personId]);
   const n=(await c.query("SELECT count(*)::int n FROM reconstruction_jobs WHERE person_id=$1 AND state IN ('CAPTURED','QUEUED','PROCESSING','VALIDATING','QUALITY_CHECK')",[req.auth.personId])).rows[0].n;
   if(n>=5)throw new HttpError(429,'Conclua um dos jobs pendentes antes de iniciar outro');
   const protocol=captureProtocol(b.category);
   const expectedShots=Array.from({length:protocol.expectedShots},(_,i)=>({azimuth:(i%12)*protocol.azimuthStep,elevation:protocol.elevations[Math.floor(i/12)]}));
   const session=(await c.query(`INSERT INTO capture_sessions(person_id,wardrobe_item_id,product_id,category,protocol_version,expected_shots)
    VALUES($1,$2,$3,$4,$5,$6) RETURNING *`,[req.auth.personId,b.itemId||null,b.productId||null,b.category,protocol.version,expectedShots])).rows[0];
-  const j=(await c.query(`INSERT INTO reconstruction_jobs(person_id,requested_by_principal_id,wardrobe_item_id,product_id,organization_id,category,pipeline_version,technique,capture_metadata,capture_session_id)
-   VALUES($1,$2,$3,$4,$5,$6,$7,'COLMAP_CPU_SGBM',$8,$9) RETURNING *`,[req.auth.personId,req.auth.principalId,b.itemId||null,b.productId||null,org,b.category,policy.version,{...b.captureMetadata,captureSessionId:session.id,protocolVersion:protocol.version},session.id])).rows[0];
+  const j=(await c.query(`INSERT INTO reconstruction_jobs(person_id,requested_by_principal_id,wardrobe_item_id,product_id,organization_id,category,pipeline_version,technique,capture_metadata,capture_session_id,idempotency_key,idempotency_fingerprint)
+   VALUES($1,$2,$3,$4,$5,$6,$7,'COLMAP_CPU_SGBM',$8,$9,$10,$11) RETURNING *`,[req.auth.personId,req.auth.principalId,b.itemId||null,b.productId||null,org,b.category,policy.version,{...b.captureMetadata,captureSessionId:session.id,protocolVersion:protocol.version},session.id,key,fingerprint])).rows[0];
   await c.query("INSERT INTO reconstruction_attempts(job_id,sequence,input_revision,pipeline_version,state) VALUES($1,1,0,$2,'CAPTURED')",[j.id,policy.version]);
   await c.query("INSERT INTO reconstruction_events(job_id,actor_person_id,to_state) VALUES($1,$2,'CAPTURED')",[j.id,req.auth.personId]);
-  return j;
- });res.status(201).json(jobDto(result));
+  return {job:j,replayed:false};
+ });res.status(result.replayed?200:201).json(jobDto(result.job));
 }
 export async function list(req,res){res.set('Cache-Control','private, no-store').json((await query('SELECT id,wardrobe_item_id,product_id,category,state,created_at FROM reconstruction_jobs WHERE person_id=$1 ORDER BY created_at DESC LIMIT 100',[req.auth.personId])).rows);}
 export async function captureSession(req,res){

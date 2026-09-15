@@ -1415,3 +1415,31 @@ test('worker output stays private and in QUALITY_CHECK until inspection; invalid
  const inspected=(await auth('post','/reconstruction/jobs/'+j.id+'/inspection',A).send({inspection:{complete:true,isolatedItem:true,colorFaithful:true,categoryConfirmed:true},dimension:{axis:'y',valueMeters:.3,source:'USER_DECLARED'}}).expect(200)).body;
  assert.equal(inspected.state,'NEEDS_MORE_INPUT');assert.equal(inspected.metrics.first_pass_success,false);
 });
+
+test('reconstruction creation idempotency is private, scoped to the owner, and conflict-safe',async()=>{
+ const key='reconstruction-create-synthetic-001';
+ const payload={itemId:owned.id,category:'TOP',captureMetadata:{background:'neutral'}};
+ const first=await auth('post','/reconstruction/jobs',A).set('Idempotency-Key',key).send(payload).expect(201);
+ const replay=await auth('post','/reconstruction/jobs',A).set('Idempotency-Key',key).send(payload).expect(200);
+ assert.equal(replay.body.id,first.body.id);
+ assert.equal(replay.body.capture_session_id,first.body.capture_session_id);
+ assert.equal('idempotency_key' in replay.body,false);
+ assert.equal('idempotency_fingerprint' in replay.body,false);
+ assert.equal((await db.query('SELECT count(*)::int n FROM reconstruction_jobs WHERE person_id=$1 AND idempotency_key=$2',[A.user.person_id,key])).rows[0].n,1);
+ assert.equal((await db.query('SELECT count(*)::int n FROM capture_sessions WHERE person_id=$1 AND id=$2',[A.user.person_id,first.body.capture_session_id])).rows[0].n,1);
+ const conflict=await auth('post','/reconstruction/jobs',A).set('Idempotency-Key',key).send({...payload,captureMetadata:{background:'different'}}).expect(409);
+ assert.equal(conflict.body.error.code,'VERSION_CONFLICT');
+ const otherPerson=await register('idempotency-other');
+ const other=(await auth('post','/wardrobe/items',otherPerson).send({name:'Other idempotency item',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+ const otherOwner=await auth('post','/reconstruction/jobs',otherPerson).set('Idempotency-Key',key).send({itemId:other.id,category:'TOP'}).expect(201);
+ assert.notEqual(otherOwner.body.id,first.body.id);
+ const concurrentKey='reconstruction-create-synthetic-concurrent';
+ const concurrentPayload={itemId:owned.id,category:'TOP',captureMetadata:{lighting:'diffuse'}};
+ const [one,two]=await Promise.all([
+  auth('post','/reconstruction/jobs',A).set('Idempotency-Key',concurrentKey).send(concurrentPayload),
+  auth('post','/reconstruction/jobs',A).set('Idempotency-Key',concurrentKey).send(concurrentPayload)
+ ]);
+ assert.deepEqual([one.status,two.status].sort(),[200,201]);
+ assert.equal(one.body.id,two.body.id);
+ assert.equal((await db.query('SELECT count(*)::int n FROM reconstruction_jobs WHERE person_id=$1 AND idempotency_key=$2',[A.user.person_id,concurrentKey])).rows[0].n,1);
+});

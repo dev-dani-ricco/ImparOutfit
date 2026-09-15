@@ -24,7 +24,7 @@ export async function transaction(work){
  catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
 }
 export function jobDto(j){
- const {lease_until,...safe}=j;return safe;
+ const {lease_until,requested_by_principal_id,idempotency_key,idempotency_fingerprint,...safe}=j;return safe;
 }
 export async function claimJob(db){
  // Atomic claim; separate workers cannot take the same queued job.
