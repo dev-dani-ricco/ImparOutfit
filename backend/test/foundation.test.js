@@ -961,6 +961,12 @@ test('Knowledge resolver failures stay inside the exact snapshot and persist onl
  assert.deepEqual(out,{id:job.id,state:'FAILED',code:'KNOWLEDGE_NOT_AVAILABLE'});assert.deepEqual((await db.query('SELECT state,error_code,result_id FROM impar_analysis_jobs WHERE id=$1',[job.id])).rows[0],{state:'FAILED',error_code:'KNOWLEDGE_NOT_AVAILABLE',result_id:null});
  assert.equal((await db.query('SELECT count(*)::int n FROM impar_analysis_results WHERE analysis_id=$1',[fixture.analysis.id])).rows[0].n,0);assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[fixture.analysis.id])).rows[0],{status:'DRAFT',final_result_id:null});
 });
+test('Invalid authorized Knowledge produces no context or result and never reaches the provider',async()=>{
+ const {runOnce}=await import('../src/imparAnalysis/worker.js');const fixture=await createAnalysisExecutionFixture(A);
+ const job=(await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs',A).set('Idempotency-Key','knowledge-invalid-'+randomBytes(3).toString('hex')).send({}).expect(201)).body;
+ const out=await runOnce({adapter:{execute:async()=>assert.fail('provider must not execute')},resolvePrompt:syntheticPromptResolver,resolveKnowledge:async()=>({})});
+ assert.deepEqual(out,{id:job.id,state:'FAILED',code:'INVALID_KNOWLEDGE_CONTENT'});assert.deepEqual((await db.query('SELECT state,error_code,result_id FROM impar_analysis_jobs WHERE id=$1',[job.id])).rows[0],{state:'FAILED',error_code:'INVALID_KNOWLEDGE_CONTENT',result_id:null});assert.equal((await db.query('SELECT count(*)::int n FROM impar_analysis_results WHERE analysis_id=$1',[fixture.analysis.id])).rows[0].n,0);
+});
 test('Analysis worker persists sanitized Gateway timeout and invalid-response failures',async()=>{
  const {runOnce}=await import('../src/imparAnalysis/worker.js');
  for(const [suffix,adapter,code] of [
