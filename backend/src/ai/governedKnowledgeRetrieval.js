@@ -12,7 +12,7 @@ export async function retrieveAuthorizedKnowledge(ids,resolve,{query='impar anal
   for(const [index,text] of content.split(/\n{2,}/).entries())if(text.trim())units.push({id:`${id}:${index+1}`,authorizedKnowledgeVersionId:id,text:text.trim(),hash:hash(text.trim())});
  }
  const terms=new Set(query.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
- const selected=units.map(unit=>({...unit,score:[...terms].filter(term=>unit.text.toLowerCase().includes(term)).length})).sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
+ const selected=units.map(unit=>({...unit,score:[...terms].filter(term=>unit.text.toLowerCase().includes(term)).length})).filter(unit=>unit.score>0).sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
  let size=0;const bounded=[];for(const unit of selected){if(bounded.length>=maxUnits||size+unit.text.length>maxChars)continue;bounded.push(unit);size+=unit.text.length;}
  if(!bounded.length)throw fail('KNOWLEDGE_NOT_AVAILABLE');
  return {strategy:RETRIEVAL_STRATEGY,version:'1',authorizedKnowledgeVersionIds:[...ids].sort(),units:bounded,context:bounded.map(unit=>({id:unit.id,content:unit.text})),size};

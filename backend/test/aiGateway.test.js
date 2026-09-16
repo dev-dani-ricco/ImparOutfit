@@ -55,4 +55,5 @@ test('governed lexical retrieval is bounded, deterministic, and cannot expand it
  const one=await retrieveAuthorizedKnowledge(ids,resolve,{maxUnits:2,maxChars:30});const two=await retrieveAuthorizedKnowledge([...ids].reverse(),resolve,{maxUnits:2,maxChars:30});
  assert.equal(one.strategy,RETRIEVAL_STRATEGY);assert.deepEqual(one.authorizedKnowledgeVersionIds,[...ids].sort());assert.deepEqual(one.units.map(u=>u.id),two.units.map(u=>u.id));assert.ok(one.units.length<=2);assert.ok(one.size<=30);assert.deepEqual([...new Set(calls)].sort(),[...ids].sort());
  await assert.rejects(()=>retrieveAuthorizedKnowledge([],resolve),e=>e.code==='KNOWLEDGE_NOT_AVAILABLE');
+ await assert.rejects(()=>retrieveAuthorizedKnowledge([ids[0]],async()=> 'unrelated structured content'),e=>e.code==='KNOWLEDGE_NOT_AVAILABLE');
 });
