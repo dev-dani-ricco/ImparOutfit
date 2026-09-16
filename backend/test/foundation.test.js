@@ -905,6 +905,34 @@ test('AnalysisJob snapshots outlive registry changes and institutional finalizat
  await auth('post','/impar-analyses/'+fixture.analysis.id+'/complete',A).send({resultId:job.result_id}).expect(200);
  assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[fixture.analysis.id])).rows[0],{status:'COMPLETED',final_result_id:job.result_id});
 });
+test('AI policy snapshot keeps V1 for retry while new AnalysisJobs select V2',async()=>{
+ const fixture=await createAnalysisExecutionFixture(A);
+ const j1=(await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs',A).set('Idempotency-Key','ai-v1-'+randomBytes(3).toString('hex')).send({}).expect(201)).body;
+ assert.equal((await db.query('SELECT ai_policy_version_id FROM impar_analysis_jobs WHERE id=$1',[j1.id])).rows[0].ai_policy_version_id,fixture.aiPolicyVersion.id);
+ await db.query("UPDATE ai_policy_versions SET status='RETIRED' WHERE id=$1",[fixture.aiPolicyVersion.id]);
+ const v2=(await db.query("INSERT INTO ai_policy_versions(ai_policy_id,version,status,provider_identifier,model_identifier,timeout_ms,created_by_principal_id,published_by_principal_id,published_at) VALUES($1,2,'PUBLISHED','synthetic-v2-provider','synthetic-v2-model',1000,$2,$2,now()) RETURNING id",[fixture.policy.id,fixture.principal.id])).rows[0];
+ await db.query("UPDATE impar_analysis_jobs SET state='FAILED',attempt=1 WHERE id=$1",[j1.id]);
+ await db.query("INSERT INTO impar_analysis_attempts(job_id,sequence,state,error_code,completed_at) VALUES($1,1,'FAILED','PROVIDER_UNAVAILABLE',now())",[j1.id]);
+ await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs/'+j1.id+'/retry',A).expect(202);
+ assert.equal((await db.query('SELECT ai_policy_version_id FROM impar_analysis_jobs WHERE id=$1',[j1.id])).rows[0].ai_policy_version_id,fixture.aiPolicyVersion.id);
+ const next=await createAnalysisExecutionFixture(A);
+ const j2=(await auth('post','/impar-analyses/'+next.analysis.id+'/jobs',A).set('Idempotency-Key','ai-v2-'+randomBytes(3).toString('hex')).send({}).expect(201)).body;
+ assert.equal((await db.query('SELECT ai_policy_version_id FROM impar_analysis_jobs WHERE id=$1',[j2.id])).rows[0].ai_policy_version_id,v2.id);
+});
+test('Analysis worker persists sanitized Gateway timeout and invalid-response failures',async()=>{
+ const {runOnce}=await import('../src/imparAnalysis/worker.js');
+ for(const [suffix,adapter,code] of [
+  ['timeout',{execute:async()=>new Promise(resolve=>setTimeout(()=>resolve({output:{late:true}}),1100))},'PROVIDER_TIMEOUT'],
+  ['invalid',{execute:async()=>({raw:'synthetic'})},'INVALID_PROVIDER_RESPONSE']
+ ]){
+  const fixture=await createAnalysisExecutionFixture(A);const job=(await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs',A).set('Idempotency-Key','ai-'+suffix+'-'+randomBytes(3).toString('hex')).send({}).expect(201)).body;
+  const out=await runOnce({adapter,resolveKnowledge:async()=>({synthetic:true})});assert.deepEqual(out,{id:job.id,state:'FAILED',code});
+  assert.deepEqual((await db.query('SELECT state,error_code,result_id FROM impar_analysis_jobs WHERE id=$1',[job.id])).rows[0],{state:'FAILED',error_code:code,result_id:null});
+  assert.deepEqual((await db.query('SELECT state,error_code FROM impar_analysis_attempts WHERE job_id=$1',[job.id])).rows[0],{state:'FAILED',error_code:code});
+  assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[fixture.analysis.id])).rows[0],{status:'DRAFT',final_result_id:null});
+  assert.deepEqual((await db.query('SELECT status,failure_code FROM ai_executions WHERE consumer_id=$1',[job.id])).rows[0],{status:'FAILED',failure_code:code});
+ }
+});
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({
     occasion:'Synthetic dinner',startsAt:'2026-09-10T19:30:00.000Z',locationText:'Synthetic location',
