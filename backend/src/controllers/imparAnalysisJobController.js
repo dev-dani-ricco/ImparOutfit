@@ -1,10 +1,10 @@
-import {createHash} from 'node:crypto';
 import {authorizeInstitutionalCapability,authorizePersonal} from '../services/authorizationService.js';
 import {HttpError} from '../utils/http.js';
 import {jobDto,transaction,authorizedJob,retryAvailable} from '../imparAnalysis/jobService.js';
+import {normalizeIdempotencyKey,sha256Json} from '../execution/primitives.js';
 
-const fingerprint=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
-const keyFor=(req,fingerprintValue)=>{const key=req.get('Idempotency-Key')??`analysis:${fingerprintValue}`;if(!/^[\x21-\x7e]{1,128}$/.test(key))throw new HttpError(400,'Idempotency-Key inválida');return key;};
+const fingerprint=sha256Json;
+const keyFor=(req,fingerprintValue)=>normalizeIdempotencyKey(req.get('Idempotency-Key')??`analysis:${fingerprintValue}`);
 
 export async function enqueue(req,res){
  const result=await transaction(async c=>{

@@ -1,11 +1,12 @@
 import {pool,query} from '../config/db.js';
 import {HttpError} from '../utils/http.js';
 import {authorizePersonal} from '../services/authorizationService.js';
+import {retryWithinBudget,withTransaction} from '../execution/primitives.js';
 
 export const DEFAULT_IMPAR_ANALYSIS_MAX_RETRIES=2;
 export const analysisMaxRetries=()=>{const value=Number.parseInt(process.env.IMPAR_ANALYSIS_MAX_RETRIES??String(DEFAULT_IMPAR_ANALYSIS_MAX_RETRIES),10);return Number.isSafeInteger(value)&&value>=0?value:DEFAULT_IMPAR_ANALYSIS_MAX_RETRIES;};
-export const retryAvailable=job=>job.attempt<=analysisMaxRetries();
-export async function transaction(work){const c=await pool.connect();try{await c.query('BEGIN');const out=await work(c);await c.query('COMMIT');return out;}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}
+export const retryAvailable=job=>retryWithinBudget(job.attempt,analysisMaxRetries());
+export const transaction=work=>withTransaction(pool,work);
 export async function authorizedJob(auth,analysisId,jobId,db={query},lock=false){
  const job=(await db.query(`SELECT * FROM impar_analysis_jobs WHERE id=$1 AND analysis_id=$2${lock?' FOR UPDATE':''}`,[jobId,analysisId])).rows[0];
  // Analysis jobs preserve the domain's owner_person_id naming.  The shared

@@ -2,6 +2,7 @@ import {query,pool} from '../config/db.js';
 import {HttpError} from '../utils/http.js';
 import {authorizePersonal,authorizeCapability} from '../services/authorizationService.js';
 import {canTransition,policy,reconstructionMaxRetries} from './domain.js';
+import {retryWithinBudget,withTransaction} from '../execution/primitives.js';
 export async function authorizedJob(auth,id,db={query},lock=false){
  const job=(await db.query('SELECT * FROM reconstruction_jobs WHERE id=$1'+(lock?' FOR UPDATE':''),[id])).rows[0];
  authorizePersonal(auth,job);
@@ -18,13 +19,9 @@ export async function transition(db,job,to,{actor=null,code=null,metrics=null,gu
  await db.query('INSERT INTO reconstruction_events(job_id,actor_person_id,from_state,to_state,code) VALUES($1,$2,$3,$4,$5)',[job.id,actor,job.state,to,code]);
  return row;
 }
-export async function transaction(work){
- const c=await pool.connect();
- try{await c.query('BEGIN');const out=await work(c);await c.query('COMMIT');return out;}
- catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
-}
+export const transaction=work=>withTransaction(pool,work);
 // `attempt` advances atomically on each worker claim and is the single retry-budget source.
-export function retryAvailable(job){return job.attempt<=reconstructionMaxRetries();}
+export function retryAvailable(job){return retryWithinBudget(job.attempt,reconstructionMaxRetries());}
 export function jobDto(j){
  const {lease_until,requested_by_principal_id,idempotency_key,idempotency_fingerprint,...safe}=j;return safe;
 }

@@ -7,17 +7,15 @@ import {authorizePersonal,authorizeCapability} from '../services/authorizationSe
 import {withMedia,storage} from '../services/imageService.js';
 import {authorizedJob,transition,transaction,jobDto,retryAvailable} from '../reconstruction/service.js';
 import {policy,validateCapture,qualityGate,categories,captureProtocol} from '../reconstruction/domain.js';
+import {normalizeIdempotencyKey,sha256Json} from '../execution/primitives.js';
 function idempotencyKey(req){
- const key=req.get('Idempotency-Key');
- if(key===undefined)return null;
- if(!/^[\x21-\x7e]{1,128}$/.test(key))throw new HttpError(400,'Idempotency-Key inválida');
- return key;
+ return normalizeIdempotencyKey(req.get('Idempotency-Key'));
 }
 function creationFingerprint(body){
- return createHash('sha256').update(JSON.stringify({
+ return sha256Json({
   itemId:body.itemId??null,productId:body.productId??null,category:body.category,
   captureMetadata:{background:body.captureMetadata.background??null,lighting:body.captureMetadata.lighting??null,support:body.captureMetadata.support??null}
- })).digest('hex');
+ });
 }
 export async function protocol(_req,res){
  res.json({version:policy.version,categories,protocols:policy.captureProtocols,minPhotos:policy.minPhotos,maxPhotos:policy.maxPhotos,
