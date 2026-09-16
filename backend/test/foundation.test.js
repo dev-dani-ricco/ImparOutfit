@@ -1519,6 +1519,15 @@ test('concurrent workers claim exactly one queued reconstruction job and preserv
  assert.equal((await db.query("SELECT state FROM reconstruction_jobs WHERE id=$1",[target])).rows[0].state,'PROCESSING');
  const attempts=(await db.query('SELECT sequence,state FROM reconstruction_attempts WHERE job_id=$1 ORDER BY sequence',[target])).rows;
  assert.deepEqual(attempts,[{sequence:1,state:'CAPTURED'},{sequence:2,state:'PROCESSING'}]);
+ const distinct=(await db.query("SELECT id FROM reconstruction_jobs WHERE person_id=$1 AND state='CAPTURED' ORDER BY created_at LIMIT 2",[A.user.person_id])).rows;
+ assert.equal(distinct.length,2);
+ await db.query("UPDATE reconstruction_jobs SET state='QUEUED' WHERE id=ANY($1::uuid[])",[distinct.map(row=>row.id)]);
+ const independent=await Promise.all([transaction(claimJob),transaction(claimJob)]);
+ assert.deepEqual(independent.map(job=>job.id).sort(),distinct.map(row=>row.id).sort());
+ for(const job of independent){
+  assert.equal(job.state,'PROCESSING');assert.ok(job.lease_until);
+  assert.deepEqual((await db.query('SELECT sequence,state FROM reconstruction_attempts WHERE job_id=$1',[job.id])).rows,[{sequence:1,state:'PROCESSING'}]);
+ }
  const nonQueued=await transaction(claimJob);
  assert.equal(nonQueued,null);
 });
