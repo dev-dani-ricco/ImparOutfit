@@ -1,6 +1,7 @@
 # AI Gateway Foundation
 
-`AnalysisJob` calls the internal AI Gateway with an exact PolicyVersion. The
+`AnalysisJob` calls the internal AI Gateway with exact PolicyVersion and
+PromptVersion snapshots. The
 Gateway selects the policy-controlled provider, model and timeout, invokes a
 Provider Adapter, returns a normalized technical result and records an
 `AIExecution` provenance record.
@@ -19,7 +20,14 @@ Production has no configured provider and fails honestly with
 Timeout and invalid provider responses become sanitized `PROVIDER_TIMEOUT` and
 `INVALID_PROVIDER_RESPONSE`. Provider/model/timeout are server-controlled.
 
-AIExecution stores safe task, policy, provider/model, requester/owner,
+Prompt content is resolved through a private resolver only at execution. Its
+opaque reference and content never reach public DTOs, logs or AIExecution.
+Without a configured production resolver the Gateway fails honestly with
+`PROMPT_NOT_AVAILABLE`; invalid resolved content fails with
+`INVALID_PROMPT_CONTENT`. Prompt is distinct from Policy, Methodology,
+Knowledge and future Agents.
+
+AIExecution stores safe task, policy, prompt-version ID, provider/model, requester/owner,
 consumer reference, usage and latency. It stores no prompt, CoT, credentials,
 private Knowledge, private refs or raw provider response. The Gateway performs
 no RAG or retrieval; authorized Knowledge references are prepared by Analysis.

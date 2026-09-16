@@ -8,6 +8,7 @@ import {migrate} from '../src/db/migrate.js';
 import {pool} from '../src/config/db.js';
 import {executeAi} from '../src/ai/gateway.js';
 import {resolvePublishedPolicy,loadHistoricalPolicy} from '../src/ai/policyService.js';
+import {resolvePublishedPrompt,loadHistoricalPrompt} from '../src/ai/promptService.js';
 
 let db,policy,v1;
 test.before(async()=>{db=new PGlite({extensions:{pgcrypto}});await migrate(db);pool.query=db.query.bind(db);pool.connect=async()=>({query:db.query.bind(db),release(){}});policy=(await db.query("INSERT INTO ai_policies(task) VALUES('IMPAR_ANALYSIS') RETURNING id")).rows[0];v1=(await db.query("INSERT INTO ai_policy_versions(ai_policy_id,version,status,provider_identifier,model_identifier,timeout_ms) VALUES($1,1,'PUBLISHED','synthetic-provider','synthetic-model',10) RETURNING *",[policy.id])).rows[0];});
@@ -30,4 +31,19 @@ test('AI Gateway executes only exact governed policies and records sanitized pro
  await db.query("UPDATE ai_policy_versions SET status='RETIRED' WHERE id=$1",[v1.id]);
  await assert.rejects(()=>resolvePublishedPolicy('IMPAR_ANALYSIS',db),e=>e.code==='POLICY_NOT_AVAILABLE');
  assert.equal((await loadHistoricalPolicy(v1.id,'IMPAR_ANALYSIS',db)).id,v1.id);
+});
+
+test('Prompt versions are exact, private-content resolved, and historical retirement does not select latest',async()=>{
+ const definition=(await db.query("INSERT INTO prompt_definitions(task) VALUES('IMPAR_ANALYSIS') RETURNING id")).rows[0];
+ const v1Prompt=(await db.query("INSERT INTO prompt_versions(prompt_definition_id,version,status,content_hash,private_content_ref) VALUES($1,1,'PUBLISHED',$2,'private://prompt/not-public') RETURNING *",[definition.id,'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'])).rows[0];
+ const request={task:'IMPAR_ANALYSIS',aiPolicyVersionId:v1.id,promptVersionId:v1Prompt.id,ownerPersonId:null,requesterPrincipalId:null,consumer:{type:'TEST',id:'00000000-0000-0000-0000-000000000005'}};
+ const output=await executeAi(request,{db,resolvePrompt:async prompt=>{assert.equal(prompt.id,v1Prompt.id);assert.equal(prompt.private_content_ref,'private://prompt/not-public');return 'synthetic test instruction';},adapter:{execute:async received=>{assert.equal(received.instruction,'synthetic test instruction');assert.equal(received.promptVersionId,v1Prompt.id);return {output:{promptSnapshot:true}};}}});
+ assert.equal(output.promptVersionId,v1Prompt.id);
+ await db.query("UPDATE prompt_versions SET status='RETIRED' WHERE id=$1",[v1Prompt.id]);
+ await assert.rejects(()=>resolvePublishedPrompt('IMPAR_ANALYSIS',db),e=>e.code==='PROMPT_NOT_AVAILABLE');
+ assert.equal((await loadHistoricalPrompt(v1Prompt.id,'IMPAR_ANALYSIS',db)).id,v1Prompt.id);
+ const v2Prompt=(await db.query("INSERT INTO prompt_versions(prompt_definition_id,version,status,content_hash,private_content_ref) VALUES($1,2,'PUBLISHED',$2,'private://prompt/v2') RETURNING id",[definition.id,'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'])).rows[0];
+ assert.equal((await resolvePublishedPrompt('IMPAR_ANALYSIS',db)).id,v2Prompt.id);
+ const execution=(await db.query('SELECT prompt_version_id,failure_code FROM ai_executions WHERE consumer_id=$1',[request.consumer.id])).rows[0];assert.deepEqual(execution,{prompt_version_id:v1Prompt.id,failure_code:null});
+ await assert.rejects(()=>executeAi({...request,consumer:{type:'TEST',id:'00000000-0000-0000-0000-000000000006'}},{db,resolvePrompt:async()=>''}),e=>e.code==='INVALID_PROMPT_CONTENT');
 });
