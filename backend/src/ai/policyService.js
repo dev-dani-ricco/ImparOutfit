@@ -1,0 +1,4 @@
+import {query} from '../config/db.js';
+import {assertTask} from './tasks.js';
+export async function resolvePublishedPolicy(task,db={query}){assertTask(task);const row=(await db.query(`SELECT v.* FROM ai_policies p JOIN ai_policy_versions v ON v.ai_policy_id=p.id WHERE p.task=$1 AND v.status='PUBLISHED'`,[task])).rows[0];if(!row)throw Object.assign(new Error('POLICY_NOT_AVAILABLE'),{code:'POLICY_NOT_AVAILABLE'});return row;}
+export async function loadHistoricalPolicy(id,task,db={query}){assertTask(task);const row=(await db.query(`SELECT v.* FROM ai_policy_versions v JOIN ai_policies p ON p.id=v.ai_policy_id WHERE v.id=$1 AND p.task=$2 AND v.status IN ('PUBLISHED','RETIRED')`,[id,task])).rows[0];if(!row)throw Object.assign(new Error('POLICY_NOT_AVAILABLE'),{code:'POLICY_NOT_AVAILABLE'});return row;}
