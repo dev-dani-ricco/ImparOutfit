@@ -4,11 +4,14 @@ import {jobDto,transaction,authorizedJob,retryAvailable} from '../imparAnalysis/
 import {normalizeIdempotencyKey,sha256Json} from '../execution/primitives.js';
 import {resolvePublishedPolicy} from '../ai/policyService.js';
 import {resolvePublishedPrompt} from '../ai/promptService.js';
+import Joi from 'joi';
+import {validate} from '../utils/validation.js';
 
 const fingerprint=sha256Json;
 const keyFor=(req,fingerprintValue)=>normalizeIdempotencyKey(req.get('Idempotency-Key')??`analysis:${fingerprintValue}`);
 
 export async function enqueue(req,res){
+ validate(Joi.object({}),req.body||{});
  const result=await transaction(async c=>{
   const analysis=(await c.query('SELECT * FROM impar_analyses WHERE id=$1 FOR UPDATE',[req.params.analysisId])).rows[0];
   authorizePersonal(req.auth,{...analysis,person_id:analysis.owner_person_id});await authorizeInstitutionalCapability(req.auth,'impar.analysis.execute',c);
