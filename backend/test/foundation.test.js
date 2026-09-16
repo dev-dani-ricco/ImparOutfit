@@ -72,6 +72,20 @@ async function createVersionedLookFixture(user=A) {
     version2Items
   };
 }
+async function createAnalysisExecutionFixture(user=A){
+ const look=await createVersionedLookFixture(user);
+ const context=(await auth('post','/contexts',user).send({occasion:'Synthetic execution context'}).expect(201)).body;
+ const analysis=(await auth('post','/impar-analyses',user).send({lookId:look.lookId,lookVersionId:look.version2Id,contextId:context.id}).expect(201)).body;
+ const principal=(await db.query("SELECT id FROM principals WHERE person_id=$1 AND principal_type='HUMAN'",[user.user.person_id])).rows[0];
+ const methodology=(await db.query("INSERT INTO methodologies(key,technical_name) VALUES($1,$2) RETURNING id",['synthetic-execution-'+randomBytes(6).toString('hex'),'Synthetic execution registry'])).rows[0];
+ const version=(await db.query("INSERT INTO methodology_versions(methodology_id,version,status,content_ref,created_by_principal_id,published_by_principal_id,published_at) VALUES($1,1,'PUBLISHED',$2,$3,$3,now()) RETURNING id",[methodology.id,'private://methodology/synthetic',principal.id])).rows[0];
+ const source=(await db.query("INSERT INTO knowledge_sources(knowledge_scope,source_type,label,private_content_ref,created_by_principal_id) VALUES('IMPAR','DOCUMENT','Synthetic source','private://knowledge/source',$1) RETURNING id",[principal.id])).rows[0];
+ const candidate=(await db.query("INSERT INTO knowledge_candidates(source_id,knowledge_scope,candidate_version,private_content_ref,status,created_by_principal_id) VALUES($1,'IMPAR',1,'private://knowledge/candidate','PUBLISHED',$2) RETURNING id",[source.id,principal.id])).rows[0];
+ const knowledge=(await db.query("INSERT INTO authorized_knowledge_versions(candidate_id,knowledge_scope,version,private_content_ref,published_by_principal_id) VALUES($1,'IMPAR',1,'private://knowledge/authorized',$2) RETURNING id",[candidate.id,principal.id])).rows[0];
+ await db.query('INSERT INTO methodology_version_knowledge(methodology_version_id,authorized_knowledge_version_id) VALUES($1,$2)',[version.id,knowledge.id]);
+ await db.query('UPDATE impar_analyses SET methodology_version_id=$1 WHERE id=$2',[version.id,analysis.id]);
+ return {analysis,look,context,version,knowledge,principal};
+}
 before(async()=>{
   db=new PGlite({extensions:{pgcrypto}});
   await migrate(db);
@@ -735,6 +749,24 @@ test('each Person resolves to one active HUMAN Principal without enabling machin
   await assert.rejects(()=>db.query("INSERT INTO principals(principal_type,person_id) VALUES('HUMAN',$1)",[created.user.person_id]));
   await assert.rejects(()=>db.query("INSERT INTO principals(principal_type,person_id) VALUES('MACHINE',NULL)"));
   await auth('get','/auth/me',created).expect(200);
+});
+
+test('governed AnalysisJob snapshots published knowledge and worker creates only a DRAFT Result',async()=>{
+ const {runOnce}=await import('../src/imparAnalysis/worker.js');
+ const fixture=await createAnalysisExecutionFixture(A);
+ const key='analysis-execution-synthetic';
+ const created=await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs',A).set('Idempotency-Key',key).send({}).expect(201);
+ const replay=await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs',A).set('Idempotency-Key',key).send({}).expect(200);
+ assert.equal(replay.body.id,created.body.id);
+ assert.equal(created.body.idempotency_key,undefined);assert.equal(created.body.lease_until,undefined);
+ const row=(await db.query('SELECT * FROM impar_analysis_jobs WHERE id=$1',[created.body.id])).rows[0];
+ assert.deepEqual({analysis_id:row.analysis_id,owner_person_id:row.owner_person_id,requested_by_principal_id:row.requested_by_principal_id,look_version_id:row.look_version_id,context_id:row.context_id,methodology_version_id:row.methodology_version_id},{analysis_id:fixture.analysis.id,owner_person_id:A.user.person_id,requested_by_principal_id:fixture.principal.id,look_version_id:fixture.look.version2Id,context_id:fixture.context.id,methodology_version_id:fixture.version.id});
+ assert.deepEqual((await db.query('SELECT authorized_knowledge_version_id FROM impar_analysis_job_knowledge WHERE job_id=$1',[row.id])).rows,[{authorized_knowledge_version_id:fixture.knowledge.id}]);
+ const result=await runOnce({resolveKnowledge:async id=>{assert.equal(id,fixture.knowledge.id);return {configured:true};}});
+ assert.deepEqual(result,{id:row.id,state:'SUCCEEDED'});
+ const job=(await db.query('SELECT state,result_id FROM impar_analysis_jobs WHERE id=$1',[row.id])).rows[0];assert.equal(job.state,'SUCCEEDED');assert.ok(job.result_id);
+ assert.deepEqual((await db.query('SELECT status,result_schema_version,payload FROM impar_analysis_results WHERE id=$1',[job.result_id])).rows[0],{status:'DRAFT',result_schema_version:1,payload:{executionValidated:true,analysisId:fixture.analysis.id,lookVersionId:fixture.look.version2Id,contextId:fixture.context.id,methodologyVersionId:fixture.version.id,authorizedKnowledgeVersionIds:[fixture.knowledge.id]}});
+ assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[fixture.analysis.id])).rows[0],{status:'DRAFT',final_result_id:null});
 });
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({

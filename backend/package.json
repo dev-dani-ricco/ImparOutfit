@@ -10,7 +10,8 @@
     "migrate": "node src/db/migrate.js",
     "migrate:adopt": "node src/db/migrate.js --adopt-legacy",
     "migrate:down": "node src/db/migrate.js --down",
-    "reconstruction:worker": "node src/reconstruction/worker.js"
+    "reconstruction:worker": "node src/reconstruction/worker.js",
+    "impar-analysis:worker": "node src/imparAnalysis/worker.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -4634,6 +4634,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /impar-analyses/{analysisId}/jobs:
+    post:
+      summary: Enfileirar execução institucional determinística de ÍMPAR Analysis
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: analysisId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: false, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses:
+        "201": {description: AnalysisJob enfileirado}
+        "200": {description: Replay idempotente do mesmo AnalysisJob}
+        "403": {description: Capability institucional ausente}
+        "404": {description: Analysis privada indisponível}
+        "409": {description: Estado ou envelope incompatível}
+  /impar-analyses/{analysisId}/jobs/{jobId}:
+    get:
+      summary: Ler metadados privados sanitizados de AnalysisJob
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: analysisId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: jobId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses: {"200": {description: AnalysisJob}, "404": {description: Job privado indisponível}}
+  /impar-analyses/{analysisId}/jobs/{jobId}/retry:
+    post:
+      summary: Reenfileirar AnalysisJob técnico falho dentro do orçamento
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: analysisId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: jobId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses: {"202": {description: Reenfileirado}, "404": {description: Job privado indisponível}, "409": {description: Estado ou limite incompatível}}
+  /impar-analyses/{analysisId}/jobs/{jobId}/cancel:
+    post:
+      summary: Cancelar AnalysisJob somente enquanto QUEUED
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: analysisId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: jobId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses: {"200": {description: Cancelado ou replay idempotente}, "404": {description: Job privado indisponível}, "409": {description: Processamento não é interrompido artificialmente}}
   /impar-analyses/{analysisId}/complete:
     post:
       summary: Concluir ÍMPAR Analysis com Result FINAL explícito
