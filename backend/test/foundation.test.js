@@ -918,6 +918,8 @@ test('AI policy snapshot keeps V1 for retry while new AnalysisJobs select V2',as
  const next=await createAnalysisExecutionFixture(A);
  const j2=(await auth('post','/impar-analyses/'+next.analysis.id+'/jobs',A).set('Idempotency-Key','ai-v2-'+randomBytes(3).toString('hex')).send({}).expect(201)).body;
  assert.equal((await db.query('SELECT ai_policy_version_id FROM impar_analysis_jobs WHERE id=$1',[j2.id])).rows[0].ai_policy_version_id,v2.id);
+ await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs/'+j1.id+'/cancel',A).expect(200);
+ await auth('post','/impar-analyses/'+next.analysis.id+'/jobs/'+j2.id+'/cancel',A).expect(200);
 });
 test('Analysis worker persists sanitized Gateway timeout and invalid-response failures',async()=>{
  const {runOnce}=await import('../src/imparAnalysis/worker.js');
