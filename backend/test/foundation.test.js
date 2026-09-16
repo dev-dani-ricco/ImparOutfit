@@ -18,6 +18,7 @@ process.env.MEDIA_ROOT=await mkdtemp(join(tmpdir(),'impar-media-test-'));
 process.env.TRUST_PROXY_HOPS='1';
 const {createApp}=await import('../src/app.js');
 let db,app,A,B,storeA,storeB,marketing,product,owned,look,reviewer,institution;
+const ownedByPerson=new Map();
 const password='synthetic-password-2026';
 let authRequestNumber=1;
 const auth=(method,path,user)=>{
@@ -46,12 +47,17 @@ async function grantInstitutionalCapability(user,capability='impar.analysis.exec
     VALUES($1,$2,$3) ON CONFLICT DO NOTHING`,[membership.id,capability,reviewer.user.person_id]);
 }
 async function createVersionedLookFixture(user=A) {
-  if(!owned) owned=(await auth('post','/wardrobe/items',user).send({name:'Fixture owned shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+  let userOwned=ownedByPerson.get(user.user.person_id);
+  if(!userOwned){
+    userOwned=(await auth('post','/wardrobe/items',user).send({name:'Fixture owned shirt',category:'tops',ownershipSource:'MANUAL_CATALOG',ownershipAttested:true}).expect(201)).body;
+    ownedByPerson.set(user.user.person_id,userOwned);
+    if(user===A)owned=userOwned;
+  }
   if(!product) product=(await auth('post','/stores/items',storeA).send({name:'Fixture commercial shirt',category:'tops'}).expect(201)).body;
-  const version1Items=[{kind:'OWNED_ITEM',wardrobeItemId:owned.id}];
+  const version1Items=[{kind:'OWNED_ITEM',wardrobeItemId:userOwned.id}];
   const created=(await auth('post','/looks',user).send({title:'Versioned fixture look',items:version1Items}).expect(201)).body;
   const version2Items=[
-    {kind:'OWNED_ITEM',wardrobeItemId:owned.id},
+    {kind:'OWNED_ITEM',wardrobeItemId:userOwned.id},
     {kind:'COMMERCIAL_PREVIEW',productId:product.id}
   ];
   const version2=(await auth('post','/looks/'+created.id+'/versions',user)
@@ -839,11 +845,39 @@ test('AnalysisJobs preserve failure history, governed retry/recovery and honest 
  assert.deepEqual((await db.query('SELECT state,error_code FROM impar_analysis_jobs WHERE id=$1',[recoveryJob.id])).rows[0],{state:'QUEUED',error_code:null});
  assert.deepEqual((await db.query('SELECT sequence,state,error_code FROM impar_analysis_attempts WHERE job_id=$1',[recoveryJob.id])).rows,[{sequence:1,state:'FAILED',error_code:'WORKER_LEASE_EXPIRED'}]);
  await auth('post','/impar-analyses/'+recoveryFixture.analysis.id+'/jobs/'+recoveryJob.id+'/cancel',A).expect(200);
+ const exhaustedFixture=await createAnalysisExecutionFixture(A);
+ const exhausted=(await auth('post','/impar-analyses/'+exhaustedFixture.analysis.id+'/jobs',A).set('Idempotency-Key','analysis-exhausted-'+randomBytes(4).toString('hex')).send({}).expect(201)).body;
+ const exhaustedClaim=await transaction(claimJob);assert.equal(exhaustedClaim.id,exhausted.id);
+ await db.query("UPDATE impar_analysis_jobs SET attempt=3,lease_until=now()-interval '1 second' WHERE id=$1",[exhausted.id]);
+ await recoverExpired();
+ assert.deepEqual((await db.query('SELECT state,error_code FROM impar_analysis_jobs WHERE id=$1',[exhausted.id])).rows[0],{state:'FAILED',error_code:'WORKER_LEASE_EXPIRED'});
  const cancelledFixture=await createAnalysisExecutionFixture(A);
  const cancelled=(await auth('post','/impar-analyses/'+cancelledFixture.analysis.id+'/jobs',A).set('Idempotency-Key','analysis-cancel-'+randomBytes(4).toString('hex')).send({}).expect(201)).body;
  await auth('post','/impar-analyses/'+cancelledFixture.analysis.id+'/jobs/'+cancelled.id+'/cancel',B).expect(404);
  assert.equal((await auth('post','/impar-analyses/'+cancelledFixture.analysis.id+'/jobs/'+cancelled.id+'/cancel',A).expect(200)).body.state,'CANCELLED');
  assert.equal((await auth('post','/impar-analyses/'+cancelledFixture.analysis.id+'/jobs/'+cancelled.id+'/cancel',A).expect(200)).body.state,'CANCELLED');
+ const processingFixture=await createAnalysisExecutionFixture(A);
+ const processing=(await auth('post','/impar-analyses/'+processingFixture.analysis.id+'/jobs',A).set('Idempotency-Key','analysis-processing-'+randomBytes(4).toString('hex')).send({}).expect(201)).body;
+ assert.equal((await transaction(claimJob)).id,processing.id);
+ await auth('post','/impar-analyses/'+processingFixture.analysis.id+'/jobs/'+processing.id+'/cancel',A).expect(409);
+});
+
+test('AnalysisJob idempotency remains owner-scoped and execution capability remains institutional',async()=>{
+ const fixture=await createAnalysisExecutionFixture(A);
+ const key='analysis-owner-scope-'+randomBytes(4).toString('hex');
+ const original=(await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs',A).set('Idempotency-Key',key).send({}).expect(201)).body;
+ const successor=(await db.query(`INSERT INTO methodology_versions(methodology_id,version,status,content_ref,created_by_principal_id,published_by_principal_id,published_at)
+   SELECT methodology_id,2,'PUBLISHED','private://methodology/conflict',created_by_principal_id,published_by_principal_id,now() FROM methodology_versions WHERE id=$1 RETURNING id`,[fixture.version.id])).rows[0];
+ await db.query('INSERT INTO methodology_version_knowledge(methodology_version_id,authorized_knowledge_version_id) VALUES($1,$2)',[successor.id,fixture.knowledge.id]);
+ await db.query('UPDATE impar_analyses SET methodology_version_id=$1 WHERE id=$2',[successor.id,fixture.analysis.id]);
+ await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs',A).set('Idempotency-Key',key).send({}).expect(409).expect(r=>assert.equal(r.body.error.code,'VERSION_CONFLICT'));
+ const other=await createAnalysisExecutionFixture(B);
+ const otherJob=(await auth('post','/impar-analyses/'+other.analysis.id+'/jobs',B).set('Idempotency-Key',key).send({}).expect(201)).body;
+ const noCapability=await register('analysis-no-capability');
+ const denied=await createAnalysisExecutionFixture(noCapability);
+ await auth('post','/impar-analyses/'+denied.analysis.id+'/jobs',noCapability).send({}).expect(403);
+ await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs/'+original.id+'/cancel',A).expect(200);
+ await auth('post','/impar-analyses/'+other.analysis.id+'/jobs/'+otherJob.id+'/cancel',B).expect(200);
 });
 
 test('AnalysisJob snapshots outlive registry changes and institutional finalization remains explicit',async()=>{
