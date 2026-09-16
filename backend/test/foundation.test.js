@@ -954,6 +954,13 @@ test('Prompt resolver failures are sanitized, cannot reach the provider, and cli
  assert.deepEqual((await db.query('SELECT state,error_code,result_id FROM impar_analysis_jobs WHERE id=$1',[invalid.id])).rows[0],{state:'FAILED',error_code:'INVALID_PROMPT_CONTENT',result_id:null});
  for(const id of [unavailable.id,invalid.id]){const execution=(await db.query('SELECT prompt_version_id,failure_code FROM ai_executions WHERE consumer_id=$1',[id])).rows[0];assert.ok(execution.prompt_version_id);assert.ok(['PROMPT_NOT_AVAILABLE','INVALID_PROMPT_CONTENT'].includes(execution.failure_code));}
 });
+test('Knowledge resolver failures stay inside the exact snapshot and persist only sanitized retrieval provenance',async()=>{
+ const {runOnce}=await import('../src/imparAnalysis/worker.js');const fixture=await createAnalysisExecutionFixture(A);
+ const job=(await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs',A).set('Idempotency-Key','knowledge-unavailable-'+randomBytes(3).toString('hex')).send({}).expect(201)).body;
+ const out=await runOnce({adapter:{execute:async()=>assert.fail('provider must not execute')},resolvePrompt:syntheticPromptResolver,resolveKnowledge:async()=>{throw Object.assign(new Error('unavailable'),{code:'KNOWLEDGE_NOT_AVAILABLE'});}});
+ assert.deepEqual(out,{id:job.id,state:'FAILED',code:'KNOWLEDGE_NOT_AVAILABLE'});assert.deepEqual((await db.query('SELECT state,error_code,result_id FROM impar_analysis_jobs WHERE id=$1',[job.id])).rows[0],{state:'FAILED',error_code:'KNOWLEDGE_NOT_AVAILABLE',result_id:null});
+ assert.equal((await db.query('SELECT count(*)::int n FROM impar_analysis_results WHERE analysis_id=$1',[fixture.analysis.id])).rows[0].n,0);assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[fixture.analysis.id])).rows[0],{status:'DRAFT',final_result_id:null});
+});
 test('Analysis worker persists sanitized Gateway timeout and invalid-response failures',async()=>{
  const {runOnce}=await import('../src/imparAnalysis/worker.js');
  for(const [suffix,adapter,code] of [
