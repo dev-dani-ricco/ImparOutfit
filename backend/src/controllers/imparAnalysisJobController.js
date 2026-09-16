@@ -1,5 +1,4 @@
 import {createHash} from 'node:crypto';
-import {pool} from '../config/db.js';
 import {authorizeInstitutionalCapability,authorizePersonal} from '../services/authorizationService.js';
 import {HttpError} from '../utils/http.js';
 import {jobDto,transaction,authorizedJob,retryAvailable} from '../imparAnalysis/jobService.js';
@@ -20,6 +19,9 @@ export async function enqueue(req,res){
   if(!all||knowledge.length!==all)throw new HttpError(409,'MethodologyVersion não possui Knowledge autorizado apto');
   const envelope={analysisId:analysis.id,lookVersionId:analysis.look_version_id,contextId:analysis.context_id,methodologyVersionId:methodology.id,authorizedKnowledgeVersionIds:knowledge.map(row=>row.id)};
   const hash=fingerprint(envelope),key=keyFor(req,hash);
+  // Serializes equal domain operations on both PostgreSQL and the PGlite test
+  // harness; the database unique constraint remains the final invariant.
+  await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`${analysis.owner_person_id}:${key}`]);
   const existing=(await c.query('SELECT * FROM impar_analysis_jobs WHERE owner_person_id=$1 AND idempotency_key=$2 FOR UPDATE',[analysis.owner_person_id,key])).rows[0];
   if(existing){if(existing.envelope_fingerprint!==hash)throw new HttpError(409,'Idempotency-Key já foi usada com outro envelope',{code:'VERSION_CONFLICT'});return {job:existing,replayed:true};}
   const job=(await c.query(`INSERT INTO impar_analysis_jobs(analysis_id,owner_person_id,requested_by_principal_id,look_version_id,context_id,methodology_version_id,idempotency_key,envelope_fingerprint)
@@ -30,5 +32,5 @@ export async function enqueue(req,res){
  res.status(result.replayed?200:201).json(jobDto(result.job));
 }
 export async function get(req,res){res.json(jobDto(await authorizedJob(req.auth,req.params.analysisId,req.params.jobId)));}
-export async function retry(req,res){const job=await transaction(async c=>{const current=await authorizedJob(req.auth,req.params.analysisId,req.params.jobId,c,true);await authorizeInstitutionalCapability(req.auth,'impar.analysis.execute',c);if(current.state!=='FAILED'||!retryAvailable(current))throw new HttpError(409,'Job não pode ser reenfileirado');return (await c.query("UPDATE impar_analysis_jobs SET state='QUEUED',error_code=NULL,completed_at=NULL WHERE id=$1 AND state='FAILED' RETURNING *",[current.id])).rows[0];});res.status(202).json(jobDto(job));}
-export async function cancel(req,res){const job=await transaction(async c=>{const current=await authorizedJob(req.auth,req.params.analysisId,req.params.jobId,c,true);await authorizeInstitutionalCapability(req.auth,'impar.analysis.execute',c);if(current.state==='CANCELLED')return current;if(current.state!=='QUEUED')throw new HttpError(409,'Job não pode ser cancelado neste estado');return (await c.query("UPDATE impar_analysis_jobs SET state='CANCELLED',completed_at=now() WHERE id=$1 AND state='QUEUED' RETURNING *",[current.id])).rows[0];});res.json(jobDto(job));}
+export async function retry(req,res){const job=await transaction(async c=>{const current=await authorizedJob(req.auth,req.params.analysisId,req.params.jobId,c,true);await authorizeInstitutionalCapability(req.auth,'impar.analysis.execute',c);if(current.state!=='FAILED'||!retryAvailable(current))throw new HttpError(409,'Job não pode ser reenfileirado');const queued=(await c.query("UPDATE impar_analysis_jobs SET state='QUEUED',error_code=NULL,completed_at=NULL WHERE id=$1 AND state='FAILED' RETURNING *",[current.id])).rows[0];if(!queued)throw new HttpError(409,'Job não pode ser reenfileirado');return queued;});res.status(202).json(jobDto(job));}
+export async function cancel(req,res){const job=await transaction(async c=>{const current=await authorizedJob(req.auth,req.params.analysisId,req.params.jobId,c,true);await authorizeInstitutionalCapability(req.auth,'impar.analysis.execute',c);if(current.state==='CANCELLED')return current;if(current.state!=='QUEUED')throw new HttpError(409,'Job não pode ser cancelado neste estado');const cancelled=(await c.query("UPDATE impar_analysis_jobs SET state='CANCELLED',completed_at=now() WHERE id=$1 AND state='QUEUED' RETURNING *",[current.id])).rows[0];if(!cancelled)throw new HttpError(409,'Job não pode ser cancelado neste estado');return cancelled;});res.json(jobDto(job));}

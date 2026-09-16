@@ -8,7 +8,10 @@ export const retryAvailable=job=>job.attempt<=analysisMaxRetries();
 export async function transaction(work){const c=await pool.connect();try{await c.query('BEGIN');const out=await work(c);await c.query('COMMIT');return out;}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}
 export async function authorizedJob(auth,analysisId,jobId,db={query},lock=false){
  const job=(await db.query(`SELECT * FROM impar_analysis_jobs WHERE id=$1 AND analysis_id=$2${lock?' FOR UPDATE':''}`,[jobId,analysisId])).rows[0];
- authorizePersonal(auth,job);return job;
+ // Analysis jobs preserve the domain's owner_person_id naming.  The shared
+ // personal authorization boundary deliberately consumes person_id, so adapt
+ // only at that boundary instead of changing the domain record.
+ authorizePersonal(auth,{...job,person_id:job?.owner_person_id});return job;
 }
 export const jobDto=job=>{const {idempotency_key,envelope_fingerprint,lease_until,...safe}=job;return safe;};
 export async function claimJob(db){

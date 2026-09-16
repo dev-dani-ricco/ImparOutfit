@@ -1,4 +1,6 @@
 import {pool} from '../config/db.js';
+import {fileURLToPath} from 'node:url';
+import {resolve} from 'node:path';
 import {CURRENT_ANALYSIS_RESULT_SCHEMA_VERSION,validateAnalysisResultPayload} from '../services/imparAnalysisResultPayload.js';
 import {resolveAuthorizedKnowledgeContent} from '../services/authorizedKnowledgeContentResolver.js';
 import {claimJob,markFailure,transaction} from './jobService.js';
@@ -22,4 +24,4 @@ export async function runOnce({resolveKnowledge=resolveAuthorizedKnowledgeConten
   return {id:job.id,state:'SUCCEEDED'};
  }catch(error){const code=error.status===503?'SERVICE_UNAVAILABLE':'PROCESSING_FAILED';await transaction(db=>markFailure(db,job,code));return {id:job.id,state:'FAILED',code};}
 }
-if(process.argv[1]?.endsWith('/worker.js')){try{console.log(JSON.stringify(await runOnce()||{state:'IDLE'}));}finally{await pool.end();}}
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){try{console.log(JSON.stringify(await runOnce()||{state:'IDLE'}));}finally{await pool.end();}}

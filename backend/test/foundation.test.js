@@ -81,7 +81,8 @@ async function createAnalysisExecutionFixture(user=A){
  const version=(await db.query("INSERT INTO methodology_versions(methodology_id,version,status,content_ref,created_by_principal_id,published_by_principal_id,published_at) VALUES($1,1,'PUBLISHED',$2,$3,$3,now()) RETURNING id",[methodology.id,'private://methodology/synthetic',principal.id])).rows[0];
  const source=(await db.query("INSERT INTO knowledge_sources(knowledge_scope,source_type,label,private_content_ref,created_by_principal_id) VALUES('IMPAR','DOCUMENT','Synthetic source','private://knowledge/source',$1) RETURNING id",[principal.id])).rows[0];
  const candidate=(await db.query("INSERT INTO knowledge_candidates(source_id,knowledge_scope,candidate_version,private_content_ref,status,created_by_principal_id) VALUES($1,'IMPAR',1,'private://knowledge/candidate','PUBLISHED',$2) RETURNING id",[source.id,principal.id])).rows[0];
- const knowledge=(await db.query("INSERT INTO authorized_knowledge_versions(candidate_id,knowledge_scope,version,private_content_ref,published_by_principal_id) VALUES($1,'IMPAR',1,'private://knowledge/authorized',$2) RETURNING id",[candidate.id,principal.id])).rows[0];
+ const knowledgeVersion=Number.parseInt(randomBytes(4).toString('hex'),16)%1000000000+1;
+ const knowledge=(await db.query("INSERT INTO authorized_knowledge_versions(candidate_id,knowledge_scope,version,private_content_ref,published_by_principal_id) VALUES($1,'IMPAR',$2,'private://knowledge/authorized',$3) RETURNING id",[candidate.id,knowledgeVersion,principal.id])).rows[0];
  await db.query('INSERT INTO methodology_version_knowledge(methodology_version_id,authorized_knowledge_version_id) VALUES($1,$2)',[version.id,knowledge.id]);
  await db.query('UPDATE impar_analyses SET methodology_version_id=$1 WHERE id=$2',[version.id,analysis.id]);
  return {analysis,look,context,version,knowledge,principal};
@@ -767,6 +768,104 @@ test('governed AnalysisJob snapshots published knowledge and worker creates only
  const job=(await db.query('SELECT state,result_id FROM impar_analysis_jobs WHERE id=$1',[row.id])).rows[0];assert.equal(job.state,'SUCCEEDED');assert.ok(job.result_id);
  assert.deepEqual((await db.query('SELECT status,result_schema_version,payload FROM impar_analysis_results WHERE id=$1',[job.result_id])).rows[0],{status:'DRAFT',result_schema_version:1,payload:{executionValidated:true,analysisId:fixture.analysis.id,lookVersionId:fixture.look.version2Id,contextId:fixture.context.id,methodologyVersionId:fixture.version.id,authorizedKnowledgeVersionIds:[fixture.knowledge.id]}});
  assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[fixture.analysis.id])).rows[0],{status:'DRAFT',final_result_id:null});
+});
+
+test('AnalysisJob fails honestly without a provider, retries its immutable snapshot, and then succeeds',async()=>{
+ const {runOnce}=await import('../src/imparAnalysis/worker.js');
+ const fixture=await createAnalysisExecutionFixture(A);
+ const created=await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs',A).set('Idempotency-Key','analysis-failure-retry').send({}).expect(201);
+ const failed=await runOnce();
+ assert.deepEqual(failed,{id:created.body.id,state:'FAILED',code:'SERVICE_UNAVAILABLE'});
+ assert.deepEqual((await db.query('SELECT state,error_code,result_id FROM impar_analysis_jobs WHERE id=$1',[created.body.id])).rows[0],{state:'FAILED',error_code:'SERVICE_UNAVAILABLE',result_id:null});
+ assert.deepEqual((await db.query('SELECT state,error_code FROM impar_analysis_attempts WHERE job_id=$1',[created.body.id])).rows,[{state:'FAILED',error_code:'SERVICE_UNAVAILABLE'}]);
+ assert.equal((await db.query('SELECT count(*)::int n FROM impar_analysis_results WHERE analysis_id=$1',[fixture.analysis.id])).rows[0].n,0);
+ const snapshot=(await db.query('SELECT look_version_id,context_id,methodology_version_id FROM impar_analysis_jobs WHERE id=$1',[created.body.id])).rows[0];
+ const knowledge=(await db.query('SELECT authorized_knowledge_version_id FROM impar_analysis_job_knowledge WHERE job_id=$1',[created.body.id])).rows;
+ await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs/'+created.body.id+'/retry',A).expect(202);
+ assert.deepEqual((await db.query('SELECT look_version_id,context_id,methodology_version_id FROM impar_analysis_jobs WHERE id=$1',[created.body.id])).rows[0],snapshot);
+ assert.deepEqual((await db.query('SELECT authorized_knowledge_version_id FROM impar_analysis_job_knowledge WHERE job_id=$1',[created.body.id])).rows,knowledge);
+ const succeeded=await runOnce({resolveKnowledge:async()=>({test:true})});
+ assert.deepEqual(succeeded,{id:created.body.id,state:'SUCCEEDED'});
+ assert.deepEqual((await db.query('SELECT sequence,state FROM impar_analysis_attempts WHERE job_id=$1 ORDER BY sequence',[created.body.id])).rows,[{sequence:1,state:'FAILED'},{sequence:2,state:'SUCCEEDED'}]);
+});
+
+test('AnalysisJobs make idempotent enqueue and atomic worker claims concurrency-safe',async()=>{
+ const {claimJob,transaction}=await import('../src/imparAnalysis/jobService.js');
+ const fixture=await createAnalysisExecutionFixture(A);
+ const key='analysis-concurrent-'+randomBytes(4).toString('hex');
+ const [one,two]=await Promise.all([
+  auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs',A).set('Idempotency-Key',key).send({}),
+  auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs',A).set('Idempotency-Key',key).send({})
+ ]);
+ assert.deepEqual([one.status,two.status].sort(),[200,201]);
+ assert.equal(one.body.id,two.body.id);
+ const jobId=one.body.id;
+ assert.equal((await db.query('SELECT count(*)::int n FROM impar_analysis_jobs WHERE owner_person_id=$1 AND idempotency_key=$2',[A.user.person_id,key])).rows[0].n,1);
+ const claims=await Promise.all([transaction(claimJob),transaction(claimJob)]);
+ const winners=claims.filter(Boolean);
+ assert.equal(winners.length,1);assert.equal(winners[0].id,jobId);assert.equal(winners[0].state,'PROCESSING');assert.ok(winners[0].lease_until);
+ assert.deepEqual((await db.query('SELECT sequence,state FROM impar_analysis_attempts WHERE job_id=$1',[jobId])).rows,[{sequence:1,state:'PROCESSING'}]);
+ assert.equal(await transaction(claimJob),null);
+ const left=await createAnalysisExecutionFixture(A),right=await createAnalysisExecutionFixture(A);
+ const leftJob=(await auth('post','/impar-analyses/'+left.analysis.id+'/jobs',A).set('Idempotency-Key','analysis-independent-left-'+randomBytes(3).toString('hex')).send({}).expect(201)).body;
+ const rightJob=(await auth('post','/impar-analyses/'+right.analysis.id+'/jobs',A).set('Idempotency-Key','analysis-independent-right-'+randomBytes(3).toString('hex')).send({}).expect(201)).body;
+ const independent=await Promise.all([transaction(claimJob),transaction(claimJob)]);
+ assert.deepEqual(independent.map(job=>job.id).sort(),[leftJob.id,rightJob.id].sort());
+});
+
+test('AnalysisJobs preserve failure history, governed retry/recovery and honest private cancellation',async()=>{
+ const {claimJob,recoverExpired,transaction}=await import('../src/imparAnalysis/jobService.js');
+ const {runOnce}=await import('../src/imparAnalysis/worker.js');
+ const fixture=await createAnalysisExecutionFixture(A);
+ const job=(await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs',A).set('Idempotency-Key','analysis-adversarial-'+randomBytes(4).toString('hex')).send({}).expect(201)).body;
+ await auth('get','/impar-analyses/'+fixture.analysis.id+'/jobs/'+job.id,B).expect(404);
+ const failed=await runOnce();assert.deepEqual(failed,{id:job.id,state:'FAILED',code:'SERVICE_UNAVAILABLE'});
+ const persisted=(await db.query('SELECT state,error_code,result_id,look_version_id,context_id,methodology_version_id FROM impar_analysis_jobs WHERE id=$1',[job.id])).rows[0];
+ assert.deepEqual({state:persisted.state,error_code:persisted.error_code,result_id:persisted.result_id},{state:'FAILED',error_code:'SERVICE_UNAVAILABLE',result_id:null});
+ await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs/'+job.id+'/retry',B).expect(404);
+ const retries=await Promise.all([auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs/'+job.id+'/retry',A),auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs/'+job.id+'/retry',A)]);
+ assert.deepEqual(retries.map(r=>r.status).sort(),[202,409]);
+ assert.deepEqual((await db.query('SELECT state,look_version_id,context_id,methodology_version_id FROM impar_analysis_jobs WHERE id=$1',[job.id])).rows[0],{state:'QUEUED',look_version_id:persisted.look_version_id,context_id:persisted.context_id,methodology_version_id:persisted.methodology_version_id});
+ const success=await runOnce({resolveKnowledge:async()=>({synthetic:true})});assert.deepEqual(success,{id:job.id,state:'SUCCEEDED'});
+ assert.deepEqual((await db.query('SELECT sequence,state FROM impar_analysis_attempts WHERE job_id=$1 ORDER BY sequence',[job.id])).rows,[{sequence:1,state:'FAILED'},{sequence:2,state:'SUCCEEDED'}]);
+ assert.equal(await runOnce({resolveKnowledge:async()=>({synthetic:true})}),null);
+ await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs/'+job.id+'/retry',A).expect(409);
+ const recoveryFixture=await createAnalysisExecutionFixture(A);
+ const recoveryJob=(await auth('post','/impar-analyses/'+recoveryFixture.analysis.id+'/jobs',A).set('Idempotency-Key','analysis-recovery-'+randomBytes(4).toString('hex')).send({}).expect(201)).body;
+ const claimed=await transaction(claimJob);assert.equal(claimed.id,recoveryJob.id);
+ assert.equal(await recoverExpired(),0);
+ await db.query("UPDATE impar_analysis_jobs SET lease_until=now()-interval '1 second' WHERE id=$1",[recoveryJob.id]);
+ const recovered=await Promise.all([recoverExpired(),recoverExpired()]);assert.deepEqual(recovered.sort(),[0,1]);
+ assert.deepEqual((await db.query('SELECT state,error_code FROM impar_analysis_jobs WHERE id=$1',[recoveryJob.id])).rows[0],{state:'QUEUED',error_code:null});
+ assert.deepEqual((await db.query('SELECT sequence,state,error_code FROM impar_analysis_attempts WHERE job_id=$1',[recoveryJob.id])).rows,[{sequence:1,state:'FAILED',error_code:'WORKER_LEASE_EXPIRED'}]);
+ await auth('post','/impar-analyses/'+recoveryFixture.analysis.id+'/jobs/'+recoveryJob.id+'/cancel',A).expect(200);
+ const cancelledFixture=await createAnalysisExecutionFixture(A);
+ const cancelled=(await auth('post','/impar-analyses/'+cancelledFixture.analysis.id+'/jobs',A).set('Idempotency-Key','analysis-cancel-'+randomBytes(4).toString('hex')).send({}).expect(201)).body;
+ await auth('post','/impar-analyses/'+cancelledFixture.analysis.id+'/jobs/'+cancelled.id+'/cancel',B).expect(404);
+ assert.equal((await auth('post','/impar-analyses/'+cancelledFixture.analysis.id+'/jobs/'+cancelled.id+'/cancel',A).expect(200)).body.state,'CANCELLED');
+ assert.equal((await auth('post','/impar-analyses/'+cancelledFixture.analysis.id+'/jobs/'+cancelled.id+'/cancel',A).expect(200)).body.state,'CANCELLED');
+});
+
+test('AnalysisJob snapshots outlive registry changes and institutional finalization remains explicit',async()=>{
+ const {runOnce}=await import('../src/imparAnalysis/worker.js');
+ const fixture=await createAnalysisExecutionFixture(A);
+ const created=(await auth('post','/impar-analyses/'+fixture.analysis.id+'/jobs',A).set('Idempotency-Key','analysis-finalization-'+randomBytes(4).toString('hex')).send({}).expect(201)).body;
+ const successor=(await db.query(`INSERT INTO methodology_versions(methodology_id,version,status,content_ref,created_by_principal_id,published_by_principal_id,published_at)
+   SELECT methodology_id,2,'PUBLISHED','private://methodology/successor',created_by_principal_id,published_by_principal_id,now() FROM methodology_versions WHERE id=$1 RETURNING id`,[fixture.version.id])).rows[0];
+ await db.query('INSERT INTO methodology_version_knowledge(methodology_version_id,authorized_knowledge_version_id) VALUES($1,$2)',[successor.id,fixture.knowledge.id]);
+ await db.query('UPDATE impar_analyses SET methodology_version_id=$1 WHERE id=$2',[successor.id,fixture.analysis.id]);
+ assert.equal((await db.query('SELECT methodology_version_id FROM impar_analysis_jobs WHERE id=$1',[created.id])).rows[0].methodology_version_id,fixture.version.id);
+ assert.deepEqual((await db.query('SELECT authorized_knowledge_version_id FROM impar_analysis_job_knowledge WHERE job_id=$1',[created.id])).rows,[{authorized_knowledge_version_id:fixture.knowledge.id}]);
+ await runOnce({resolveKnowledge:async()=>({synthetic:true})});
+ const job=(await db.query('SELECT state,result_id FROM impar_analysis_jobs WHERE id=$1',[created.id])).rows[0];
+ assert.equal(job.state,'SUCCEEDED');
+ assert.deepEqual((await db.query('SELECT status FROM impar_analysis_results WHERE id=$1',[job.result_id])).rows[0],{status:'DRAFT'});
+ assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[fixture.analysis.id])).rows[0],{status:'DRAFT',final_result_id:null});
+ await auth('post','/impar-analyses/'+fixture.analysis.id+'/results/'+job.result_id+'/finalize',A).send({}).expect(200);
+ assert.deepEqual((await db.query('SELECT status FROM impar_analysis_results WHERE id=$1',[job.result_id])).rows[0],{status:'FINAL'});
+ assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[fixture.analysis.id])).rows[0],{status:'DRAFT',final_result_id:null});
+ await auth('post','/impar-analyses/'+fixture.analysis.id+'/complete',A).send({resultId:job.result_id}).expect(200);
+ assert.deepEqual((await db.query('SELECT status,final_result_id FROM impar_analyses WHERE id=$1',[fixture.analysis.id])).rows[0],{status:'COMPLETED',final_result_id:job.result_id});
 });
 test('POST /contexts creates only private progressive Context records',async()=>{
   const full=(await auth('post','/contexts',A).send({
