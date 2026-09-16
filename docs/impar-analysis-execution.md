@@ -58,6 +58,6 @@ cooperativa segura.
 ## Estado atual
 
 AI **não implementada**. LLM **não implementado**. RAG **não implementado**.
-Agents **não implementados**. Não existe ExecutionJob, ExecutionAttempt ou
-Shared Execution Engine genérico. Uma extração compartilhada só será avaliada
+Agents **não implementados**. Machine Principal **não implementado**. Não existe
+ExecutionJob, ExecutionAttempt ou Shared Execution Engine genérico. Uma extração compartilhada só será avaliada
 após comparar este segundo consumidor real com Reconstruction.
