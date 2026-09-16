@@ -9,6 +9,7 @@ import {pool} from '../src/config/db.js';
 import {executeAi} from '../src/ai/gateway.js';
 import {resolvePublishedPolicy,loadHistoricalPolicy} from '../src/ai/policyService.js';
 import {resolvePublishedPrompt,loadHistoricalPrompt} from '../src/ai/promptService.js';
+import {retrieveAuthorizedKnowledge,RETRIEVAL_STRATEGY} from '../src/ai/governedKnowledgeRetrieval.js';
 
 let db,policy,v1;
 test.before(async()=>{db=new PGlite({extensions:{pgcrypto}});await migrate(db);pool.query=db.query.bind(db);pool.connect=async()=>({query:db.query.bind(db),release(){}});policy=(await db.query("INSERT INTO ai_policies(task) VALUES('IMPAR_ANALYSIS') RETURNING id")).rows[0];v1=(await db.query("INSERT INTO ai_policy_versions(ai_policy_id,version,status,provider_identifier,model_identifier,timeout_ms) VALUES($1,1,'PUBLISHED','synthetic-provider','synthetic-model',10) RETURNING *",[policy.id])).rows[0];});
@@ -46,4 +47,12 @@ test('Prompt versions are exact, private-content resolved, and historical retire
  assert.equal((await resolvePublishedPrompt('IMPAR_ANALYSIS',db)).id,v2Prompt.id);
  const execution=(await db.query('SELECT prompt_version_id,failure_code FROM ai_executions WHERE consumer_id=$1',[request.consumer.id])).rows[0];assert.deepEqual(execution,{prompt_version_id:v1Prompt.id,failure_code:null});
  await assert.rejects(()=>executeAi({...request,consumer:{type:'TEST',id:'00000000-0000-0000-0000-000000000006'}},{db,resolvePrompt:async()=>''}),e=>e.code==='INVALID_PROMPT_CONTENT');
+});
+
+test('governed lexical retrieval is bounded, deterministic, and cannot expand its authorized snapshot',async()=>{
+ const ids=['00000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000010'];const calls=[];
+ const resolve=async id=>{calls.push(id);return id.endsWith('10')?'analysis alpha\n\nanalysis beta':'analysis gamma\n\nanalysis delta';};
+ const one=await retrieveAuthorizedKnowledge(ids,resolve,{maxUnits:2,maxChars:30});const two=await retrieveAuthorizedKnowledge([...ids].reverse(),resolve,{maxUnits:2,maxChars:30});
+ assert.equal(one.strategy,RETRIEVAL_STRATEGY);assert.deepEqual(one.authorizedKnowledgeVersionIds,[...ids].sort());assert.deepEqual(one.units.map(u=>u.id),two.units.map(u=>u.id));assert.ok(one.units.length<=2);assert.ok(one.size<=30);assert.deepEqual([...new Set(calls)].sort(),[...ids].sort());
+ await assert.rejects(()=>retrieveAuthorizedKnowledge([],resolve),e=>e.code==='KNOWLEDGE_NOT_AVAILABLE');
 });
