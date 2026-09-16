@@ -6,14 +6,15 @@ import {resolveAuthorizedKnowledgeContent} from '../services/authorizedKnowledge
 import {resolvePromptContent} from '../services/promptContentResolver.js';
 import {claimJob,markFailure,transaction} from './jobService.js';
 import {executeAi} from '../ai/gateway.js';
+import {retrieveAuthorizedKnowledge} from '../ai/governedKnowledgeRetrieval.js';
 
 export async function runOnce({resolveKnowledge=resolveAuthorizedKnowledgeContent,resolvePrompt=resolvePromptContent,adapter}={}){
  const job=await transaction(claimJob);if(!job)return null;
  try{
   const knowledge=(await pool.query('SELECT authorized_knowledge_version_id FROM impar_analysis_job_knowledge WHERE job_id=$1 ORDER BY authorized_knowledge_version_id',[job.id])).rows.map(row=>row.authorized_knowledge_version_id);
-  for(const id of knowledge)await resolveKnowledge(id);
+  const retrieval=await retrieveAuthorizedKnowledge(knowledge,resolveKnowledge);
   if(!job.ai_policy_version_id||!job.prompt_version_id)throw Object.assign(new Error('PROMPT_NOT_AVAILABLE'),{code:'PROMPT_NOT_AVAILABLE'});
-  const execution=await executeAi({task:'IMPAR_ANALYSIS',aiPolicyVersionId:job.ai_policy_version_id,promptVersionId:job.prompt_version_id,requesterPrincipalId:job.requested_by_principal_id,ownerPersonId:job.owner_person_id,consumer:{type:'IMPAR_ANALYSIS_JOB',id:job.id},input:{analysisId:job.analysis_id,lookVersionId:job.look_version_id,contextId:job.context_id,methodologyVersionId:job.methodology_version_id,authorizedKnowledgeVersionIds:knowledge}},{adapter,resolvePrompt});
+  const execution=await executeAi({task:'IMPAR_ANALYSIS',aiPolicyVersionId:job.ai_policy_version_id,promptVersionId:job.prompt_version_id,retrieval,requesterPrincipalId:job.requested_by_principal_id,ownerPersonId:job.owner_person_id,consumer:{type:'IMPAR_ANALYSIS_JOB',id:job.id},input:{analysisId:job.analysis_id,lookVersionId:job.look_version_id,contextId:job.context_id,methodologyVersionId:job.methodology_version_id,authorizedKnowledgeVersionIds:knowledge,knowledgeContext:retrieval.context}},{adapter,resolvePrompt});
   const payload=validateAnalysisResultPayload(CURRENT_ANALYSIS_RESULT_SCHEMA_VERSION,execution.output);
   await transaction(async db=>{
    const current=(await db.query('SELECT * FROM impar_analysis_jobs WHERE id=$1 FOR UPDATE',[job.id])).rows[0];
@@ -26,6 +27,6 @@ export async function runOnce({resolveKnowledge=resolveAuthorizedKnowledgeConten
    await db.query("UPDATE impar_analysis_jobs SET state='SUCCEEDED',result_id=$2,completed_at=now(),lease_until=NULL WHERE id=$1 AND state='PROCESSING'",[current.id,result.id]);
   });
   return {id:job.id,state:'SUCCEEDED'};
- }catch(error){const code=['PROVIDER_UNAVAILABLE','PROVIDER_TIMEOUT','INVALID_PROVIDER_RESPONSE','POLICY_NOT_AVAILABLE','PROMPT_NOT_AVAILABLE','INVALID_PROMPT_CONTENT'].includes(error.code)?error.code:(error.status===503?'SERVICE_UNAVAILABLE':'PROCESSING_FAILED');await transaction(db=>markFailure(db,job,code));return {id:job.id,state:'FAILED',code};}
+ }catch(error){const code=['PROVIDER_UNAVAILABLE','PROVIDER_TIMEOUT','INVALID_PROVIDER_RESPONSE','POLICY_NOT_AVAILABLE','PROMPT_NOT_AVAILABLE','INVALID_PROMPT_CONTENT','KNOWLEDGE_NOT_AVAILABLE','INVALID_KNOWLEDGE_CONTENT'].includes(error.code)?error.code:(error.status===503?'SERVICE_UNAVAILABLE':'PROCESSING_FAILED');await transaction(db=>markFailure(db,job,code));return {id:job.id,state:'FAILED',code};}
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){try{console.log(JSON.stringify(await runOnce()||{state:'IDLE'}));}finally{await pool.end();}}
