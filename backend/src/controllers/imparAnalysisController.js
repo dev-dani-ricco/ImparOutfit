@@ -182,3 +182,43 @@ export async function complete(req,res) {
     throw error;
   } finally { client.release(); }
 }
+
+
+export async function list(req,res) {
+  const rows=(await query(`
+    SELECT
+      a.id,a.look_id,a.look_version_id,a.context_id,a.status,a.origin,
+      a.methodology_version_ref,a.methodology_version_id,a.final_result_id,a.created_at,
+      r.result_version,r.result_schema_version,r.status AS result_status,r.payload AS result_payload,r.created_at AS result_created_at,
+      j.id AS job_id,j.state AS job_state,j.error_code AS job_error_code,j.created_at AS job_created_at,j.completed_at AS job_completed_at
+    FROM impar_analyses a
+    LEFT JOIN impar_analysis_results r ON r.id=a.final_result_id AND r.owner_person_id=a.owner_person_id
+    LEFT JOIN LATERAL (
+      SELECT id,state,error_code,created_at,completed_at
+      FROM impar_analysis_jobs
+      WHERE analysis_id=a.id AND owner_person_id=a.owner_person_id
+      ORDER BY created_at DESC,id DESC
+      LIMIT 1
+    ) j ON true
+    WHERE a.owner_person_id=$1
+    ORDER BY a.created_at DESC,a.id DESC
+  `,[req.auth.personId])).rows;
+  res.json(rows.map(row=>({
+    ...toAnalysis(row),
+    latestJob:row.job_id?{
+      id:row.job_id,
+      state:row.job_state,
+      errorCode:row.job_error_code,
+      createdAt:row.job_created_at,
+      completedAt:row.job_completed_at
+    }:null,
+    finalResult:row.final_result_id?{
+      id:row.final_result_id,
+      resultVersion:row.result_version,
+      resultSchemaVersion:row.result_schema_version,
+      status:row.result_status,
+      payload:row.result_payload,
+      createdAt:row.result_created_at
+    }:null
+  })));
+}

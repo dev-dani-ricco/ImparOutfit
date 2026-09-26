@@ -37,6 +37,8 @@ const icons = {
   Armário: '◇',
   'Dani Rico': '✎',
   Perfil: '○',
+  Universo: '◇',
+  'Análise ÍMPAR': '✦',
 };
 
 const stackOptions = {
@@ -94,6 +96,31 @@ function ProfileStack() {
     <ProfileStackNav.Navigator screenOptions={stackOptions}>
       <ProfileStackNav.Screen name="Meu perfil" component={ProfileScreen} options={{ headerShown: false }} />
     </ProfileStackNav.Navigator>
+  );
+}
+
+function ConnectedExperience() {
+  return (
+    <Tab.Navigator
+      initialRouteName="Universo"
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarHideOnKeyboard: true,
+        tabBarActiveTintColor: colors.bg,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarActiveBackgroundColor: colors.accent,
+        tabBarInactiveBackgroundColor: colors.bg,
+        tabBarStyle: { height: 72, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
+        tabBarItemStyle: { paddingTop: 7, paddingBottom: 7 },
+        tabBarLabelStyle: { fontSize: 8, fontWeight: '900', letterSpacing: 0.4 },
+        tabBarIcon: ({ color, focused }) => (
+          <Text style={{ color, fontSize: focused ? 21 : 17, fontWeight: '900' }}>{icons[route.name]}</Text>
+        ),
+      })}
+    >
+      <Tab.Screen name="Universo" component={ApiFoundationScreen} />
+      <Tab.Screen name="Análise ÍMPAR" component={DaniRicoScreen} />
+    </Tab.Navigator>
   );
 }
 
@@ -156,7 +183,7 @@ export default function RootNavigator() {
   const { isReady, token, user, activeContext, demoMode } = useAuth();
 
   if (!isReady) return <Splash />;
-  if(token && !demoMode)return <ApiFoundationScreen />;
+  if(token && !demoMode)return <ConnectedExperience />;
 
   return (
     <RootStack.Navigator screenOptions={stackOptions}>

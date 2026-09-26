@@ -272,3 +272,5 @@ __pycache__/
 *.pyc
 
 frontend/.expo-cycle2-check/
+frontend/.expo-product-check/
+.aider.chat.history.md

@@ -13,7 +13,7 @@ import {retrieveAuthorizedKnowledge,RETRIEVAL_STRATEGY} from '../src/ai/governed
 
 let db,policy,v1;
 test.before(async()=>{db=new PGlite({extensions:{pgcrypto}});await migrate(db);pool.query=db.query.bind(db);pool.connect=async()=>({query:db.query.bind(db),release(){}});policy=(await db.query("INSERT INTO ai_policies(task) VALUES('IMPAR_ANALYSIS') RETURNING id")).rows[0];v1=(await db.query("INSERT INTO ai_policy_versions(ai_policy_id,version,status,provider_identifier,model_identifier,timeout_ms) VALUES($1,1,'PUBLISHED','synthetic-provider','synthetic-model',10) RETURNING *",[policy.id])).rows[0];});
-test.after(async()=>db.close());
+test.after(async()=>{await db.close();await pool.end();});
 
 test('AI Gateway task boundary recognizes only the institutional Analysis task',()=>{
  assert.equal(assertTask(AI_TASKS.IMPAR_ANALYSIS),'IMPAR_ANALYSIS');

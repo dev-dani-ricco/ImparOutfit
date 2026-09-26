@@ -4558,6 +4558,28 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
   /impar-analyses:
+    get:
+      summary: Listar histórico privado de ÍMPAR Analyses
+      description: Retorna somente Analyses da Person autenticada, com o último estado de execução e o Result final ancorado quando existir. Não expõe prompts, chunks, referências privadas ou traces internos.
+      operationId: get__impar_analyses
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Histórico privado da Person autenticada.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+        "401":
+          description: Sessão ausente ou inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     post:
       summary: Criar ÍMPAR Analysis privada em DRAFT
       description: Exige LookVersion e Context explícitos. O servidor cria a Analysis sem origem ou referência metodológica atribuídas; quando disponíveis, são referências opacas atribuídas por execução institucional.
@@ -4634,6 +4656,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /impar-analyses/{analysisId}/requests:
+    post:
+      summary: Solicitar execução institucional da própria ÍMPAR Analysis
+      description: Cria uma solicitação privada da Person. Não concede capability institucional e não enfileira diretamente o AnalysisJob.
+      operationId: post__impar_analyses_analysisId_requests
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: analysisId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: false, schema: {type: string, minLength: 1, maxLength: 128}}
+      responses:
+        "201": {description: Solicitação criada}
+        "200": {description: Replay da solicitação existente}
+        "401": {description: Sessão ausente ou inválida}
+        "404": {description: Analysis privada indisponível}
+        "409": {description: Analysis não aceita nova solicitação}
+  /impar-analyses/{analysisId}/request:
+    get:
+      summary: Consultar a solicitação privada de execução
+      operationId: get__impar_analyses_analysisId_request
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: analysisId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: Solicitação privada}
+        "401": {description: Sessão ausente ou inválida}
+        "404": {description: Analysis ou solicitação privada indisponível}
+  /impar-analyses/{analysisId}/request/cancel:
+    post:
+      summary: Cancelar solicitação ainda não aceita
+      operationId: post__impar_analyses_analysisId_request_cancel
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: analysisId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: Solicitação cancelada ou replay idempotente}
+        "401": {description: Sessão ausente ou inválida}
+        "404": {description: Analysis ou solicitação privada indisponível}
+        "409": {description: Solicitação já entrou em execução}
   /impar-analyses/{analysisId}/jobs:
     post:
       summary: Enfileirar execução institucional determinística de ÍMPAR Analysis

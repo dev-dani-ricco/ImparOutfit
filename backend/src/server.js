@@ -1,11 +1,21 @@
 import { createApp } from './app.js';
 import { assertAuthConfig } from './middleware/auth.js';
 import { connectRedis } from './config/redis.js';
+import { startAnalysisSupervisor } from './imparAnalysis/supervisor.js';
 
 assertAuthConfig();
 if(process.env.NODE_ENV==='production' && !process.env.MEDIA_ROOT) throw new Error('Production requires explicit durable MEDIA_ROOT');
 await connectRedis();
+
 const app=createApp();
-const server=app.listen(process.env.PORT||4000,()=>console.log('API started'));
+const host=process.env.HOST||'127.0.0.1';
+const port=Number.parseInt(process.env.PORT||'4000',10);
+const server=app.listen(port,host,()=>console.log(`API started on ${host}:${port}`));
 server.requestTimeout=30_000;
 server.headersTimeout=15_000;
+
+const supervisor=process.env.IMPAR_ANALYSIS_SUPERVISOR_ENABLED==='false'
+  ? null
+  : startAnalysisSupervisor();
+
+server.on('close',()=>supervisor?.stop());
