@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
 import FavoritesScreen from '../screens/FavoritesScreen';
 import FeedScreen from '../screens/FeedScreen';
+import HomeScreen from '../screens/HomeScreen';
 import DaniRicoScreen from '../screens/DaniRicoScreen';
 import ItemFormScreen from '../screens/ItemFormScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -32,10 +33,10 @@ const BrandStackNav = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const icons = {
-  Feed: '✦',
-  Lojas: '⌂',
+  Início: '◆',
+  Descobrir: '✦',
   Armário: '◇',
-  'Dani Rico': '✎',
+  Análise: '✎',
   Perfil: '○',
   Universo: '◇',
   'Análise ÍMPAR': '✦',
@@ -53,7 +54,8 @@ function FeedStack() {
   return (
     <FeedStackNav.Navigator initialRouteName="Feed principal" screenOptions={stackOptions}>
       <FeedStackNav.Screen name="Referência comercial" component={WardrobeItemScreen} />
-      <FeedStackNav.Screen name="Feed principal" component={FeedScreen} options={{ title: 'IMPAR OUTFIT  •  FEED DAS LOJAS' }} />
+      <FeedStackNav.Screen name="Feed principal" component={FeedScreen} options={{ title: 'IMPAR OUTFIT  •  DESCOBRIR' }} />
+      <FeedStackNav.Screen name="Lojas" component={StoresScreen} options={{ title: 'MARCAS' }} />
       <FeedStackNav.Screen name="Favoritas" component={FavoritesScreen} options={{ title: 'PUBLICAÇÕES FAVORITAS' }} />
       <FeedStackNav.Screen name="Campanha patrocinada" component={ShowcasesScreen} options={{ title: 'CONTEÚDO PATROCINADO • AD' }} />
       <FeedStackNav.Screen name="Loja do anúncio" component={StoreDetailScreen} options={{ title: 'VITRINE DA MARCA' }} />
@@ -127,27 +129,27 @@ function ConnectedExperience() {
 function PersonExperience() {
   return (
     <Tab.Navigator
-      initialRouteName="Perfil"
+      initialRouteName="Início"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarHideOnKeyboard: true,
-        tabBarActiveTintColor: colors.bg,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarActiveBackgroundColor: colors.accent,
-        tabBarInactiveBackgroundColor: colors.bg,
-        tabBarStyle: { height: 72, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
-        tabBarItemStyle: { paddingTop: 7, paddingBottom: 7 },
+        tabBarActiveTintColor: '#FFFFFF',
+        tabBarInactiveTintColor: '#8F8983',
+        tabBarActiveBackgroundColor: '#171719',
+        tabBarInactiveBackgroundColor: '#0B0B0C',
+        tabBarStyle: { height: 74, backgroundColor: '#0B0B0C', borderTopWidth: 0, paddingTop: 4 },
+        tabBarItemStyle: { paddingTop: 6, paddingBottom: 8 },
         tabBarLabelStyle: { fontSize: 8, fontWeight: '900', letterSpacing: 0.4 },
         tabBarIcon: ({ color, focused }) => (
-          <Text style={{ color, fontSize: focused ? 21 : 17, fontWeight: '900' }}>{icons[route.name]}</Text>
+          <Text style={{ color: focused ? colors.gold : color, fontSize: focused ? 20 : 16, fontWeight: '900' }}>{icons[route.name]}</Text>
         ),
       })}
     >
-      <Tab.Screen name="Perfil" component={ProfileStack} />
+      <Tab.Screen name="Início" component={HomeScreen} />
       <Tab.Screen name="Armário" component={WardrobeStack} />
-      <Tab.Screen name="Lojas" component={StoreStack} />
-      <Tab.Screen name="Feed" component={FeedStack} />
-      <Tab.Screen name="Dani Rico" component={DaniStack} />
+      <Tab.Screen name="Descobrir" component={FeedStack} />
+      <Tab.Screen name="Análise" component={DaniStack} />
+      <Tab.Screen name="Perfil" component={ProfileStack} />
     </Tab.Navigator>
   );
 }

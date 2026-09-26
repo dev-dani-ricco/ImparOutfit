@@ -1,7 +1,8 @@
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, PanResponder, StyleSheet, Text, View } from 'react-native';
-import { Canvas, useLoader } from '@react-three/fiber/native';
+import { Canvas } from '@react-three/fiber/native';
 import { useAssets } from 'expo-asset';
+import { File } from 'expo-file-system';
 import * as THREE from 'three';
 import { GLTFLoader, SkeletonUtils } from 'three-stdlib';
 import { colors } from '../theme/colors';
@@ -174,8 +175,54 @@ function HairModel({ style }) {
   );
 }
 
-function ProfessionalAvatar({ proportions, angle, modelUri, hairStyle }) {
-  const gltf = useLoader(GLTFLoader, modelUri);
+function useLocalGltf(modelUri) {
+  const [gltf, setGltf] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!modelUri) {
+      setGltf(null);
+      setError(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setGltf(null);
+    setError(null);
+
+    (async () => {
+      try {
+        const file = new File(modelUri);
+        const buffer = await file.arrayBuffer();
+        if (cancelled) return;
+
+        const loader = new GLTFLoader();
+        loader.parse(
+          buffer,
+          '',
+          (loaded) => {
+            if (!cancelled) setGltf(loaded);
+          },
+          (loadError) => {
+            if (!cancelled) setError(loadError instanceof Error ? loadError : new Error(String(loadError)));
+          },
+        );
+      } catch (loadError) {
+        if (!cancelled) setError(loadError instanceof Error ? loadError : new Error(String(loadError)));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [modelUri]);
+
+  return { gltf, error };
+}
+
+function ProfessionalAvatar({ proportions, angle, gltf, hairStyle }) {
   const prepared = useMemo(() => prepareModel(gltf.scene), [gltf.scene]);
 
   useEffect(() => {
@@ -204,7 +251,7 @@ function ProfessionalAvatar({ proportions, angle, modelUri, hairStyle }) {
   );
 }
 
-function StudioScene({ proportions, angle, modelUri, hairStyle }) {
+function StudioScene({ proportions, angle, gltf, hairStyle }) {
   return (
     <>
       <color attach="background" args={['#DED4C9']} />
@@ -212,10 +259,8 @@ function StudioScene({ proportions, angle, modelUri, hairStyle }) {
       <directionalLight position={[-3, 5, 5]} intensity={3.6} color="#FFF0DB" castShadow />
       <directionalLight position={[4, 2, -3]} intensity={2.6} color="#D8B7C8" />
       <pointLight position={[0, -1, 4]} intensity={1.2} color="#F5DDC7" />
-      {modelUri ? (
-        <Suspense fallback={null}>
-          <ProfessionalAvatar proportions={proportions} angle={angle} modelUri={modelUri} hairStyle={hairStyle} />
-        </Suspense>
+      {gltf ? (
+        <ProfessionalAvatar proportions={proportions} angle={angle} gltf={gltf} hairStyle={hairStyle} />
       ) : null}
       <mesh position={[0, -2.17, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <circleGeometry args={[2.05, 64]} />
@@ -238,6 +283,8 @@ export default function BodyAvatar3D({ profile }) {
   const lastTapAt = useRef(0);
   const [modelAssets, modelAssetError] = useAssets([AVATAR_MODEL]);
   const modelUri = modelAssets?.[0]?.localUri || modelAssets?.[0]?.uri;
+  const { gltf, error: modelLoadError } = useLocalGltf(modelUri);
+  const modelError = modelAssetError || modelLoadError;
   const hairStyle = profile.hairStyle || 'Coque';
   const source = imageSource(profile.profilePhoto || profile.profilePhotoUrl || profile.avatar_url);
   const setRotation = (value) => {
@@ -272,7 +319,7 @@ export default function BodyAvatar3D({ profile }) {
         {...panResponder.panHandlers}
       >
         <Canvas style={styles.canvas} camera={{ position: [0, 0, 8.2], fov: 37 }} shadows="basic" dpr={1.5} gl={{ antialias: true, alpha: false }}>
-          <StudioScene proportions={proportions} angle={angle} modelUri={modelUri} hairStyle={hairStyle} />
+          <StudioScene proportions={proportions} angle={angle} gltf={gltf} hairStyle={hairStyle} />
         </Canvas>
 
         <View style={styles.studioLabel} pointerEvents="none">
@@ -280,8 +327,8 @@ export default function BodyAvatar3D({ profile }) {
           <Text style={styles.studioTitle}>AVATAR GENÉRICO • EXPERIMENTAL</Text>
         </View>
         <View style={styles.liveBadge} pointerEvents="none">
-          <View style={[styles.liveDot, modelAssetError && styles.errorDot]} />
-          <Text style={styles.liveText}>{modelAssetError ? 'FALHA NO MODELO' : modelUri ? 'RIG ATIVO' : 'CARREGANDO 3D'}</Text>
+          <View style={[styles.liveDot, modelError && styles.errorDot]} />
+          <Text style={styles.liveText}>{modelError ? 'FALHA NO MODELO' : gltf ? 'RIG ATIVO' : 'CARREGANDO 3D'}</Text>
         </View>
         {source ? (
           <View style={styles.identityCard} pointerEvents="none">

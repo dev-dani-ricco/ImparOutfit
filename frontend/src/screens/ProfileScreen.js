@@ -9,7 +9,7 @@ import { colors } from '../theme/colors';
 const bodyShapes = ['Ampulheta', 'Triângulo', 'Triângulo invertido', 'Retângulo', 'Oval'];
 const hairStyles = ['Curto', 'Longo', 'Cacheado', 'Coque'];
 
-export default function ProfileScreen({ navigation }) {
+export default function ProfileScreen({ navigation, route }) {
   const { logout, user, switchContext } = useAuth();
   const { profile, resetDemo, setProfile, wardrobe, wardrobeCapacity } = useDemo();
   const [draft, setDraft] = useState(profile);
@@ -19,6 +19,12 @@ export default function ProfileScreen({ navigation }) {
   useEffect(() => {
     setDraft(profile);
   }, [profile]);
+
+  useEffect(() => {
+    if (!route?.params?.startEditing) return;
+    setEditing(true);
+    navigation.setParams({ startEditing: undefined });
+  }, [navigation, route?.params?.startEditing]);
 
   function update(key, value) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -35,9 +41,14 @@ export default function ProfileScreen({ navigation }) {
   }
 
   function save() {
-    setProfile(draft);
+    const nextProfile = {
+      ...draft,
+      avatarConfiguredAt: draft.avatarConfiguredAt || new Date().toISOString(),
+    };
+    setDraft(nextProfile);
+    setProfile(nextProfile);
     setEditing(false);
-    Alert.alert('Perfil atualizado', 'Perfil demonstrativo atualizado. O avatar exibido é experimental.');
+    Alert.alert('Avatar atualizado', 'Suas medidas e referências foram salvas para esta experiência.');
   }
 
   function cancelEditing() {
