@@ -3,7 +3,7 @@
                  "name":  "IMPAROutfit",
                  "slug":  "imparoutfit",
                  "version":  "1.0.0",
-                 "sdkVersion":  "54.0.0",
+                 "sdkVersion":  "57.0.0",
                  "scheme":  "imparoutfit",
                  "orientation":  "portrait",
                  "userInterfaceStyle":  "light",
@@ -20,8 +20,8 @@
                                  [
                                      "expo-image-picker",
                                      {
-                                         "photosPermission":  "A IMPAR Outfit usa suas fotos para digitalizar peÃ§as do guarda-roupa.",
-                                         "cameraPermission":  "A IMPAR Outfit usa a cÃ¢mera para registrar os Ã¢ngulos das peÃ§as.",
+                                         "photosPermission":  "A IMPAR Outfit usa suas fotos para digitalizar peças do guarda-roupa.",
+                                         "cameraPermission":  "A IMPAR Outfit usa a câmera para registrar os ângulos das peças.",
                                          "microphonePermission":  false
                                      }
                                  ],
