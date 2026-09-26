@@ -17,6 +17,8 @@ import RegisterScreen from '../screens/RegisterScreen';
 import ShowcasesScreen from '../screens/ShowcasesScreen';
 import StoreDashboardScreen from '../screens/StoreDashboardScreen';
 import StoreCampaignScreen from '../screens/StoreCampaignScreen';
+import StoreCatalogScreen from '../screens/StoreCatalogScreen';
+import StoreAccountScreen from '../screens/StoreAccountScreen';
 import StoreDetailScreen from '../screens/StoreDetailScreen';
 import StoresScreen from '../screens/StoresScreen';
 import WardrobeItemScreen from '../screens/WardrobeItemScreen';
@@ -30,6 +32,7 @@ const WardrobeStackNav = createNativeStackNavigator();
 const DaniStackNav = createNativeStackNavigator();
 const ProfileStackNav = createNativeStackNavigator();
 const BrandStackNav = createNativeStackNavigator();
+const BrandTab = createBottomTabNavigator();
 const Tab = createBottomTabNavigator();
 
 const icons = {
@@ -40,6 +43,10 @@ const icons = {
   Perfil: '○',
   Universo: '◇',
   'Análise ÍMPAR': '✦',
+  Painel: '▣',
+  Catálogo: '◇',
+  Campanhas: 'AD',
+  Conta: '○',
 };
 
 const stackOptions = {
@@ -154,10 +161,37 @@ function PersonExperience() {
   );
 }
 
+function BrandTabs() {
+  return (
+    <BrandTab.Navigator
+      initialRouteName="Painel"
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarHideOnKeyboard: true,
+        tabBarActiveTintColor: '#FFFFFF',
+        tabBarInactiveTintColor: '#8F8983',
+        tabBarActiveBackgroundColor: '#171719',
+        tabBarInactiveBackgroundColor: '#0B0B0C',
+        tabBarStyle: { height: 74, backgroundColor: '#0B0B0C', borderTopWidth: 0, paddingTop: 4 },
+        tabBarItemStyle: { paddingTop: 6, paddingBottom: 8 },
+        tabBarLabelStyle: { fontSize: 8, fontWeight: '900', letterSpacing: 0.4 },
+        tabBarIcon: ({ color, focused }) => (
+          <Text style={{ color: focused ? colors.gold : color, fontSize: route.name === 'Campanhas' ? 11 : focused ? 20 : 16, fontWeight: '900' }}>{icons[route.name]}</Text>
+        ),
+      })}
+    >
+      <BrandTab.Screen name="Painel" component={StoreDashboardScreen} />
+      <BrandTab.Screen name="Catálogo" component={StoreCatalogScreen} />
+      <BrandTab.Screen name="Campanhas" component={StoreCampaignScreen} />
+      <BrandTab.Screen name="Conta" component={StoreAccountScreen} />
+    </BrandTab.Navigator>
+  );
+}
+
 function BrandExperience() {
   return (
     <BrandStackNav.Navigator screenOptions={stackOptions}>
-      <BrandStackNav.Screen name="Painel da marca" component={StoreDashboardScreen} options={{ headerShown: false }} />
+      <BrandStackNav.Screen name="Marca" component={BrandTabs} options={{ headerShown: false }} />
       <BrandStackNav.Screen name="Nova peça" component={ItemFormScreen} initialParams={{ store: true }} options={{ title: 'PUBLICAR NO CATÁLOGO' }} />
       <BrandStackNav.Screen name="Peça publicada" component={WardrobeItemScreen} options={{ title: 'PEÇA PUBLICADA • PRÉVIA' }} />
       <BrandStackNav.Screen
@@ -166,7 +200,6 @@ function BrandExperience() {
         initialParams={{ storeId: 'store-aurora', preview: true }}
         options={{ title: 'COMO A CLIENTE VÊ' }}
       />
-      <BrandStackNav.Screen name="Campanhas" component={StoreCampaignScreen} options={{ title: 'MÍDIA E ANÚNCIOS • AD' }} />
     </BrandStackNav.Navigator>
   );
 }

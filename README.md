@@ -5,7 +5,7 @@ armário pessoal e memberships em lojas simultaneamente. Produtos comerciais sal
 referências, sem aquisição automática de posse.
 
 - Backend: Express, PostgreSQL, JWT revogável, autorização por capabilities e storage privado.
-- Frontend: Expo 54/React Native; demonstração isolada por identidade e uma superfície de leitura da API.
+- Frontend: Expo 57/React Native 0.86; demonstração isolada por identidade, jornadas PERSON/ORGANIZATION e uma superfície de leitura da API.
 - [Arquitetura](docs/architecture.md), [ERD](docs/data-model.md), [OpenAPI](docs/openapi.yaml).
 - [Migrations](docs/migrations.md), [uploads](docs/upload-policy.md), [IP](docs/ip-classification.md).
 - [Baseline](docs/repository-baseline.md), [auditoria histórica](docs/current-state-audit.md), [CICLO 1](docs/cycle1-validation.md).

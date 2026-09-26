@@ -8,6 +8,7 @@ const AuthContext = createContext(null);
 const DEMO_SESSION_KEY = '@imparoutfit/presentation-session-v3';
 const TOKEN_KEY = 'imparoutfit-token';
 const configuredDemoMode = Constants.expoConfig?.extra?.demoMode === true;
+const configuredDemoAutoResume = Constants.expoConfig?.extra?.demoAutoResume === true;
 
 const demoUsers = {
   PERSON: {
@@ -42,12 +43,14 @@ export function AuthProvider({ children }) {
     async function restoreSession() {
       try {
         if (demoMode) {
-          const saved = await AsyncStorage.getItem(DEMO_SESSION_KEY);
-          if (saved) {
-            const session = JSON.parse(saved);
-            setToken(session.token);
-            setUser(session.user);
-            setActiveContext(session.activeContext || 'personal');
+          if (configuredDemoAutoResume) {
+            const saved = await AsyncStorage.getItem(DEMO_SESSION_KEY);
+            if (saved) {
+              const session = JSON.parse(saved);
+              setToken(session.token);
+              setUser(session.user);
+              setActiveContext(session.activeContext || 'personal');
+            }
           }
           return;
         }

@@ -1,25 +1,37 @@
 import React, { useMemo } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { useDemo } from '../contexts/DemoContext';
 import { colors } from '../theme/colors';
 
 export default function HomeScreen({ navigation }) {
-  const { user } = useAuth();
+  const { user, demoMode, logout } = useAuth();
   const { profile, wardrobe, personalCollections, commercialSaves } = useDemo();
   const firstName = String(profile?.name || user?.name || 'Você').trim().split(/\s+/)[0];
   const avatarReady = Boolean(profile?.avatarConfiguredAt);
   const recentPieces = useMemo(() => wardrobe.slice(0, 3), [wardrobe]);
 
-  const go = (tab, screen, params) => {
+  const go = async (tab, screen, params) => {
+    await Haptics.selectionAsync().catch(() => {});
     if (screen) navigation.navigate(tab, { screen, params });
     else navigation.navigate(tab);
+  };
+
+  const changeJourney = async () => {
+    await Haptics.selectionAsync().catch(() => {});
+    if (demoMode) await logout();
   };
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
-        <Text style={styles.brand}>IMPAR OUTFIT</Text>
+        <View style={styles.heroTop}>
+          <Text style={styles.brand}>IMPAR OUTFIT</Text>
+          <View style={styles.contextBadge}><Text style={styles.contextBadgeText}>CLIENTE FINAL</Text></View>
+        </View>
+        {demoMode ? <Pressable onPress={changeJourney}><Text style={styles.changeJourney}>TROCAR JORNADA →</Text></Pressable> : null}
         <Text style={styles.kicker}>SEU UNIVERSO PESSOAL</Text>
         <Text style={styles.title}>Vista melhor o que já é seu.</Text>
         <Text style={styles.subtitle}>
@@ -35,7 +47,7 @@ export default function HomeScreen({ navigation }) {
                 : 'Seu primeiro passo é criar um único avatar pessoal. Ele será a base do armário, dos Looks e das análises.'}
             </Text>
           </View>
-          {profile?.profilePhoto ? <Image source={profile.profilePhoto} style={styles.photo} /> : <View style={styles.photoPlaceholder}><Text style={styles.photoInitial}>{firstName.charAt(0)}</Text></View>}
+          {profile?.profilePhoto ? <Image source={profile.profilePhoto} style={styles.photo} contentFit="cover" transition={140} cachePolicy="memory-disk" /> : <View style={styles.photoPlaceholder}><Text style={styles.photoInitial}>{firstName.charAt(0)}</Text></View>}
         </View>
 
         <Pressable
@@ -107,7 +119,7 @@ export default function HomeScreen({ navigation }) {
                 style={styles.pieceCard}
                 onPress={() => go('Armário', 'Peça 2D e 3D', { itemId: piece.id })}
               >
-                {piece.image ? <Image source={piece.image} style={styles.pieceImage} /> : <View style={styles.pieceImagePlaceholder} />}
+                {piece.image ? <Image source={piece.image} style={styles.pieceImage} contentFit="cover" transition={160} cachePolicy="memory-disk" /> : <View style={styles.pieceImagePlaceholder} />}
                 <Text numberOfLines={1} style={styles.pieceName}>{piece.name}</Text>
                 <Text numberOfLines={1} style={styles.pieceMeta}>{piece.category || piece.color || 'Peça'}</Text>
               </Pressable>
@@ -152,8 +164,12 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F7F3EE' },
   content: { paddingBottom: 110 },
   hero: { backgroundColor: '#0B0B0C', paddingHorizontal: 22, paddingTop: 34, paddingBottom: 28 },
+  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   brand: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 3.4 },
-  kicker: { color: colors.gold, fontSize: 9, fontWeight: '900', letterSpacing: 1.8, marginTop: 28 },
+  contextBadge: { borderWidth: 1, borderColor: '#5B4D3E', paddingHorizontal: 9, paddingVertical: 6 },
+  contextBadgeText: { color: colors.gold, fontSize: 7, fontWeight: '900', letterSpacing: 1.2 },
+  changeJourney: { color: '#8F8881', fontSize: 7, fontWeight: '900', letterSpacing: 1, textAlign: 'right', marginTop: 8 },
+  kicker: { color: colors.gold, fontSize: 9, fontWeight: '900', letterSpacing: 1.8, marginTop: 24 },
   title: { color: '#FFFFFF', fontFamily: 'serif', fontSize: 42, lineHeight: 45, marginTop: 8, maxWidth: 330 },
   subtitle: { color: '#C8C0B7', fontSize: 13, lineHeight: 20, marginTop: 12, maxWidth: 350 },
   identityRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 28, paddingTop: 18, borderTopWidth: 1, borderTopColor: '#292929' },

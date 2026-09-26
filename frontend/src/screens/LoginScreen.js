@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
+import * as Haptics from 'expo-haptics';
 
 export default function LoginScreen({ navigation }) {
   const { demoMode, login, loginDemo, setDemoMode } = useAuth();
@@ -23,6 +24,7 @@ export default function LoginScreen({ navigation }) {
     setError('');
     setLoadingRole(role);
     try {
+      await Haptics.selectionAsync().catch(() => {});
       await loginDemo(role);
     } catch (caught) {
       setError(caught.message || 'Não foi possível abrir a apresentação.');
@@ -67,7 +69,7 @@ export default function LoginScreen({ navigation }) {
 
         {demoMode ? (
           <View style={styles.presentation}>
-            <Text style={styles.sectionLabel}>ESCOLHA UMA JORNADA</Text>
+            <Text style={styles.sectionLabel}>ESCOLHA COMO VOCÊ QUER TESTAR</Text>
             <Pressable
               disabled={Boolean(loadingRole)}
               style={styles.personButton}
@@ -75,9 +77,9 @@ export default function LoginScreen({ navigation }) {
             >
               <View style={styles.roleIconDark}><Text style={styles.roleIconLight}>◇</Text></View>
               <View style={styles.roleCopy}>
-                <Text style={styles.personEyebrow}>EXPERIÊNCIA DA CLIENTE</Text>
+                <Text style={styles.personEyebrow}>CLIENTE FINAL · EXPERIÊNCIA PESSOAL</Text>
                 <Text style={styles.personTitle}>Explorar meu estilo</Text>
-                <Text style={styles.personDescription}>Perfil com avatar, armário e capturas, marcas, Feed das lojas e Painel Dani Rico.</Text>
+                <Text style={styles.personDescription}>Avatar pessoal, guarda-roupa, Looks, descoberta de marcas e Análise IMPAR.</Text>
               </View>
               {loadingRole === 'PERSON'
                 ? <ActivityIndicator color={colors.bg} />
@@ -91,9 +93,9 @@ export default function LoginScreen({ navigation }) {
             >
               <View style={styles.roleIconLightWrap}><Text style={styles.roleIconDarkText}>▣</Text></View>
               <View style={styles.roleCopy}>
-                <Text style={styles.storeEyebrow}>EXPERIÊNCIA DA MARCA</Text>
+                <Text style={styles.storeEyebrow}>LOJISTA · CONTEXTO COMERCIAL</Text>
                 <Text style={styles.storeTitle}>Gerenciar minha vitrine</Text>
-                <Text style={styles.storeDescription}>Painel comercial, catálogo e prévias, anúncios e engajamento.</Text>
+                <Text style={styles.storeDescription}>Painel, catálogo, campanhas, prévias comerciais e capacidades da equipe.</Text>
               </View>
               {loadingRole === 'STORE'
                 ? <ActivityIndicator color={colors.accent} />
@@ -103,7 +105,7 @@ export default function LoginScreen({ navigation }) {
             <View style={styles.demoNote}>
               <Text style={styles.demoNoteTitle}>PRONTO PARA O EXPO GO</Text>
               <Text style={styles.demoNoteCopy}>
-                Suas interações ficam salvas neste aparelho. Nenhum servidor é necessário para a apresentação.
+                Os dados fictícios de cada jornada ficam separados. A cada abertura você escolhe Cliente final ou Lojista.
               </Text>
             </View>
           </View>
