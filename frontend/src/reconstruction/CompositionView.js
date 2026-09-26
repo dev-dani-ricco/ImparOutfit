@@ -8,7 +8,8 @@ import {GLTFLoader,SkeletonUtils} from 'three-stdlib';
 import * as THREE from 'three';
 import {API_URL} from '../api/client';
 import {compositionItem} from './composition.mjs';
-import {avatarMorphWeights,garmentFitScale,normalizeAvatarSpec} from '../avatar/avatarSpec.mjs';
+import {avatarMorphWeights,normalizeAvatarSpec} from '../avatar/avatarSpec.mjs';
+import {garmentFitProfile,normalizeGarmentMaterials} from './garmentFitV2.mjs';
 import {useDemo} from '../contexts/DemoContext';
 import RendererBoundary from './RendererBoundary';
 const avatarModule=require('../../assets/models/parametric/makehuman-parametric-base.glb');
@@ -79,7 +80,7 @@ export default function CompositionView({job,token,inspectionOnly=false,compareJ
   fetch(API_URL+'/reconstruction/jobs/'+job.id+'/output',{headers:{Authorization:'Bearer '+token},cache:'no-store'})
    .then(async r=>{if(!r.ok)throw new Error('Asset privado indisponível');const b=await r.arrayBuffer();if(b.byteLength>67108864)throw new Error('Asset excede limite');return b;})
    .then(b=>new Promise((resolve,reject)=>new GLTFLoader().parse(b,'',resolve,reject)))
-   .then(g=>{loaded=g.scene;if(cancelled)dispose(loaded);else setMesh(loaded);})
+   .then(g=>{loaded=normalizeGarmentMaterials(g.scene);if(cancelled)dispose(loaded);else setMesh(loaded);})
    .catch(()=>{if(!cancelled)setError('Não foi possível renderizar a malha validada.');});
   return ()=>{cancelled=true;dispose(loaded);};
  },[job.id,job.output?.id,token,allowed]);
@@ -87,13 +88,15 @@ export default function CompositionView({job,token,inspectionOnly=false,compareJ
  const b=job.output?.metadata?.bounds;
  const size=b?Math.max(...b.max.map((v,i)=>v-b.min[i])):1;
  const scale=inspectionOnly?1/size:job.placement.uniformScale;
- const fit=inspectionOnly||!fitEnabled?[1,1,1]:garmentFitScale(anchorCategory,avatarSpec);
+ const fitProfile=garmentFitProfile(anchorCategory,avatarSpec);
+ const fit=inspectionOnly||!fitEnabled?[1,1,1]:fitProfile.scale;
  const fittedScale=[scale*fit[0],scale*fit[1],scale*fit[2]];
- const position=inspect?[0,0,0]:(anchors[anchorCategory]||anchors.TOP).map((v,i)=>v*height+offset[i]);
+ const fitAnchor=fitProfile.anchor||anchors[anchorCategory]||anchors.TOP;
+ const position=inspect?[0,0,0]:fitAnchor.map((v,i)=>v*height+offset[i]);
  const action=(label,fn)=><Pressable key={label} accessibilityRole="button" onPress={fn} style={{padding:9,borderWidth:1,borderColor:'#bbb'}}><Text>{label}</Text></Pressable>;
  return <View style={{gap:10}}>
-  <Text>{inspectionOnly?'INSPEÇÃO EXPERIMENTAL • escala ainda não calibrada':'COMPOSIÇÃO 3D • avatar paramétrico + ajuste proporcional do vestuário'}</Text>
-  <Text>Adaptação proporcional visual. Sem simulação de tecido, caimento ou avaliação metodológica.</Text>
+  <Text>{inspectionOnly?'INSPEÇÃO EXPERIMENTAL • escala ainda não calibrada':'COMPOSIÇÃO 3D • GARMENT FIT V2'}</Text>
+  <Text>{fitProfile.label} • ajuste por medidas + folga visual PBR. {fitProfile.disclaimer}</Text>
   {error?<Text accessibilityRole="alert">{error}</Text>:null}
   <View style={{height:430,backgroundColor:'#e9e4dd'}} {...controls.panHandlers}>
    <RendererBoundary><Canvas camera={{position:[0,.9,3.5],fov:40}} gl={{antialias:true}} dpr={1}>
@@ -114,7 +117,7 @@ export default function CompositionView({job,token,inspectionOnly=false,compareJ
    {!inspectionOnly&&['X','Y','Z'].flatMap((axis,i)=>[-1,1].map(sign=>action(axis+(sign>0?' +':' −'),()=>setOffset(o=>o.map((v,k)=>k===i?v+sign*.02:v)))))}
   </View>
   {!inspectionOnly&&compareJobs.map(j=>action('Comparar '+j.category+' • '+j.id.slice(0,6),()=>onSwap?.(j)))}
-  {!inspectionOnly?<Text>Ajuste visual do vestuário: X {fit[0].toFixed(2)} · Y {fit[1].toFixed(2)} · Z {fit[2].toFixed(2)} com base em busto, cintura, quadril e altura. É prévia proporcional, não simulação física de tecido.</Text>:null}
+  {!inspectionOnly?<Text>Garment Fit V2: X {fit[0].toFixed(2)} · Y {fit[1].toFixed(2)} · Z {fit[2].toFixed(2)} · folga {Math.round(fitProfile.silhouetteAllowance*1000)} mm. Base: busto, cintura, quadril, altura e categoria. Não é simulação física de tecido.</Text>:null}
   <Text>A troca mantém câmera, avatar, posição e orientação. O quality gate continua usando a escala dimensional declarada; o fit corporal é uma camada visual reversível.</Text>
  </View>;
 }

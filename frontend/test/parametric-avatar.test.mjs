@@ -76,7 +76,7 @@ test('mobile implementation exposes studio and proportional garment fit', () => 
   assert.match(avatar, /arrayBuffer\(\)/);
   assert.match(avatar, /morphTargetInfluences/);
   for (const tab of ['CORPO','ROSTO','CABELO']) assert.match(studio, new RegExp(tab));
-  assert.match(composition, /garmentFitScale/);
+  assert.match(composition, /garmentFitProfile/);
   assert.match(composition, /Aplicar ajuste corporal/);
   assert.match(composition, /makehuman-parametric-base\.glb/);
 });

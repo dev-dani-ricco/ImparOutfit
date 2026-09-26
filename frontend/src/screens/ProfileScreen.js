@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import ParametricAvatar3D from '../components/ParametricAvatar3D';
+import RealisticAvatar3D from '../components/RealisticAvatar3D';
 import { useAuth } from '../contexts/AuthContext';
 import { useDemo } from '../contexts/DemoContext';
 import { colors } from '../theme/colors';
@@ -84,7 +85,7 @@ export default function ProfileScreen({ navigation, route }) {
       </View>
 
       <View style={styles.avatarSection}>
-        <ParametricAvatar3D profile={draft} />
+        {draft.realisticAvatar?.url ? <RealisticAvatar3D avatar={draft.realisticAvatar} /> : <ParametricAvatar3D profile={draft} />}
         <View style={styles.avatarActions}>
           <Pressable style={styles.photoButton} onPress={selectProfilePhoto}>
             <Text style={styles.photoButtonText}>
@@ -92,11 +93,16 @@ export default function ProfileScreen({ navigation, route }) {
             </Text>
           </Pressable>
           <Pressable style={styles.editButton} onPress={() => navigation.navigate('Avatar Studio')}>
-            <Text style={styles.editButtonText}>ABRIR AVATAR STUDIO →</Text>
+            <Text style={styles.editButtonText}>AJUSTAR AVATAR PARAMÉTRICO →</Text>
+          </Pressable>
+          <Pressable style={styles.realisticButton} onPress={() => navigation.navigate('Avatar Realista')}>
+            <Text style={styles.realisticButtonText}>{draft.realisticAvatar?.url ? 'ATUALIZAR AVATAR REALISTA →' : 'CRIAR AVATAR REALISTA POR FOTOS →'}</Text>
           </Pressable>
         </View>
         <Text style={styles.avatarNote}>
-          Arraste para girar. O modelo paramétrico responde a rosto, corpo, cabelo, altura e medidas.
+          {draft.realisticAvatar?.url
+            ? 'Avatar realista ativo. A identidade visual vem do modelo exportado; medidas do perfil continuam sendo usadas no ajuste das roupas.'
+            : 'Arraste para girar. O avatar paramétrico responde a rosto, corpo, cabelo, altura e medidas.'}
         </Text>
       </View>
 
@@ -292,11 +298,13 @@ const styles = StyleSheet.create({
   greeting: { color: colors.text, fontFamily: 'serif', fontSize: 39, lineHeight: 44, marginTop: 5 },
   intro: { color: colors.muted, fontSize: 13, lineHeight: 20, marginTop: 7 },
   avatarSection: { marginHorizontal: 18 },
-  avatarActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  avatarActions: { gap: 8, marginTop: 10 },
   photoButton: { flex: 1, borderWidth: 1, borderColor: colors.accent, padding: 12, alignItems: 'center' },
   photoButtonText: { color: colors.accent, fontSize: 7, fontWeight: '900', letterSpacing: 0.7, textAlign: 'center' },
-  editButton: { flex: 1, backgroundColor: colors.accent, padding: 12, alignItems: 'center' },
+  editButton: { backgroundColor: colors.accent, padding: 12, alignItems: 'center' },
   editButtonText: { color: colors.bg, fontSize: 7, fontWeight: '900', letterSpacing: 0.7 },
+  realisticButton: { backgroundColor: '#0B0B0C', borderWidth: 1, borderColor: colors.gold, padding: 13, alignItems: 'center' },
+  realisticButtonText: { color: colors.gold, fontSize: 7, fontWeight: '900', letterSpacing: 0.8 },
   avatarNote: { color: colors.muted, fontSize: 8, lineHeight: 13, textAlign: 'center', marginTop: 8 },
   dashboard: { margin: 18, flexDirection: 'row', borderWidth: 1, borderColor: colors.line },
   dashboardMetric: { flex: 1, alignItems: 'center', paddingVertical: 13, borderRightWidth: 1, borderRightColor: colors.line },
