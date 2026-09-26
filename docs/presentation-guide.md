@@ -1,28 +1,76 @@
-# Showcase Build — roteiro após CICLO 1
+# IMPAR Outfit — roteiro de apresentação ao cliente
 
-Uso interno; dados fictícios. Não cadastrar dados pessoais reais na demonstração.
-A Showcase roda com demoMode=true e não sincroniza dados com a API.
+## Antes da reunião
+Use o preview Expo Go autenticado na conta `poshaze1`.
 
-1. Abra “Experiência da cliente”. A pessoa fictícia demo-person recebe perfil, medidas,
-   armário e coleções de exemplo.
-2. Navegue por Perfil, Armário, Lojas e Feed. Abra uma loja e use “Salvar referência”:
-   o item fica em referências comerciais e a quantidade no armário não aumenta.
-3. Em Feed → Favoritas, abra uma referência salva. Em nova coleção, combine peças
-   possuídas e referências; a relação original de cada item permanece.
-4. Para catalogar peça pessoal, declare que possui a peça (ou que é uma fixture da demo).
-   Foto/captura não representa malha reconstruída ou propriedade verificada externamente.
-5. Saia e entre em “Experiência da marca”. demo-store-owner possui contexto comercial.
-   “Abrir meu contexto pessoal” permite usar perfil e armário próprios sem perder membership.
-   Os dados da cliente anterior não são carregados. No perfil, retorne à loja.
-6. Cadastro demonstrativo cria identidade fictícia nova com estado pessoal vazio.
-   A chave global antiga não é importada nem apagada automaticamente.
-7. Conteúdo associado à Dani, campanhas e métricas são demonstração sob classificação de IP.
-   Não constituem atendimento, agenda, parecer profissional, publicidade veiculada ou analytics real.
+Endereço atual:
+`exp://8t_ysow-poshaze1-8480.exp.direct`
 
-As ações de marca são exemplos locais por identidade. Dados pessoais não atravessam sessões.
-Fotos locais podem depender da retenção do sistema operacional. AsyncStorage não é cofre
-criptografado; não usar a demo como armazenamento de dados reais.
+O Dell possui a tarefa automática `IMPAR Outfit Expo Preview`, que mantém o servidor de desenvolvimento ativo e tenta reiniciá-lo em caso de queda. Para uma apresentação importante, confirme o endpoint antes da reunião.
 
-Com demoMode=false, a interface mostra dados pessoais e comerciais lidos da API autenticada.
-Os demais fluxos estão em integração. Bundles Android/web preservam navegação e assets, mas
-não comprovam distribuição assinada ou funcionamento do avatar em aparelho físico.
+A apresentação usa dados fictícios. Não cadastre dados pessoais reais neste ambiente demonstrativo.
+
+## Abertura
+Ao abrir o app, a primeira tela deve pedir a escolha da jornada. Isso é intencional e demonstra a separação de contexto do produto.
+
+### Jornada 1 — CLIENTE FINAL
+Escolha **Explorar meu estilo**.
+
+Demonstre nesta ordem:
+1. Início: destaque que o produto parte do avatar + guarda-roupa, não de um feed genérico.
+2. Avatar: abra **Criar meu avatar** / **Atualizar meu avatar** e mostre medidas, foto e representação 3D experimental.
+3. Armário: mostre peças possuídas, capacidade e catalogação.
+4. Looks: crie ou abra uma coleção pessoal.
+5. Descobrir: mostre marcas e referências comerciais sem transformar uma referência em peça possuída.
+6. Análise: mostre o espaço reservado à Análise IMPAR e explique que conteúdo/IA institucional real depende do modo conectado e da governança autorizada.
+7. Perfil: mostre que a pessoa mantém identidade e contexto próprios.
+
+Mensagem principal: o cliente final controla avatar, acervo e Looks; marcas aparecem como descoberta e referência, não como dona dos dados privados da pessoa.
+
+### Jornada 2 — LOJISTA
+Use **Trocar jornada** e escolha **Gerenciar minha vitrine**.
+
+A navegação comercial agora é própria:
+- Painel
+- Catálogo
+- Campanhas
+- Conta
+
+Demonstre:
+1. Painel: saúde da vitrine, métricas e ações rápidas.
+2. Catálogo: produtos publicados, prévias e nova publicação.
+3. Campanhas: configuração e visualização de mídia patrocinada.
+4. Conta: mostre o selo **LOJISTA**, capabilities e a troca explícita para o contexto pessoal.
+
+Mensagem principal: a mesma pessoa pode operar uma marca sem transformar a identidade pessoal em um papel global de lojista. Dados pessoais e comerciais continuam separados.
+
+## 3D — como apresentar
+O avatar genérico atual é uma POC de representação proporcional e não um avatar corporal reconstruído da usuária.
+
+O produto já possui fundação para:
+- captura multivista de peças;
+- jobs de reconstrução;
+- GLB privado;
+- quality gate;
+- composição com avatar de referência.
+
+Não apresentar como fitting físico preciso, simulação de tecido ou reconstrução corporal pronta.
+
+## O que mudou nesta entrega
+- Expo SDK 57;
+- carregamento nativo do GLB corrigido;
+- Home cliente final orientada ao guarda-roupa;
+- navegação CLIENTE FINAL própria;
+- navegação LOJISTA própria;
+- escolha explícita da jornada na abertura;
+- catálogo comercial dedicado;
+- contexto/capabilities do lojista;
+- expo-image para cache/transição de imagens em superfícies novas;
+- feedback háptico em ações principais;
+- preview Expo Go auto-reiniciável no Dell;
+- EAS Update configurado e primeira atualização `preview` publicada.
+
+## Limites que ainda devem ser explicados
+O Expo Go atual ainda depende do Dell estar ligado, conectado e com a sessão do usuário disponível. É o caminho rápido já conhecido pelo cliente.
+
+O caminho realmente independente da máquina é o build de preview do próprio IMPAR Outfit ligado ao canal EAS `preview`. O update hospedado já existe; falta gerar/instalar o primeiro build iOS compatível para que futuras apresentações recebam atualizações sem depender do Metro do Dell.

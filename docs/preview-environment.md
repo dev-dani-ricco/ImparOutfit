@@ -61,3 +61,13 @@ This removes the dependency on an always-on development machine. A preview/devel
 
 ## Important boundary
 Expo Go remains useful for fast stakeholder demos because the client already knows the workflow. It is not the final production distribution architecture.
+
+
+## Published preview baseline — 2026-09-26
+Branch: preview
+Runtime version: 1.0.0
+Update group: 97206ee5-6f56-4d37-a821-951b27688422
+Commit: 27b736f57c1f2f916c9d56c9266c199097e249d4
+Platforms: iOS and Android
+
+This is the first hosted EAS baseline for the separated CLIENTE FINAL / LOJISTA experience.
