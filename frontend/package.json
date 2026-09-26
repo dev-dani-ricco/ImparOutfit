@@ -1,50 +1,51 @@
 {
-    "name": "imparoutfit-frontend",
-    "version": "1.0.0",
-    "main": "expo/AppEntry.js",
-    "scripts": {
-        "start": "expo start --go",
-        "start:dev-client": "expo start --dev-client",
-        "check:bundle": "npm run guard:api-config && expo export --platform android --output-dir .expo-demo-check --clear",
-        "android": "expo run:android",
-        "ios": "expo run:ios",
-        "web": "expo start --web",
-        "test": "node --test test/*.test.mjs",
-        "guard:api-config": "node scripts/check-api-config.mjs",
-        "eas-build-pre-install": "npm run guard:api-config"
-    },
-    "dependencies": {
-        "@expo/metro-runtime": "~57.0.16",
-        "@react-native-async-storage/async-storage": "2.2.0",
-        "@react-navigation/bottom-tabs": "^6.6.1",
-        "@react-navigation/native": "^6.1.18",
-        "@react-navigation/native-stack": "^6.11.0",
-        "@react-three/fiber": "^9.7.0",
-        "expo": "~57.0.25",
-        "expo-asset": "~57.0.18",
-        "expo-dev-client": "~57.0.19",
-        "expo-file-system": "~57.0.7",
-        "expo-gl": "~57.0.2",
-        "expo-haptics": "~57.0.3",
-        "expo-image": "~57.0.5",
-        "expo-image-picker": "~57.0.20",
-        "expo-secure-store": "~57.0.4",
-        "expo-updates": "~57.0.23",
-        "react": "19.2.3",
-        "react-dom": "19.2.3",
-        "react-native": "0.86.3",
-        "react-native-safe-area-context": "~5.7.0",
-        "react-native-screens": "~4.26.0",
-        "react-native-web": "^0.21.0",
-        "three": "^0.185.1",
-        "three-stdlib": "^2.36.1"
-    },
-    "devDependencies": {
-        "@babel/core": "^7.24.0",
-        "@expo/ngrok": "^4.1.3"
-    },
-    "private": true,
-    "overrides": {
-        "postcss": "^8.5.23"
-    }
+  "name": "imparoutfit-frontend",
+  "version": "1.0.0",
+  "main": "expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start --go",
+    "start:dev-client": "expo start --dev-client",
+    "check:bundle": "npm run guard:api-config && expo export --platform android --output-dir .expo-demo-check --clear",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "test": "node --test test/*.test.mjs",
+    "guard:api-config": "node scripts/check-api-config.mjs",
+    "eas-build-pre-install": "npm run guard:api-config"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~57.0.16",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/slider": "5.2.0",
+    "@react-navigation/bottom-tabs": "^6.6.1",
+    "@react-navigation/native": "^6.1.18",
+    "@react-navigation/native-stack": "^6.11.0",
+    "@react-three/fiber": "^9.7.0",
+    "expo": "~57.0.25",
+    "expo-asset": "~57.0.18",
+    "expo-dev-client": "~57.0.19",
+    "expo-file-system": "~57.0.7",
+    "expo-gl": "~57.0.2",
+    "expo-haptics": "~57.0.3",
+    "expo-image": "~57.0.5",
+    "expo-image-picker": "~57.0.20",
+    "expo-secure-store": "~57.0.4",
+    "expo-updates": "~57.0.23",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-web": "^0.21.0",
+    "three": "^0.185.1",
+    "three-stdlib": "^2.36.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@expo/ngrok": "^4.1.3"
+  },
+  "private": true,
+  "overrides": {
+    "postcss": "^8.5.23"
+  }
 }

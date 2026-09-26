@@ -1,4 +1,5 @@
 import ApiFoundationScreen from '../screens/ApiFoundationScreen';
+import AvatarStudioScreen from '../screens/AvatarStudioScreen';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -104,6 +105,7 @@ function ProfileStack() {
   return (
     <ProfileStackNav.Navigator screenOptions={stackOptions}>
       <ProfileStackNav.Screen name="Meu perfil" component={ProfileScreen} options={{ headerShown: false }} />
+      <ProfileStackNav.Screen name="Avatar Studio" component={AvatarStudioScreen} options={{ headerShown: false }} />
     </ProfileStackNav.Navigator>
   );
 }

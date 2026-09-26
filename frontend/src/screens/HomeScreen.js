@@ -52,7 +52,7 @@ export default function HomeScreen({ navigation }) {
 
         <Pressable
           style={avatarReady ? styles.secondaryHeroButton : styles.primaryHeroButton}
-          onPress={() => go('Perfil', 'Meu perfil', { startEditing: true })}
+          onPress={() => go('Perfil', 'Avatar Studio')}
         >
           <Text style={avatarReady ? styles.secondaryHeroButtonText : styles.primaryHeroButtonText}>
             {avatarReady ? 'ATUALIZAR MEU AVATAR →' : 'CRIAR MEU AVATAR →'}

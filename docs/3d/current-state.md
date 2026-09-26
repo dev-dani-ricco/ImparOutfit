@@ -1,23 +1,19 @@
-# Estado 3D anterior à POC — CICLO 2
+# Estado 3D atual — Avatar Paramétrico & Garment Fit V1
 
-| Capacidade/arquivo | Classe | Evidência e limite |
+| Capacidade | Estado atual | Limite / próximo passo |
 | --- | --- | --- |
-| BodyAvatar3D.native.js | EXPERIMENTAL | Three.js via @react-three/fiber/native e expo-gl; WebGL no native. Canvas, luzes, câmera perspectiva e geometria reais. |
-| assets/models/michelle.glb | REAL (geometria), DEMO (identidade) | glTF 2, 3.276.888 bytes, 1 mesh, 16.340 vértices, 28.106 triângulos, 1 skin, 65 joints, 1 material, 4 imagens; TPose e SambaDance. Modelo genérico preexistente. |
-| Rig | EXPERIMENTAL | Joints Mixamo (hips/spine/head/arms/hands/legs/feet). Nenhum anchor de roupa validado; animações embutidas não usadas pelo componente. |
-| Personalização native | EXPERIMENTAL | Morphs gerados por funções gaussianas e medidas declaradas; sem calibração antropométrica. Altura geométrica base ~1,6644 unidades; renderer normaliza a 4,15 unidades de cena. Não prova centímetros. |
-| Pessoa/avatar | DEMO | Profile isolado por Person no demo e API; foto facial é cartão de referência 2D, não reconstrução facial. Sem asset corporal próprio por pessoa. |
-| BodyAvatar3D.js (web) | FAKE/LEGACY | Views planas com transform perspective/rotateY; sem malha/WebGL. |
-| Model3DPreview.js | FAKE/LEGACY | Animated.Image gira por rotateY; não reconstrói nem carrega malha. |
-| ItemFormScreen.js | DEMO | Até quatro fotos em estado local; metadata model3d sem job/worker/proveniência. Quantidade de ângulos não valida um asset. |
-| Composição/fit/physics | FAKE/LEGACY (alegações) | Não existe mesh reconstruída de roupa sobre avatar, solver físico, colisão, escala física validada ou comparação 3D real. |
+| Avatar corporal | MakeHuman/MPFB2 CC0 parametric-base.glb, skinned, com centenas de morph targets corporais e faciais | Representação paramétrica, não scan biométrico |
+| Avatar Studio | Controles de corpo, rosto, altura, medidas, pele, cabelo e cor | Validar ergonomia e performance em iPhone/Android reais |
+| Cabelo | Quatro meshes 3D modulares CC0 da Quaternius | Ampliar biblioteca e adicionar estilos de maior fidelidade com mesma governança de licença |
+| Identidade facial | Morphs de formato, mandíbula, queixo, maçãs, testa, nariz, olhos, boca e lábios | Foto ainda é referência; reconstrução facial por foto não está habilitada |
+| Persistência demo | avatarControls + medidas persistidos no profile local | Connected mode deve persistir spec versionado no backend |
+| Captura de roupa | Fotos multivista autenticadas no pipeline conectado | Adicionar validação visual de cobertura/foco em tempo real |
+| Reconstrução de roupa | Job privado -> worker -> GLB -> quality gate | Pipeline local/CPU ainda é POC e precisa benchmark com captura real |
+| Composição | Avatar paramétrico + asset de roupa validado | Sem simulação de tecido ou colisão |
+| Garment Fit V1 | Ajuste proporcional reversível X/Y/Z por categoria e medidas | Evoluir para landmarks, rig/cage deformation, oclusão e collision shell |
+| Legacy Michelle | assets/models/michelle.glb preservado apenas para compatibilidade/rollback | Não é mais o avatar principal da experiência móvel |
+| Web fallback | BodyAvatar3D.js preserva uma visualização simplificada | O editor 3D profissional é prioritariamente iOS/Android |
 
-Stack preservada: Expo 54.0.36, RN 0.81.5, React 19.1, Three 0.185.1,
-R3F 9.7.0, expo-gl 16.0.10, three-stdlib 2.36.1, expo-image-picker 17.0.11.
-Extensão native seleciona renderer diferente do web. Development Client já existe;
-esta auditoria não encontrou evidência que justifique substituir a stack.
+Stack atual: Expo SDK 57, React Native, Three.js, React Three Fiber, three-stdlib, expo-file-system e @react-native-community/slider.
 
-GPU identificada no registro: NVIDIA GeForce GT 220. PyCOLMAP 4.2.0 instalado em
-ambiente isolado informa has_cuda=False. CPU i5-2400, quatro threads, ~8 GiB RAM.
-Uma malha genérica renderizada não é evidência de reconstrução da pessoa ou da peça.
-***
+Critério de produto: o sistema pode afirmar representação paramétrica e prévia proporcional. Não pode afirmar scan biométrico, fitting físico exato, colisão corporal ou simulação de tecido enquanto esses estágios não existirem.

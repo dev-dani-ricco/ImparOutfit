@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import BodyAvatar3D from '../components/BodyAvatar3D';
+import ParametricAvatar3D from '../components/ParametricAvatar3D';
 import { useAuth } from '../contexts/AuthContext';
 import { useDemo } from '../contexts/DemoContext';
 import { colors } from '../theme/colors';
@@ -84,19 +84,19 @@ export default function ProfileScreen({ navigation, route }) {
       </View>
 
       <View style={styles.avatarSection}>
-        <BodyAvatar3D profile={draft} />
+        <ParametricAvatar3D profile={draft} />
         <View style={styles.avatarActions}>
           <Pressable style={styles.photoButton} onPress={selectProfilePhoto}>
             <Text style={styles.photoButtonText}>
               {draft.profilePhoto ? 'ALTERAR FOTO DO ROSTO' : '＋ ADICIONAR FOTO DO ROSTO'}
             </Text>
           </Pressable>
-          <Pressable style={styles.editButton} onPress={() => setEditing((current) => !current)}>
-            <Text style={styles.editButtonText}>{editing ? 'FECHAR EDIÇÃO' : 'EDITAR MEDIDAS →'}</Text>
+          <Pressable style={styles.editButton} onPress={() => navigation.navigate('Avatar Studio')}>
+            <Text style={styles.editButtonText}>ABRIR AVATAR STUDIO →</Text>
           </Pressable>
         </View>
         <Text style={styles.avatarNote}>
-          Arraste o avatar com o dedo. Corpo, proporções e base neutra respondem às suas medidas.
+          Arraste para girar. O modelo paramétrico responde a rosto, corpo, cabelo, altura e medidas.
         </Text>
       </View>
 
