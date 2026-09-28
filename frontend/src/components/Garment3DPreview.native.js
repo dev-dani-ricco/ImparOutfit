@@ -1,108 +1,136 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, View } from 'react-native';
 import { Canvas } from '@react-three/fiber/native';
+import { useAssets } from 'expo-asset';
+import { File } from 'expo-file-system';
 import * as THREE from 'three';
+import { GLTFLoader, SkeletonUtils } from 'three-stdlib';
 import { colors } from '../theme/colors';
 import { useDemo } from '../contexts/DemoContext';
 import { normalizeAvatarSpec } from '../avatar/avatarSpec.mjs';
 import { garmentFitProfile } from '../reconstruction/garmentFitV2.mjs';
 
-function GarmentMesh({ category, angle, color = '#7A3148', fitScale = [1, 1, 1] }) {
+const GARMENT_ASSETS = {
+  top: require('../../assets/models/garments/top.glb'),
+  pants: require('../../assets/models/garments/pants.glb'),
+  skirt: require('../../assets/models/garments/skirt.glb'),
+  dress: require('../../assets/models/garments/dress.glb'),
+  bag: require('../../assets/models/garments/bag.glb'),
+  shoe: require('../../assets/models/garments/shoe.glb'),
+};
+const GARMENT_KEYS = Object.keys(GARMENT_ASSETS);
+const ALL_GARMENT_ASSETS = GARMENT_KEYS.map((key) => GARMENT_ASSETS[key]);
+
+const FABRIC_MATERIALS = {
+  RIGID: { roughness: 0.82, metalness: 0.01, sheen: 0.0 },
+  STRUCTURED: { roughness: 0.68, metalness: 0.01, sheen: 0.04 },
+  KNIT: { roughness: 0.92, metalness: 0.0, sheen: 0.08 },
+  FLUID: { roughness: 0.38, metalness: 0.0, sheen: 0.24 },
+};
+
+function garmentKind(category) {
   const type = String(category || '').toLowerCase();
-  const group = useRef();
+  if (type.includes('vest') || type.includes('dress')) return 'dress';
+  if (type.includes('saia') || type.includes('skirt')) return 'skirt';
+  if (type.includes('cal') || type.includes('pants') || type.includes('jeans')) return 'pants';
+  if (type.includes('bolsa') || type.includes('bag')) return 'bag';
+  if (type.includes('sap') || type.includes('tênis') || type.includes('tenis') || type.includes('shoe')) return 'shoe';
+  return 'top';
+}
 
-  const kind = useMemo(() => {
-    if (type.includes('vest') || type.includes('dress')) return 'dress';
-    if (type.includes('cal') || type.includes('pants') || type.includes('jeans')) return 'pants';
-    if (type.includes('saia') || type.includes('skirt')) return 'skirt';
-    if (type.includes('bolsa') || type.includes('bag')) return 'bag';
-    if (type.includes('sap') || type.includes('tênis') || type.includes('tenis') || type.includes('shoe')) return 'shoe';
-    return 'top';
-  }, [type]);
+function fitCategory(category) {
+  const kind = garmentKind(category);
+  if (kind === 'dress') return 'DRESS';
+  if (kind === 'pants' || kind === 'skirt') return 'PANTS';
+  if (kind === 'bag') return 'BAG';
+  if (kind === 'shoe') return 'FOOTWEAR';
+  return 'TOP';
+}
 
-  const material = <meshStandardMaterial color={color} roughness={0.62} metalness={0.03} side={THREE.DoubleSide} />;
+function useLocalGltf(uri) {
+  const [state, setState] = useState({ gltf: null, error: null });
+  useEffect(() => {
+    let cancelled = false;
+    if (!uri) return undefined;
+    (async () => {
+      try {
+        const buffer = await new File(uri).arrayBuffer();
+        if (cancelled) return;
+        new GLTFLoader().parse(
+          buffer,
+          '',
+          (gltf) => !cancelled && setState({ gltf, error: null }),
+          (error) => !cancelled && setState({ gltf: null, error: error instanceof Error ? error : new Error(String(error)) }),
+        );
+      } catch (error) {
+        if (!cancelled) setState({ gltf: null, error: error instanceof Error ? error : new Error(String(error)) });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [uri]);
+  return state;
+}
 
+function prepareGarment(scene, color, fabricClass) {
+  const root = SkeletonUtils.clone(scene);
+  const materialProfile = FABRIC_MATERIALS[fabricClass] || FABRIC_MATERIALS.STRUCTURED;
+  root.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+    const materials = (Array.isArray(object.material) ? object.material : [object.material]).filter(Boolean);
+    const next = materials.map((material) => {
+      const copy = material.clone?.() || new THREE.MeshStandardMaterial();
+      if (copy.color) copy.color.set(color);
+      if ('roughness' in copy) copy.roughness = materialProfile.roughness;
+      if ('metalness' in copy) copy.metalness = materialProfile.metalness;
+      if ('sheen' in copy) copy.sheen = materialProfile.sheen;
+      copy.side = THREE.DoubleSide;
+      copy.needsUpdate = true;
+      return copy;
+    });
+    object.material = Array.isArray(object.material) ? next : next[0];
+  });
+  root.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(root);
+  const center = bounds.getCenter(new THREE.Vector3());
+  root.position.set(-center.x, -center.y, -center.z);
+  return root;
+}
+
+function GarmentModel({ gltf, angle, color, fitScale, fabricClass }) {
+  const garment = useMemo(
+    () => prepareGarment(gltf.scene, color, fabricClass),
+    [gltf.scene, color, fabricClass],
+  );
   return (
-    <group ref={group} rotation={[0, THREE.MathUtils.degToRad(angle), 0]} scale={fitScale}>
-      {kind === 'dress' ? (
-        <>
-          <mesh position={[0, 0.68, 0]} scale={[0.72, 0.62, 0.38]} castShadow>
-            <cylinderGeometry args={[0.62, 0.78, 1.15, 48, 1, true]} />{material}
-          </mesh>
-          <mesh position={[0, -0.25, 0]} scale={[0.95, 1.2, 0.52]} castShadow>
-            <coneGeometry args={[0.95, 1.6, 64, 1, true]} />{material}
-          </mesh>
-        </>
-      ) : null}
-
-      {kind === 'pants' ? (
-        <>
-          <mesh position={[-0.26, -0.15, 0]} scale={[0.28, 1.2, 0.32]} castShadow>
-            <capsuleGeometry args={[0.5, 1.25, 10, 24]} />{material}
-          </mesh>
-          <mesh position={[0.26, -0.15, 0]} scale={[0.28, 1.2, 0.32]} castShadow>
-            <capsuleGeometry args={[0.5, 1.25, 10, 24]} />{material}
-          </mesh>
-          <mesh position={[0, 0.85, 0]} scale={[0.72, 0.34, 0.38]} castShadow>
-            <boxGeometry args={[1, 1, 1]} />{material}
-          </mesh>
-        </>
-      ) : null}
-
-      {kind === 'skirt' ? (
-        <mesh position={[0, 0.12, 0]} scale={[0.88, 1, 0.52]} castShadow>
-          <coneGeometry args={[0.9, 1.7, 64, 1, true]} />{material}
-        </mesh>
-      ) : null}
-
-      {kind === 'bag' ? (
-        <>
-          <mesh position={[0, 0, 0]} scale={[1.05, 0.82, 0.36]} castShadow>
-            <boxGeometry args={[1.2, 1, 0.62]} />{material}
-          </mesh>
-          <mesh position={[0, 0.78, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-            <torusGeometry args={[0.48, 0.06, 18, 48, Math.PI]} />{material}
-          </mesh>
-        </>
-      ) : null}
-
-      {kind === 'shoe' ? (
-        <mesh position={[0, 0, 0]} rotation={[0, 0, -0.04]} scale={[1.35, 0.42, 0.58]} castShadow>
-          <capsuleGeometry args={[0.52, 1.2, 10, 30]} />{material}
-        </mesh>
-      ) : null}
-
-      {kind === 'top' ? (
-        <>
-          <mesh position={[0, 0.3, 0]} scale={[0.82, 0.78, 0.42]} castShadow>
-            <cylinderGeometry args={[0.65, 0.72, 1.25, 48, 1, true]} />{material}
-          </mesh>
-          <mesh position={[-0.78, 0.38, 0]} rotation={[0, 0, -0.2]} scale={[0.2, 0.65, 0.22]} castShadow>
-            <capsuleGeometry args={[0.5, 1.1, 8, 20]} />{material}
-          </mesh>
-          <mesh position={[0.78, 0.38, 0]} rotation={[0, 0, 0.2]} scale={[0.2, 0.65, 0.22]} castShadow>
-            <capsuleGeometry args={[0.5, 1.1, 8, 20]} />{material}
-          </mesh>
-        </>
-      ) : null}
+    <group rotation={[0, THREE.MathUtils.degToRad(angle), 0]} scale={fitScale}>
+      <primitive object={garment} />
     </group>
   );
 }
 
-function fitCategory(category) {
-  const value = String(category || '').toLowerCase();
-  if (value.includes('vest') || value.includes('dress')) return 'DRESS';
-  if (value.includes('cal') || value.includes('pants') || value.includes('jeans') || value.includes('saia') || value.includes('skirt')) return 'PANTS';
-  if (value.includes('bolsa') || value.includes('bag')) return 'BAG';
-  if (value.includes('sap') || value.includes('tênis') || value.includes('tenis') || value.includes('shoe')) return 'FOOTWEAR';
-  if (value.includes('acess') || value.includes('access')) return 'ACCESSORY';
-  return 'TOP';
-}
-
-export default function Garment3DPreview({ category, color, compact = false, reconstructed = false, fabricClass = 'STRUCTURED' }) {
+export default function Garment3DPreview({
+  category,
+  color,
+  compact = false,
+  reconstructed = false,
+  fabricClass = 'STRUCTURED',
+}) {
   const { profile } = useDemo();
   const avatarSpec = useMemo(() => normalizeAvatarSpec(profile), [profile]);
-  const fitProfile = useMemo(() => garmentFitProfile(fitCategory(category), avatarSpec, { fabricClass }), [category, avatarSpec, fabricClass]);
+  const fitProfile = useMemo(
+    () => garmentFitProfile(fitCategory(category), avatarSpec, { fabricClass }),
+    [category, avatarSpec, fabricClass],
+  );
+  const kind = garmentKind(category);
+  const [assets, assetError] = useAssets(ALL_GARMENT_ASSETS);
+  const assetIndex = GARMENT_KEYS.indexOf(kind);
+  const selectedAsset = assets?.[Math.max(0, assetIndex)];
+  const uri = selectedAsset?.localUri || selectedAsset?.uri;
+  const { gltf, error: modelError } = useLocalGltf(uri);
   const [angle, setAngle] = useState(0);
   const start = useRef(0);
   const current = useRef(0);
@@ -119,28 +147,45 @@ export default function Garment3DPreview({ category, color, compact = false, rec
     },
   }), []);
 
+  const error = assetError || modelError;
   return (
     <View style={[styles.wrapper, compact && styles.compact]}>
       <View style={styles.stage} {...controls.panHandlers}>
-        <Canvas camera={{ position: [0, 0.2, 4.8], fov: 38 }} dpr={1.2}>
+        <Canvas camera={{ position: [0, 0.05, 4.5], fov: 36 }} dpr={1.25} gl={{ antialias: true }}>
           <color attach="background" args={['#E8E1DA']} />
           <ambientLight intensity={1.8} />
-          <directionalLight position={[3, 4, 4]} intensity={2.4} />
-          <directionalLight position={[-3, 1, -2]} intensity={1.2} />
-          <GarmentMesh category={category} angle={angle} color={color || '#7A3148'} fitScale={fitProfile.scale} />
+          <hemisphereLight intensity={0.8} color="#FFF7EF" groundColor="#81766D" />
+          <directionalLight position={[3, 4, 4]} intensity={2.6} />
+          <directionalLight position={[-3, 1, -2]} intensity={1.15} />
+          {gltf ? (
+            <GarmentModel
+              gltf={gltf}
+              angle={angle}
+              color={color || '#7A3148'}
+              fitScale={fitProfile.scale}
+              fabricClass={fabricClass}
+            />
+          ) : null}
           <mesh position={[0, -1.55, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[1.45, 48]} />
             <meshStandardMaterial color="#CFC4BA" roughness={0.95} />
           </mesh>
         </Canvas>
         <View style={styles.badge} pointerEvents="none">
-          <Text style={styles.badgeText}>{reconstructed ? 'GLB VALIDADO' : 'PROXY 3D PARAMÉTRICO · AJUSTADO AO AVATAR'}</Text>
+          <Text style={styles.badgeText}>
+            {reconstructed ? 'GLB VALIDADO' : 'PROXY TAILORED 3D · AJUSTADO AO AVATAR'}
+          </Text>
         </View>
+        {error ? <View style={styles.error}><Text style={styles.errorText}>FALHA NO TEMPLATE 3D</Text></View> : null}
       </View>
       {!compact ? (
         <View style={styles.footer}>
-          <Text style={styles.title}>{reconstructed ? 'Geometria reconstruída' : 'Prévia volumétrica da peça'}</Text>
-          <Text style={styles.copy}>{reconstructed ? 'Modelo privado aprovado pelo quality gate.' : `${fitProfile.label} · escala ${fitProfile.scale.map((value) => value.toFixed(2)).join(' × ')}. Prévia proporcional; a reconstrução real substitui este proxy após o quality gate.`}</Text>
+          <Text style={styles.title}>{reconstructed ? 'Geometria reconstruída' : 'Template volumétrico profissional'}</Text>
+          <Text style={styles.copy}>
+            {reconstructed
+              ? 'Modelo privado aprovado pelo quality gate.'
+              : `${fitProfile.label} · ${fitProfile.fabricLabel} · escala ${fitProfile.scale.map((value) => value.toFixed(2)).join(' × ')}. O template é apenas uma prévia; a reconstrução privada substitui esta geometria após o quality gate.`}
+          </Text>
         </View>
       ) : null}
     </View>
@@ -153,6 +198,8 @@ const styles = StyleSheet.create({
   stage: { height: 320, overflow: 'hidden' },
   badge: { position: 'absolute', top: 12, right: 12, backgroundColor: colors.accent, paddingHorizontal: 9, paddingVertical: 6 },
   badgeText: { color: '#FFFFFF', fontSize: 7, fontWeight: '900', letterSpacing: 1 },
+  error: { position: 'absolute', left: 12, bottom: 12, backgroundColor: '#8D2D2D', paddingHorizontal: 9, paddingVertical: 6 },
+  errorText: { color: '#FFFFFF', fontSize: 7, fontWeight: '900', letterSpacing: 0.8 },
   footer: { padding: 13, borderTopWidth: 1, borderColor: '#D9D0C8' },
   title: { color: '#151515', fontFamily: 'serif', fontSize: 18 },
   copy: { color: '#756D66', fontSize: 9, lineHeight: 14, marginTop: 4 },

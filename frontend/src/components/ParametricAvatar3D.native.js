@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, View } from 'react-native';
-import { Canvas } from '@react-three/fiber/native';
+import { Canvas, useThree } from '@react-three/fiber/native';
 import { useAssets } from 'expo-asset';
 import { File } from 'expo-file-system';
 import * as THREE from 'three';
@@ -141,9 +141,22 @@ function ParametricHuman({ bodyGltf, hairGltf, spec, angle }) {
   );
 }
 
-function Studio({ bodyGltf, hairGltf, spec, angle }) {
+function CameraRig({ focus }) {
+  const { camera } = useThree();
+  useEffect(() => {
+    const face = focus === 'ROSTO' || focus === 'CABELO';
+    camera.position.set(0, face ? 1.45 : 0.05, face ? 4.0 : 8.15);
+    camera.lookAt(0, face ? 1.45 : 0, 0);
+    camera.fov = face ? 31 : 36;
+    camera.updateProjectionMatrix();
+  }, [camera, focus]);
+  return null;
+}
+
+function Studio({ bodyGltf, hairGltf, spec, angle, focus }) {
   return (
     <>
+      <CameraRig focus={focus} />
       <color attach="background" args={['#E4DDD5']} />
       <ambientLight intensity={1.5} color="#FFF7EF" />
       <hemisphereLight intensity={1.15} color="#FFF3E8" groundColor="#847A72" />
@@ -159,7 +172,7 @@ function Studio({ bodyGltf, hairGltf, spec, angle }) {
   );
 }
 
-export default function ParametricAvatar3D({ profile, spec: providedSpec, compact = false }) {
+export default function ParametricAvatar3D({ profile, spec: providedSpec, compact = false, focus = 'CORPO' }) {
   const spec = useMemo(() => providedSpec || normalizeAvatarSpec(profile), [profile, providedSpec]);
   const [assets, assetError] = useAssets(ALL_ASSETS);
   const bodyUri = assets?.[0]?.localUri || assets?.[0]?.uri;
@@ -196,7 +209,7 @@ export default function ParametricAvatar3D({ profile, spec: providedSpec, compac
         {...panResponder.panHandlers}
       >
         <Canvas camera={{ position: [0, 0.05, 8.15], fov: 36 }} shadows="basic" dpr={1.4} gl={{ antialias: true, alpha: false }}>
-          {bodyGltf ? <Studio bodyGltf={bodyGltf} hairGltf={hairGltf} spec={spec} angle={angle} /> : null}
+          {bodyGltf ? <Studio bodyGltf={bodyGltf} hairGltf={hairGltf} spec={spec} angle={angle} focus={focus} /> : null}
         </Canvas>
 
         <View style={styles.heading} pointerEvents="none">
@@ -216,7 +229,7 @@ export default function ParametricAvatar3D({ profile, spec: providedSpec, compac
       <View style={styles.footer}>
         <View>
           <Text style={styles.footerTitle}>ROTAÇÃO {Math.round(angle)}°</Text>
-          <Text style={styles.footerCopy}>Face, corpo, cabelo e proporções atualizam em tempo real.</Text>
+          <Text style={styles.footerCopy}>{focus === 'CORPO' ? 'Corpo completo e medidas em tempo real.' : focus === 'ROSTO' ? 'Zoom facial para ajuste fino de traços.' : 'Zoom de cabeça para cabelo, olhos e aparência.'}</Text>
         </View>
         <View style={styles.engineBadge}><Text style={styles.engineText}>MAKEHUMAN · CC0</Text></View>
       </View>

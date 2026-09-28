@@ -110,3 +110,96 @@ Gates:
 MakeHuman é o default por controle, licença CC0 e ausência de lock-in.
 Avaturn fica como rota premium/realista; API/SDK comercial depende de credenciais e plano do fornecedor.
 A camada provider existe justamente para permitir troca futura sem reescrever domínio, perfil ou composição.
+
+## V4 implementation slice — 2026-09-28
+
+### PO / Project Lead
+The 3D promise is split into three explicit product levels:
+1. Avatar Paramétrico Profissional — controllable identity using MakeHuman/MPFB CC0, real morph targets and modular hair.
+2. Avatar Realista por Fotos — optional premium route through a provider adapter; current adapter target is Avaturn.
+3. Peça 3D — an immediate tailored proxy for UX continuity, replaced by the authenticated private reconstructed GLB only after the reconstruction quality gate.
+
+This avoids presenting a generic proxy as if it were the customer's real body or garment.
+
+### Tech Lead / Architecture
+The avatar renderer remains provider-agnostic. avatarSpec is the stable domain contract; renderer/provider implementations can change without rewriting wardrobe/Looks/reconstruction domains.
+
+A backend Avaturn adapter now:
+- keeps the provider token server-side;
+- creates pseudonymous external identities;
+- issues short-lived provider sessions;
+- requires HTTPS;
+- rate-limits session creation;
+- does not persist raw face/body photos in the identity mapping.
+
+The provider identity table stores only person_id, provider and external user id.
+
+### UX / Product Design
+Avatar Studio now changes camera framing by editing task:
+- CORPO: full body;
+- ROSTO: facial close-up;
+- CABELO: head/hair close-up.
+
+Additional controls expose arm length, calves, glutes, chin projection, nose bridge, eye height and eye color. The premium photo-realistic route is visible from the same studio instead of being hidden in an unrelated settings screen.
+
+### Mobile
+The local MakeHuman runtime contains 306 morph targets on the body mesh plus compatible eye/teeth/tongue morphs.
+
+The garment instant preview no longer uses React Three primitive shapes directly. TI Broker now ships original Blender-generated GLB templates for:
+- top;
+- pants;
+- skirt;
+- dress;
+- bag;
+- shoe.
+
+Each template:
+- is self-contained GLB;
+- receives avatar measurement scaling;
+- receives fabric-class material tuning;
+- is explicitly labelled as a tailored proxy.
+
+Connected mode now checks for a READY reconstruction job for a wardrobe item. If one exists, the wardrobe detail loads the authenticated private GLB output instead of labeling the proxy as reconstructed.
+
+### Backend / Data
+A provider session route exists at POST /api/avatar/realistic/session.
+
+Persistent provider credentials remain server-only.
+
+Reconstructed garment output remains GET /api/reconstruction/jobs/:jobId/output.
+
+The latter is authorization-protected, integrity-checked and served as model/gltf-binary.
+
+### 3D / Reconstruction
+Garment proxy materials react to declared fabric class:
+- RIGID;
+- STRUCTURED;
+- KNIT;
+- FLUID.
+
+The private reconstruction pipeline remains authoritative for actual garment geometry. The proxy is never reconstruction-equivalent.
+
+### Security / Privacy
+- provider session URL must be HTTPS;
+- provider token is not exposed in Expo configuration;
+- raw photos are not persisted in avatar_provider_identities;
+- reconstructed GLBs remain authenticated/private;
+- unknown-provenance human mesh remains blocked from production;
+- generated garment proxy templates are TI Broker-owned procedural assets and are not presented as captured garments.
+
+### QA / Release
+New gates added:
+- Avaturn adapter tests;
+- all garment proxy GLBs must be valid self-contained GLB 2.0;
+- advanced avatar controls must map to existing morph names;
+- wardrobe detail must distinguish proxy from private READY output;
+- Android bundle must include parametric human, hair and garment GLBs.
+
+### Provider research boundary
+Current provider decision remains:
+- MakeHuman/MPFB: default controlled local base because core graphical assets are CC0 and the target system supports extensive face/body deformation.
+- Avaturn: optional realistic/photo route because it exposes embeddable SDK/API sessions and avatar GLB export, but it is a paid external dependency.
+- SMPL-X: not used as default because the public research model license is non-commercial without a separate commercial license.
+- MetaHuman: not used as default because the content/runtime path is Unreal-centered and mismatched with the Expo/React Native product.
+
+No provider result is described as biometric identity, medically accurate body measurement, guaranteed size recommendation or physical cloth simulation.

@@ -3544,6 +3544,84 @@ paths:
               required:
                 - planId
       deprecated: true
+  /avatar/realistic/session:
+    post:
+      summary: Criar sessão temporária para avatar realista
+      description: Cria uma sessão server-side no provedor de avatar realista para a pessoa autenticada. Tokens do provedor e fotos cruas não são retornados nem persistidos neste contrato.
+      operationId: post__avatar_realistic_session
+      security:
+        - bearerAuth: []
+      parameters: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                avatarId:
+                  type: string
+                  nullable: true
+                  pattern: "^[A-Za-z0-9_-]{1,160}$"
+      responses:
+        "200":
+          description: Sessão temporária criada
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - provider
+                  - sessionId
+                  - url
+                  - shortLived
+                properties:
+                  provider:
+                    type: string
+                    enum:
+                      - AVATURN
+                  sessionId:
+                    type: string
+                  url:
+                    type: string
+                    format: uri
+                  shortLived:
+                    type: boolean
+        "400":
+          description: Entrada inválida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Autenticação necessária
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Limite de criação de sessão atingido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          description: Falha no provedor externo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Provedor não configurado neste ambiente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /profile:
     get:
       summary: Perfil pessoal e referência privada de mídia

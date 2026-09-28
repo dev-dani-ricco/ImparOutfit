@@ -69,7 +69,9 @@ test('garment preview distinguishes proxy geometry from reconstructed GLB', () =
   const form = read('src/screens/ItemFormScreen.js');
   const item = read('src/screens/WardrobeItemScreen.js');
 
-  assert.match(garment, /PROXY 3D PARAMÉTRICO/);
+  assert.match(garment, /PROXY TAILORED 3D/);
+  for (const asset of ['top.glb', 'pants.glb', 'skirt.glb', 'dress.glb', 'bag.glb', 'shoe.glb']) assert.match(garment, new RegExp(asset.replace('.', '\\.')));
+  assert.match(garment, /FABRIC_MATERIALS/);
   assert.match(garment, /GLB VALIDADO/);
   assert.match(form, /quality gate/);
   assert.match(item, /Garment3DPreview/);

@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import ParametricAvatar3D from '../components/ParametricAvatar3D';
 import {
   FACE_SHAPES,
+  EYE_COLORS,
   HAIR_COLORS,
   HAIR_STYLES,
   SKIN_TONES,
@@ -70,7 +71,7 @@ export default function AvatarStudioScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <ParametricAvatar3D profile={liveProfile} spec={spec} />
+        <ParametricAvatar3D profile={liveProfile} spec={spec} focus={section} />
 
         <View style={styles.tabs}>
           {SECTIONS.map((item) => (
@@ -107,7 +108,12 @@ export default function AvatarStudioScreen({ navigation }) {
             <MorphControl label="TÓRAX" value={spec.body.chest} left="Estreito" right="Profundo" onChange={(value) => updateBody('chest', value)} />
             <MorphControl label="CINTURA 3D" value={spec.body.waist} left="Marcada" right="Ampla" onChange={(value) => updateBody('waist', value)} />
             <MorphControl label="QUADRIL 3D" value={spec.body.hips} left="Estreito" right="Amplo" onChange={(value) => updateBody('hips', value)} />
+            <MorphControl label="ABDÔMEN" value={spec.body.belly} left="Definido" right="Mais volume" onChange={(value) => updateBody('belly', value)} />
+            <MorphControl label="BRAÇOS" value={spec.body.arms} left="Finos" right="Volumosos" onChange={(value) => updateBody('arms', value)} />
+            <MorphControl label="COMPRIMENTO DOS BRAÇOS" value={spec.body.armsLength} left="Curtos" right="Longos" onChange={(value) => updateBody('armsLength', value)} />
             <MorphControl label="COXAS" value={spec.body.thighs} left="Finas" right="Volumosas" onChange={(value) => updateBody('thighs', value)} />
+            <MorphControl label="PANTURRILHAS" value={spec.body.calves} left="Finas" right="Volumosas" onChange={(value) => updateBody('calves', value)} />
+            <MorphControl label="GLÚTEOS" value={spec.body.glutes} left="Discretos" right="Projetados" onChange={(value) => updateBody('glutes', value)} />
             <MorphControl label="COMPRIMENTO DAS PERNAS" value={spec.body.legsLength} left="Curtas" right="Longas" onChange={(value) => updateBody('legsLength', value)} />
           </View>
         ) : null}
@@ -121,17 +127,21 @@ export default function AvatarStudioScreen({ navigation }) {
             <MorphControl label="LARGURA DO ROSTO" value={spec.face.width} left="Estreito" right="Largo" onChange={(value) => updateFace('width', value)} />
             <MorphControl label="MANDÍBULA" value={spec.face.jaw} left="Delicada" right="Marcada" onChange={(value) => updateFace('jaw', value)} />
             <MorphControl label="QUEIXO" value={spec.face.chin} left="Curto" right="Longo" onChange={(value) => updateFace('chin', value)} />
+            <MorphControl label="PROJEÇÃO DO QUEIXO" value={spec.face.chinProjection} left="Recuado" right="Projetado" onChange={(value) => updateFace('chinProjection', value)} />
             <MorphControl label="MAÇÃS DO ROSTO" value={spec.face.cheek} left="Definidas" right="Cheias" onChange={(value) => updateFace('cheek', value)} />
             <MorphControl label="TESTA" value={spec.face.forehead} left="Baixa" right="Alta" onChange={(value) => updateFace('forehead', value)} />
+            <MorphControl label="PONTE DO NARIZ" value={spec.face.noseBridge} left="Estreita" right="Larga" onChange={(value) => updateFace('noseBridge', value)} />
             <MorphControl label="LARGURA DO NARIZ" value={spec.face.noseWidth} left="Estreito" right="Largo" onChange={(value) => updateFace('noseWidth', value)} />
             <MorphControl label="COMPRIMENTO DO NARIZ" value={spec.face.noseLength} left="Curto" right="Longo" onChange={(value) => updateFace('noseLength', value)} />
             <MorphControl label="PROJEÇÃO DO NARIZ" value={spec.face.noseProjection} left="Recuado" right="Projetado" onChange={(value) => updateFace('noseProjection', value)} />
             <MorphControl label="TAMANHO DOS OLHOS" value={spec.face.eyesSize} left="Pequenos" right="Grandes" onChange={(value) => updateFace('eyesSize', value)} />
             <MorphControl label="ESPAÇAMENTO DOS OLHOS" value={spec.face.eyesSpacing} left="Próximos" right="Afastados" onChange={(value) => updateFace('eyesSpacing', value)} />
+            <MorphControl label="ALTURA DOS OLHOS" value={spec.face.eyesHeight} left="Baixos" right="Altos" onChange={(value) => updateFace('eyesHeight', value)} />
             <MorphControl label="LARGURA DA BOCA" value={spec.face.mouthWidth} left="Estreita" right="Larga" onChange={(value) => updateFace('mouthWidth', value)} />
             <MorphControl label="VOLUME DOS LÁBIOS" value={spec.face.lipFullness} left="Finos" right="Volumosos" onChange={(value) => updateFace('lipFullness', value)} />
 
             <ColorRow label="TOM DE PELE" colors={SKIN_TONES} value={spec.appearance.skinTone} onChange={(value) => updateAppearance('skinTone', value)} />
+            <ColorRow label="COR DOS OLHOS" colors={EYE_COLORS} value={spec.appearance.eyeColor} onChange={(value) => updateAppearance('eyeColor', value)} />
           </View>
         ) : null}
 
@@ -155,6 +165,17 @@ export default function AvatarStudioScreen({ navigation }) {
             <ColorRow label="COR DO CABELO" colors={HAIR_COLORS} value={spec.appearance.hairColor} onChange={(value) => updateAppearance('hairColor', value)} />
           </View>
         ) : null}
+
+        <View style={styles.realisticCard}>
+          <View style={styles.realisticCopy}>
+            <Text style={styles.realisticTag}>ROTA PREMIUM · FOTOS</Text>
+            <Text style={styles.realisticTitle}>Quer mais semelhança facial?</Text>
+            <Text style={styles.realisticText}>Use o Avatar Realista para gerar uma identidade 3D a partir de fotos com provedor especializado. O avatar paramétrico continua sendo o modo controlável e sem lock-in.</Text>
+          </View>
+          <Pressable style={styles.realisticButton} onPress={() => navigation.navigate('Avatar Realista')}>
+            <Text style={styles.realisticButtonText}>ABRIR AVATAR REALISTA →</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.quality}>
           <Text style={styles.qualityTag}>QUALIDADE E LIMITES</Text>
@@ -259,6 +280,13 @@ const styles = StyleSheet.create({
   hairGlyph: { width: 30, height: 34, borderTopLeftRadius: 15, borderTopRightRadius: 15, borderBottomLeftRadius: 9, borderBottomRightRadius: 9 },
   hairLabel: { color: '#756B63', fontSize: 7, fontWeight: '800', marginTop: 7 },
   hairLabelActive: { color: colors.accent },
+  realisticCard: { marginTop: 18, backgroundColor: '#111112', padding: 16, borderWidth: 1, borderColor: '#2B2927' },
+  realisticCopy: { marginBottom: 13 },
+  realisticTag: { color: colors.gold, fontSize: 7, fontWeight: '900', letterSpacing: 1.1 },
+  realisticTitle: { color: '#FFFFFF', fontFamily: 'serif', fontSize: 24, marginTop: 5 },
+  realisticText: { color: '#B9B0A7', fontSize: 9, lineHeight: 15, marginTop: 5 },
+  realisticButton: { borderWidth: 1, borderColor: colors.gold, padding: 12, alignItems: 'center' },
+  realisticButtonText: { color: colors.gold, fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },
   quality: { marginTop: 18, backgroundColor: '#ECE5DE', borderLeftWidth: 3, borderLeftColor: colors.gold, padding: 15 },
   qualityTag: { color: colors.gold, fontSize: 7, fontWeight: '900', letterSpacing: 1.1 },
   qualityText: { color: '#615950', fontSize: 9, lineHeight: 15, marginTop: 5 },

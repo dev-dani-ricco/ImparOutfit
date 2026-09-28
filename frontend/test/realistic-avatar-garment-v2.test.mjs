@@ -43,3 +43,32 @@ test('garment capture records fabric behavior for the 3D fit preview',()=>{
  assert.match(form,/fabricClass=\{fabricClass\}/);
  assert.match(detail,/item\.fabricClass/);
 });
+
+test('professional avatar studio exposes advanced anatomical controls and focus zoom',()=>{
+ const domain=fs.readFileSync(new URL('../src/avatar/avatarSpec.mjs',import.meta.url),'utf8');
+ const studio=fs.readFileSync(new URL('../src/screens/AvatarStudioScreen.js',import.meta.url),'utf8');
+ const renderer=fs.readFileSync(new URL('../src/components/ParametricAvatar3D.native.js',import.meta.url),'utf8');
+ for(const control of ['armsLength','calves','glutes','chinProjection','noseBridge','eyesHeight']) assert.match(domain,new RegExp(control));
+ for(const label of ['COMPRIMENTO DOS BRAÇOS','PANTURRILHAS','GLÚTEOS','PROJEÇÃO DO QUEIXO','PONTE DO NARIZ','ALTURA DOS OLHOS','COR DOS OLHOS']) assert.match(studio,new RegExp(label));
+ assert.match(renderer,/CameraRig/);
+ assert.match(renderer,/focus === 'ROSTO'/);
+ assert.match(studio,/Avatar Realista/);
+});
+
+test('professional garment preview uses GLB templates and fabric-aware materials',()=>{
+ const preview=fs.readFileSync(new URL('../src/components/Garment3DPreview.native.js',import.meta.url),'utf8');
+ for(const asset of ['top.glb','pants.glb','skirt.glb','dress.glb','bag.glb','shoe.glb']) assert.match(preview,new RegExp(asset.replace('.', '\\.')));
+ for(const fabric of ['RIGID','STRUCTURED','KNIT','FLUID']) assert.match(preview,new RegExp(fabric));
+ assert.match(preview,/GLTFLoader/);
+ assert.match(preview,/PROXY TAILORED 3D/);
+});
+
+test('wardrobe uses authenticated private GLB only for READY reconstruction jobs',()=>{
+ const screen=fs.readFileSync(new URL('../src/screens/WardrobeItemScreen.js',import.meta.url),'utf8');
+ const privateRenderer=fs.readFileSync(new URL('../src/components/PrivateGarment3D.native.js',import.meta.url),'utf8');
+ assert.match(screen,/job\.wardrobe_item_id === item\.id && job\.state === 'READY'/);
+ assert.match(screen,/PrivateGarment3D jobId=\{readyJob\.id\} token=\{token\}/);
+ assert.match(privateRenderer,/Authorization: 'Bearer ' \+ token/);
+ assert.match(privateRenderer,/\/reconstruction\/jobs\/.*\/output/);
+ assert.match(privateRenderer,/GLB PRIVADO · QUALITY GATE APROVADO/);
+});

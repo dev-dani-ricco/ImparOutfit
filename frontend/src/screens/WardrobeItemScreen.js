@@ -1,18 +1,41 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Garment3DPreview from '../components/Garment3DPreview';
+import PrivateGarment3D from '../components/PrivateGarment3D';
+import { api } from '../api/client';
+import { useAuth } from '../contexts/AuthContext';
 import { useDemo } from '../contexts/DemoContext';
 import { colors } from '../theme/colors';
 
 export default function WardrobeItemScreen({ route }) {
   const { stores, wardrobe, commercialSaves } = useDemo();
+  const { token, demoMode } = useAuth();
   const [mode, setMode] = useState('2d');
+  const [readyJob, setReadyJob] = useState(null);
   const publishedItem = stores
     .flatMap((store) => store.items)
     .find((piece) => piece.id === route.params?.storeItemId);
   const item = publishedItem
     || wardrobe.find((piece) => piece.id === route.params?.itemId)
     || Object.values(commercialSaves).find(piece=>piece.id===route.params?.itemId || piece.legacyWardrobeId===route.params?.itemId);
+  useEffect(() => {
+    let cancelled = false;
+    if (!item?.id || demoMode || !token || publishedItem) {
+      setReadyJob(null);
+      return () => { cancelled = true; };
+    }
+    api('/reconstruction/jobs', { token })
+      .then((jobs) => {
+        if (cancelled) return;
+        const match = jobs.find((job) => job.wardrobe_item_id === item.id && job.state === 'READY');
+        setReadyJob(match || null);
+      })
+      .catch(() => {
+        if (!cancelled) setReadyJob(null);
+      });
+    return () => { cancelled = true; };
+  }, [item?.id, demoMode, token, publishedItem]);
+
   if(!item)return <View style={styles.content}><Text>Peça não encontrada.</Text></View>;
 
   return (
@@ -32,8 +55,10 @@ export default function WardrobeItemScreen({ route }) {
           <Image source={item.image} style={styles.image} resizeMode="contain" />
           <Text style={styles.modeBadge}>VISUALIZAÇÃO 2D ✓</Text>
         </View>
+      ) : readyJob ? (
+        <PrivateGarment3D jobId={readyJob.id} token={token} />
       ) : (
-        <Garment3DPreview category={item.category || item.subcategory} fabricClass={item.fabricClass || 'STRUCTURED'} reconstructed={item.model3d?.status === 'READY'} />
+        <Garment3DPreview category={item.category || item.subcategory} fabricClass={item.fabricClass || 'STRUCTURED'} />
       )}
       <View style={styles.data}>
         <Data label="Categoria" value={item.category} />
@@ -44,10 +69,11 @@ export default function WardrobeItemScreen({ route }) {
         <Data label="Relação" value={publishedItem || item.kind!=='OWNED_ITEM' ? 'Referência comercial' : 'Peça catalogada como possuída'} />
         <Data label="Origem" value={item.source || 'Ateliê Aurora'} />
         <Data label="Fotos de referência" value={`${item.model3d?.angles || 0} ângulos registrados`} />
+        <Data label="Geometria 3D" value={readyJob ? 'Reconstrução privada aprovada' : 'Template/proxy proporcional'} />
       </View>
       <View style={styles.required}>
         <Text style={styles.requiredTitle}>PADRÃO DO ARMÁRIO INTELIGENTE</Text>
-        <Text style={styles.requiredText}>O proxy 3D mostra volume aproximado por categoria. Quando a reconstrução real for aprovada pelo quality gate, o GLB privado substitui o proxy.</Text>
+        <Text style={styles.requiredText}>{readyJob ? 'Esta peça está exibindo o GLB privado aprovado pelo quality gate. O arquivo é carregado somente com a sessão autenticada.' : 'O template 3D mostra volume proporcional por categoria, medidas e tecido. Ele não é apresentado como reconstrução real; após o quality gate, o GLB privado passa a ser a geometria exibida.'}</Text>
       </View>
     </ScrollView>
   );

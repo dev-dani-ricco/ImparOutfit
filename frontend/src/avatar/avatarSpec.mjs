@@ -15,6 +15,7 @@ export const FACE_SHAPES = [
 
 export const SKIN_TONES = ['#F4D7C4','#E8BDA2','#D79B76','#B97855','#875139','#4E2E23'];
 export const HAIR_COLORS = ['#1F1714','#3B271E','#6A452D','#A56C3F','#D5B17A','#7B2C23'];
+export const EYE_COLORS = ['#2E211B','#4E382D','#6C5439','#6A7652','#4B6975','#718CA3'];
 
 const clamp01 = (value) => Math.min(1, Math.max(0, Number.isFinite(Number(value)) ? Number(value) : 0.5));
 const numberFrom = (value, fallback) => {
@@ -58,7 +59,10 @@ export function normalizeAvatarSpec(profile = {}) {
       hips: clamp01(body.hips ?? 0.55),
       belly: clamp01(body.belly ?? 0.42),
       arms: clamp01(body.arms ?? 0.48),
+      armsLength: clamp01(body.armsLength ?? 0.5),
       thighs: clamp01(body.thighs ?? 0.5),
+      calves: clamp01(body.calves ?? 0.5),
+      glutes: clamp01(body.glutes ?? 0.5),
       legsLength: clamp01(body.legsLength ?? 0.5),
     },
     face: {
@@ -66,13 +70,16 @@ export function normalizeAvatarSpec(profile = {}) {
       width: clamp01(face.width ?? 0.5),
       jaw: clamp01(face.jaw ?? 0.45),
       chin: clamp01(face.chin ?? 0.5),
+      chinProjection: clamp01(face.chinProjection ?? 0.5),
       cheek: clamp01(face.cheek ?? 0.5),
       forehead: clamp01(face.forehead ?? 0.5),
+      noseBridge: clamp01(face.noseBridge ?? 0.5),
       noseWidth: clamp01(face.noseWidth ?? 0.5),
       noseLength: clamp01(face.noseLength ?? 0.5),
       noseProjection: clamp01(face.noseProjection ?? 0.5),
       eyesSize: clamp01(face.eyesSize ?? 0.5),
       eyesSpacing: clamp01(face.eyesSpacing ?? 0.5),
+      eyesHeight: clamp01(face.eyesHeight ?? 0.5),
       mouthWidth: clamp01(face.mouthWidth ?? 0.5),
       lipFullness: clamp01(face.lipFullness ?? 0.5),
     },
@@ -124,7 +131,10 @@ export function avatarMorphWeights(spec) {
   add(pair(spec.body.hips, 'hipsWider', 'hipsNarrower', 0.72));
   add(pair(spec.body.belly, 'bellyBigger', 'bellyToned', 0.55));
   add(pair(spec.body.arms, 'armsThicker', 'armsThinner', 0.58));
+  add(pair(spec.body.armsLength, 'armsLonger', 'armsShorter', 0.44));
   add(pair(spec.body.thighs, 'thighsThicker', 'thighsThinner', 0.58));
+  add(pair(spec.body.calves, 'calvesThicker', 'calvesThinner', 0.52));
+  add(pair(spec.body.glutes, 'gluteusBigger', 'gluteusSmaller', 0.54));
   add(pair(spec.body.legsLength, 'legsLonger', 'legsShorter', 0.48));
 
   const bustDelta = (spec.measurements.bust - 94) / 28;
@@ -149,13 +159,16 @@ export function avatarMorphWeights(spec) {
   add(pair(spec.face.width, 'headWider', 'headNarrower', 0.62));
   add(pair(spec.face.jaw, 'jawWider', 'jawNarrower', 0.65));
   add(pair(spec.face.chin, 'jawChinLonger', 'jawChinShorter', 0.55));
+  add(pair(spec.face.chinProjection, 'jawChinForward', 'jawChinBack', 0.5));
   add(symmetricPair(spec.face.cheek, 'cheekFullerLeft', 'cheekFullerRight', 'cheekHollowLeft', 'cheekHollowRight', 0.55));
   add(pair(spec.face.forehead, 'foreheadTaller', 'foreheadShorter', 0.52));
+  add(pair(spec.face.noseBridge, 'noseBridgeWider', 'noseBridgeNarrower', 0.5));
   add(pair(spec.face.noseWidth, 'noseWider', 'noseNarrower', 0.62));
   add(pair(spec.face.noseLength, 'noseLonger', 'noseShorter', 0.6));
   add(pair(spec.face.noseProjection, 'noseForward', 'noseBackward', 0.52));
   add(symmetricPair(spec.face.eyesSize, 'eyeBiggerLeft', 'eyeBiggerRight', 'eyeSmallerLeft', 'eyeSmallerRight', 0.5));
   add(symmetricPair(spec.face.eyesSpacing, 'eyeOutwardLeft', 'eyeOutwardRight', 'eyeInwardLeft', 'eyeInwardRight', 0.48));
+  add(symmetricPair(spec.face.eyesHeight, 'eyeHigherLeft', 'eyeHigherRight', 'eyeLowerLeft', 'eyeLowerRight', 0.42));
   add(pair(spec.face.mouthWidth, 'mouthWider', 'mouthNarrower', 0.52));
 
   const lips = signed(spec.face.lipFullness) * 0.56;
