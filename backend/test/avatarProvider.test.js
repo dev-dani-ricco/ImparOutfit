@@ -21,8 +21,10 @@ test('avatar provider creates anonymous user and HTTPS session', async () => {
   const oldToken = process.env.AVATURN_API_TOKEN;
   const oldBase = process.env.AVATURN_API_BASE;
   const oldFetch = globalThis.fetch;
+  const oldAllowed = process.env.AVATURN_ALLOWED_SESSION_HOST_SUFFIX;
   process.env.AVATURN_API_TOKEN = 'test-token';
   process.env.AVATURN_API_BASE = 'https://provider.example/api/v1';
+  process.env.AVATURN_ALLOWED_SESSION_HOST_SUFFIX = '.example';
 
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -54,6 +56,8 @@ test('avatar provider creates anonymous user and HTTPS session', async () => {
     else process.env.AVATURN_API_TOKEN = oldToken;
     if (oldBase === undefined) delete process.env.AVATURN_API_BASE;
     else process.env.AVATURN_API_BASE = oldBase;
+    if (oldAllowed === undefined) delete process.env.AVATURN_ALLOWED_SESSION_HOST_SUFFIX;
+    else process.env.AVATURN_ALLOWED_SESSION_HOST_SUFFIX = oldAllowed;
   }
 });
 
@@ -61,8 +65,10 @@ test('avatar provider rejects insecure persistent session URLs', async () => {
   const oldToken = process.env.AVATURN_API_TOKEN;
   const oldBase = process.env.AVATURN_API_BASE;
   const oldFetch = globalThis.fetch;
+  const oldAllowed = process.env.AVATURN_ALLOWED_SESSION_HOST_SUFFIX;
   process.env.AVATURN_API_TOKEN = 'test-token';
   process.env.AVATURN_API_BASE = 'https://provider.example/api/v1';
+  process.env.AVATURN_ALLOWED_SESSION_HOST_SUFFIX = '.example';
   globalThis.fetch = async () => new Response(JSON.stringify({ id: 'session-1', url: 'http://unsafe.example/session' }), { status: 200, headers: { 'content-type': 'application/json' } });
 
   try {
@@ -73,5 +79,7 @@ test('avatar provider rejects insecure persistent session URLs', async () => {
     else process.env.AVATURN_API_TOKEN = oldToken;
     if (oldBase === undefined) delete process.env.AVATURN_API_BASE;
     else process.env.AVATURN_API_BASE = oldBase;
+    if (oldAllowed === undefined) delete process.env.AVATURN_ALLOWED_SESSION_HOST_SUFFIX;
+    else process.env.AVATURN_ALLOWED_SESSION_HOST_SUFFIX = oldAllowed;
   }
 });

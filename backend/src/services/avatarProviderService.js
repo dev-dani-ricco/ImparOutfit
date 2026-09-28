@@ -3,7 +3,8 @@ const DEFAULT_BASE = 'https://api.avaturn.me/api/v1';
 function providerConfig() {
   const token = String(process.env.AVATURN_API_TOKEN || '').trim();
   const baseUrl = String(process.env.AVATURN_API_BASE || DEFAULT_BASE).replace(/\/+$/, '');
-  return { token, baseUrl };
+  const allowedSessionHostSuffix = String(process.env.AVATURN_ALLOWED_SESSION_HOST_SUFFIX || '.avaturn.dev').trim().toLowerCase();
+  return { token, baseUrl, allowedSessionHostSuffix };
 }
 
 export function avaturnConfigured() {
@@ -50,6 +51,7 @@ export async function createAvaturnUser() {
 }
 
 export async function createAvaturnSession(userId, { avatarId = null } = {}) {
+  const { allowedSessionHostSuffix } = providerConfig();
   const config = avatarId
     ? { type: 'edit_existing', avatar_id: avatarId }
     : { type: 'create_or_edit_existing' };
@@ -66,7 +68,12 @@ export async function createAvaturnSession(userId, { avatarId = null } = {}) {
     parsed = null;
   }
 
-  if (!parsed || parsed.protocol !== 'https:' || !data?.id) {
+  const host = parsed?.hostname?.toLowerCase() || '';
+  const hostAllowed = allowedSessionHostSuffix
+    ? host.endsWith(allowedSessionHostSuffix) || host === allowedSessionHostSuffix.replace(/^\./, '')
+    : false;
+
+  if (!parsed || parsed.protocol !== 'https:' || !hostAllowed || !data?.id) {
     const error = new Error('AVATURN_INVALID_SESSION_RESPONSE');
     error.code = 'AVATURN_INVALID_SESSION_RESPONSE';
     throw error;
