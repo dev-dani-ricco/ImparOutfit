@@ -35,3 +35,11 @@ test('garment fit v3 reacts to body measurements and fabric class',()=>{
  const pants=garmentFitProfile('PANTS',{...base,measurements:{...base.measurements,hips:120}},{fabricClass:'STRUCTURED'});
  assert.ok(pants.scale[0]>1);
 });
+
+test('garment capture records fabric behavior for the 3D fit preview',()=>{
+ const form=fs.readFileSync(new URL('../src/screens/ItemFormScreen.js',import.meta.url),'utf8');
+ const detail=fs.readFileSync(new URL('../src/screens/WardrobeItemScreen.js',import.meta.url),'utf8');
+ for(const fabric of ['RIGID','STRUCTURED','KNIT','FLUID']) assert.match(form,new RegExp(fabric));
+ assert.match(form,/fabricClass=\{fabricClass\}/);
+ assert.match(detail,/item\.fabricClass/);
+});

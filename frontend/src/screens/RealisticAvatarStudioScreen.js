@@ -31,11 +31,28 @@ export default function RealisticAvatarStudioScreen({navigation}){
  const {profile,setProfile}=useDemo();
  const {token,demoMode}=useAuth();
  const configuredProjectUrl=Constants.expoConfig?.extra?.avaturnProjectUrl||'';
- const projectUrl=configuredProjectUrl||(demoMode?'https://demo.avaturn.dev':'');
  const [ready,setReady]=useState(false);
  const [error,setError]=useState('');
  const [consented,setConsented]=useState(false);
- const source=useMemo(()=>projectUrl?({html:html(projectUrl),baseUrl:'https://app.imparoutfit.local'}):null,[projectUrl]);
+ const [sessionUrl,setSessionUrl]=useState('');
+ const [loadingProvider,setLoadingProvider]=useState(false);
+ const source=useMemo(()=>sessionUrl?({html:html(sessionUrl),baseUrl:'https://app.imparoutfit.local'}):null,[sessionUrl]);
+
+ async function continueProvider(){
+  setConsented(true);setError('');setLoadingProvider(true);
+  try{
+   if(!demoMode&&token){
+    const data=await api('/avatar/realistic/session',{token,method:'POST',body:{avatarId:profile.realisticAvatar?.avatarId||null}});
+    setSessionUrl(data.url);
+   }else if(configuredProjectUrl){
+    setSessionUrl(configuredProjectUrl);
+   }else{
+    setError('Avatar realista requer um projeto Avaturn configurado. O avatar paramétrico profissional continua disponível sem fornecedor externo.');
+   }
+  }catch(caught){
+   setError(caught.message||'Não foi possível iniciar o provedor de avatar.');
+  }finally{setLoadingProvider(false);}
+ }
 
  async function onMessage(event){
   let message;
@@ -77,12 +94,12 @@ export default function RealisticAvatarStudioScreen({navigation}){
    <Text style={styles.consentTag}>PRIVACIDADE ANTES DA CAPTURA</Text>
    <Text style={styles.consentTitle}>Suas fotos serão processadas por um provedor externo.</Text>
    <Text style={styles.consentCopy}>Ao continuar, você abrirá o estúdio Avaturn. Fotos faciais/corporais e dados necessários à criação do avatar poderão ser processados por esse provedor. Esta integração é de protótipo; não use dados de terceiros sem autorização.</Text>
-   <Pressable style={styles.consentButton} onPress={()=>setConsented(true)} accessibilityRole="button">
-    <Text style={styles.consentButtonText}>ENTENDO E QUERO CONTINUAR →</Text>
+   <Pressable style={styles.consentButton} onPress={continueProvider} accessibilityRole="button">
+    <Text style={styles.consentButtonText}>{loadingProvider?'CONECTANDO…':'ENTENDO E QUERO CONTINUAR →'}</Text>
    </Pressable>
   </View> : <>
    {error?<View style={styles.error}><Text style={styles.errorText}>{error}</Text></View>:null}
-   <WebView
+   {source?<WebView
     source={source}
     style={styles.web}
     originWhitelist={['https://*']}
@@ -92,7 +109,7 @@ export default function RealisticAvatarStudioScreen({navigation}){
     mediaPlaybackRequiresUserAction={false}
     onMessage={onMessage}
     onError={(e)=>setError(e.nativeEvent.description||'Falha ao abrir o Avatar Studio.')}
-   />
+   />:<View style={styles.providerWait}><Text style={styles.providerWaitText}>{loadingProvider?'Preparando sessão segura…':'Configure o provider realista para liberar esta rota.'}</Text></View>}
   </>}
  </SafeAreaView>;
 }
@@ -105,5 +122,6 @@ const styles=StyleSheet.create({
  notice:{paddingHorizontal:16,paddingVertical:10,backgroundColor:'#EDE5DC'},noticeTitle:{color:colors.accent,fontSize:7,fontWeight:'900',letterSpacing:1},noticeCopy:{color:'#665E57',fontSize:9,lineHeight:14,marginTop:3},
  consent:{margin:16,padding:18,borderWidth:1,borderColor:'#CDBFAF',backgroundColor:'#FBF8F4'},consentTag:{color:colors.gold,fontSize:7,fontWeight:'900',letterSpacing:1.1},consentTitle:{color:'#211B18',fontFamily:'serif',fontSize:24,lineHeight:29,marginTop:7},consentCopy:{color:'#665E57',fontSize:10,lineHeight:16,marginTop:8},consentButton:{marginTop:16,backgroundColor:colors.accent,padding:14,alignItems:'center'},consentButtonText:{color:'#FFF',fontSize:8,fontWeight:'900',letterSpacing:.8},
  error:{padding:10,backgroundColor:'#F5DFDF'},errorText:{color:'#922',fontSize:10},
+ providerWait:{flex:1,alignItems:'center',justifyContent:'center',padding:24,backgroundColor:'#E6DED6'},providerWaitText:{color:'#665E57',fontSize:11,lineHeight:18,textAlign:'center'},
  web:{flex:1,backgroundColor:'#E6DED6'}
 });

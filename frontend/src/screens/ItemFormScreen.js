@@ -16,6 +16,13 @@ import { useDemo } from '../contexts/DemoContext';
 import { demoImages, wardrobeCategories } from '../demo/data';
 import { colors } from '../theme/colors';
 
+const fabricClasses = [
+  { id: 'RIGID', label: 'Rígido', description: 'Jeans, couro, sarja' },
+  { id: 'STRUCTURED', label: 'Estruturado', description: 'Alfaiataria, tricoline' },
+  { id: 'KNIT', label: 'Malha', description: 'Tricô, jersey, stretch' },
+  { id: 'FLUID', label: 'Fluido', description: 'Seda, viscose, cetim' },
+];
+
 const requiredAngles = [
   { id: 'front', label: 'Frente' },
   { id: 'right', label: 'Lado direito' },
@@ -33,6 +40,7 @@ export default function ItemFormScreen({ navigation, route }) {
   const [image, setImage] = useState(null);
   const [angleCaptures, setAngleCaptures] = useState({});
   const [demoCapture, setDemoCapture] = useState(false);
+  const [fabricClass, setFabricClass] = useState('STRUCTURED');
 
   const completedAngles = Object.keys(angleCaptures).length;
   const canSave = Boolean(form.name && category && image && (isStore || ownershipAttested));
@@ -106,6 +114,7 @@ export default function ItemFormScreen({ navigation, route }) {
       size: form.size || 'Não informado',
       source: 'Meu armário',
       image,
+      fabricClass,
       ownershipAttested,
       ownershipSource:demoCapture?'DEMO_CATALOG':'REAL_CAPTURE',
       model3d: {
@@ -206,6 +215,19 @@ export default function ItemFormScreen({ navigation, route }) {
             <Field label="TAMANHO" value={form.size} onChangeText={(value) => update('size', value)} />
           </View>
         </View>
+        <Text style={styles.fieldLabel}>COMPORTAMENTO DO TECIDO</Text>
+        <View style={styles.fabricGrid}>
+          {fabricClasses.map((fabric) => (
+            <Pressable
+              key={fabric.id}
+              style={[styles.fabricButton, fabricClass === fabric.id && styles.fabricActive]}
+              onPress={() => setFabricClass(fabric.id)}
+            >
+              <Text style={[styles.fabricTitle, fabricClass === fabric.id && styles.fabricActiveText]}>{fabric.label}</Text>
+              <Text style={[styles.fabricDescription, fabricClass === fabric.id && styles.fabricActiveText]}>{fabric.description}</Text>
+            </Pressable>
+          ))}
+        </View>
         {isStore ? (
           <Field
             label="PREÇO (R$)"
@@ -248,7 +270,7 @@ export default function ItemFormScreen({ navigation, route }) {
         {demoCapture && image && completedAngles === 4 ? (
           <View style={styles.demoPreview}>
             <Text style={styles.demoPreviewTag}>PROXY 3D • VOLUME POR CATEGORIA</Text>
-            <Garment3DPreview category={category?.label} compact />
+            <Garment3DPreview category={category?.label} fabricClass={fabricClass} compact />
             <Text style={styles.demoPreviewCopy}>Este proxy volumétrico não é a peça reconstruída. Após o processamento e o quality gate, o GLB privado substitui automaticamente esta aproximação.</Text>
           </View>
         ) : null}
@@ -350,6 +372,12 @@ const styles = StyleSheet.create({
   half: { flex: 1 },
   fieldLabel: { color: colors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1.1 },
   input: { borderBottomWidth: 1, borderColor: colors.line, color: colors.text, fontSize: 15, paddingVertical: 10 },
+  fabricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 8, marginBottom: 15 },
+  fabricButton: { width: '48%', borderWidth: 1, borderColor: colors.line, padding: 10 },
+  fabricActive: { backgroundColor: '#151515', borderColor: '#151515' },
+  fabricTitle: { color: colors.text, fontSize: 10, fontWeight: '900' },
+  fabricDescription: { color: colors.muted, fontSize: 7, lineHeight: 11, marginTop: 3 },
+  fabricActiveText: { color: '#FFFFFF' },
   scanCopy: { color: colors.muted, fontSize: 11, lineHeight: 17, marginBottom: 13 },
   angleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   angleButton: { width: '48%', borderWidth: 1, borderColor: colors.line, padding: 13 },

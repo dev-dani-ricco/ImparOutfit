@@ -33,13 +33,14 @@ export default function WardrobeItemScreen({ route }) {
           <Text style={styles.modeBadge}>VISUALIZAÇÃO 2D ✓</Text>
         </View>
       ) : (
-        <Garment3DPreview category={item.category || item.subcategory} reconstructed={item.model3d?.status === 'READY'} />
+        <Garment3DPreview category={item.category || item.subcategory} fabricClass={item.fabricClass || 'STRUCTURED'} reconstructed={item.model3d?.status === 'READY'} />
       )}
       <View style={styles.data}>
         <Data label="Categoria" value={item.category} />
         <Data label="Tipo" value={item.subcategory} />
         <Data label="Cor" value={item.color} />
         <Data label="Tamanho" value={item.size} />
+        <Data label="Tecido 3D" value={item.fabricClass || 'STRUCTURED'} />
         <Data label="Relação" value={publishedItem || item.kind!=='OWNED_ITEM' ? 'Referência comercial' : 'Peça catalogada como possuída'} />
         <Data label="Origem" value={item.source || 'Ateliê Aurora'} />
         <Data label="Fotos de referência" value={`${item.model3d?.angles || 0} ângulos registrados`} />
