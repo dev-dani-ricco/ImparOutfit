@@ -80,4 +80,14 @@ Update group: 97206ee5-6f56-4d37-a821-951b27688422
 Commit: 27b736f57c1f2f916c9d56c9266c199097e249d4
 Platforms: iOS and Android
 
-This hosted EAS baseline predates the latest realistic-avatar / Garment Fit V2 stabilization work. Do not treat the 3D V2 branch as published to EAS until the physical smoke gate is completed.
+This hosted EAS preview baseline predates the final realistic-avatar / Garment Fit V2 production promotion.
+
+## Published production runtime — 2026-09-28
+Channel: production
+Runtime version: 1.0.0
+Update group: cbd838c5-afb2-4487-9e07-ac5d1eff5cfa
+Commit: fe52a0bdeeee6dbf7621fd9fd8f28405b19463d4
+Platforms: iOS and Android
+Message: `Production: Avatar Hibrido + Garment Fit V2 - smoke mobile aprovado`
+
+This is the production EAS runtime approved after the user's physical mobile smoke. It is a demonstrable production runtime, not yet a store-distributed connected binary. The connected distribution remains blocked until a public HTTPS API is deployed and `EXPO_PUBLIC_API_URL` is configured in the EAS production environment.
