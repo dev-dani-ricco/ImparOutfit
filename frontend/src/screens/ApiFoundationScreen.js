@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
 import { colors } from '../theme/colors';
 import ReconstructionScreen from './ReconstructionScreen';
+import ParametricAvatar3D from '../components/ParametricAvatar3D';
+import RealisticAvatar3D from '../components/RealisticAvatar3D';
 
-export default function ApiFoundationScreen() {
+export default function ApiFoundationScreen({navigation}) {
   const [reconstruction,setReconstruction]=useState(false);
   const {token,user,activeContext,switchContext,logout}=useAuth();
   const [data,setData]=useState(null);
@@ -17,6 +20,7 @@ export default function ApiFoundationScreen() {
   const [actionBusy,setActionBusy]=useState(false);
   const [actionError,setActionError]=useState('');
   const reload=useCallback(()=>setRefreshKey(value=>value+1),[]);
+  useFocusEffect(useCallback(()=>{ reload(); },[reload]));
 
   async function createPiece(){
     if(!pieceForm.name.trim()||!pieceForm.category.trim())return;
@@ -94,6 +98,19 @@ export default function ApiFoundationScreen() {
         <Stat label="REFERÊNCIAS" value={saves.length}/>
       </View>
       {actionError?<Text style={styles.actionError}>{actionError}</Text>:null}
+
+      <Section title="Meu avatar" subtitle={profile?.realisticAvatar?.url?'Avatar realista conectado ao seu perfil.':'Avatar paramétrico conectado às suas medidas e preferências.'}>
+        {profile?.realisticAvatar?.url ? <RealisticAvatar3D avatar={profile.realisticAvatar} compact /> : <ParametricAvatar3D profile={profile||{}} compact />}
+        <View style={styles.avatarActions}>
+          <Pressable style={styles.primaryButton} onPress={()=>navigation.navigate('Avatar Studio',{profile})}>
+            <Text style={styles.primaryButtonText}>AJUSTAR AVATAR PARAMÉTRICO</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={()=>navigation.navigate('Avatar Realista',{profile})}>
+            <Text style={styles.secondaryButtonText}>{profile?.realisticAvatar?.url?'ATUALIZAR AVATAR REALISTA':'CRIAR AVATAR REALISTA'}</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.muted}>As configurações ficam vinculadas ao seu perfil autenticado. O avatar realista continua sujeito à qualidade da captura e ao provedor.</Text>
+      </Section>
 
       <Section title="Meu armário" subtitle={wardrobe.length?'Suas peças catalogadas e possuídas.':'Seu armário ainda está vazio.'}>
         {wardrobe.slice(0,5).map(item=><View key={item.id} style={styles.row}>
@@ -188,6 +205,9 @@ const styles=StyleSheet.create({
   choiceTextActive:{color:colors.bg},
   actionError:{fontSize:12,lineHeight:18,color:colors.accent},
   primaryButton:{padding:14,borderRadius:12,backgroundColor:colors.accent},
+  secondaryButton:{padding:14,borderRadius:12,borderWidth:1,borderColor:colors.accent,backgroundColor:colors.bg},
+  secondaryButtonText:{textAlign:'center',fontSize:10,fontWeight:'900',letterSpacing:1,color:colors.accent},
+  avatarActions:{gap:8},
   disabled:{opacity:0.45},
   primaryButtonText:{textAlign:'center',fontSize:10,fontWeight:'900',letterSpacing:1,color:colors.bg},
   link:{fontSize:10,fontWeight:'900',letterSpacing:1,color:colors.accent},

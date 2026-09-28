@@ -3,6 +3,37 @@ import { pool, query } from '../config/db.js';
 import { withMedia } from '../services/imageService.js';
 import { HttpError } from '../utils/http.js';
 
+const unit=Joi.number().min(0).max(1);
+const avatarControlsSchema=Joi.object({
+  face:Joi.object({
+    shape:Joi.string().valid('oval','round','square','diamond','triangular'),
+    width:unit,jaw:unit,chin:unit,cheek:unit,forehead:unit,noseWidth:unit,noseLength:unit,noseProjection:unit,
+    eyesSize:unit,eyesSpacing:unit,mouthWidth:unit,lipFullness:unit
+  }).unknown(false),
+  body:Joi.object({
+    presentation:Joi.string().valid('feminine','masculine','neutral'),
+    weight:unit,muscle:unit,shoulders:unit,chest:unit,waist:unit,hips:unit,belly:unit,arms:unit,thighs:unit,legsLength:unit
+  }).unknown(false),
+  appearance:Joi.object({
+    skinTone:Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/),
+    eyeColor:Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/),
+    hairStyle:Joi.string().valid('buzzed','parted','long','buns'),
+    hairColor:Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/)
+  }).unknown(false)
+}).unknown(false);
+const realisticAvatarSchema=Joi.object({
+  provider:Joi.string().valid('AVATURN').required(),
+  url:Joi.string().uri({scheme:['https']}).max(2048).required(),
+  urlType:Joi.string().max(80).allow('',null),
+  avatarId:Joi.string().max(200).allow('',null),
+  sessionId:Joi.string().max(200).allow('',null),
+  bodyId:Joi.string().max(200).allow('',null),
+  gender:Joi.string().max(80).allow('',null),
+  supportsFaceAnimations:Joi.boolean(),
+  exportedAt:Joi.date().iso(),
+  version:Joi.number().integer().min(1).max(100)
+}).unknown(false);
+
 const profileSchema = Joi.object({
   name: Joi.string().min(2).max(120),
   age: Joi.number().integer().min(13).max(120).allow(null),
@@ -15,6 +46,10 @@ const profileSchema = Joi.object({
   waist: Joi.number().positive().max(300).allow(null),
   hips: Joi.number().positive().max(300).allow(null),
   height: Joi.number().min(80).max(250).allow(null),
+  avatarControls: avatarControlsSchema.allow(null),
+  realisticAvatar: realisticAvatarSchema.allow(null),
+  avatarEngine: Joi.string().valid('makehuman-parametric-v1','avaturn-realistic-v1','PARAMETRIC','AVATURN').allow(null),
+  avatarConfiguredAt: Joi.date().iso().allow(null),
 }).min(1);
 
 const toProfile = (row) => ({
@@ -34,6 +69,10 @@ const toProfile = (row) => ({
   hips: row.hips_cm,
   height: row.height_cm,
   avatarConfig: row.avatar_config,
+  avatarControls: row.avatar_config?.avatarControls || null,
+  realisticAvatar: row.avatar_config?.realisticAvatar || null,
+  avatarEngine: row.avatar_config?.avatarEngine || row.avatar_config?.renderer || null,
+  avatarConfiguredAt: row.avatar_config?.avatarConfiguredAt || null,
   updatedAt: row.updated_at,
 });
 
@@ -106,6 +145,16 @@ export async function updateProfile(req, res) {
     }
     if (Object.hasOwn(value,'hairStyle') && value.hairStyle === null) {
       await client.query("UPDATE customer_profiles SET avatar_config=avatar_config-'hairStyle' WHERE user_id=$1",[req.user.id]);
+    }
+    const avatarPatch={};
+    for(const key of ['avatarControls','realisticAvatar','avatarEngine','avatarConfiguredAt']){
+      if(Object.hasOwn(value,key) && value[key] !== null) avatarPatch[key]=value[key];
+    }
+    if(Object.keys(avatarPatch).length){
+      await client.query('UPDATE customer_profiles SET avatar_config=avatar_config || $2::jsonb,updated_at=now() WHERE user_id=$1',[req.user.id,JSON.stringify(avatarPatch)]);
+    }
+    for(const key of ['avatarControls','realisticAvatar','avatarEngine','avatarConfiguredAt']){
+      if(Object.hasOwn(value,key) && value[key] === null) await client.query('UPDATE customer_profiles SET avatar_config=avatar_config-$2,updated_at=now() WHERE user_id=$1',[req.user.id,key]);
     }
     const row = (await client.query(profileSelect, [req.user.id])).rows[0];
     await client.query('COMMIT');

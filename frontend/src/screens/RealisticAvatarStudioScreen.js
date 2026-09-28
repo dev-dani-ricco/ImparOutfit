@@ -5,6 +5,8 @@ import * as Haptics from 'expo-haptics';
 import {WebView} from 'react-native-webview';
 import {realisticAvatarFromExport} from '../avatar/avatarProvider.mjs';
 import {useDemo} from '../contexts/DemoContext';
+import {useAuth} from '../contexts/AuthContext';
+import {api} from '../api/client';
 import {colors} from '../theme/colors';
 
 function html(projectUrl){
@@ -25,8 +27,10 @@ function html(projectUrl){
  </script></body></html>`;
 }
 
-export default function RealisticAvatarStudioScreen({navigation}){
+export default function RealisticAvatarStudioScreen({navigation,route}){
  const {profile,setProfile}=useDemo();
+ const {token,demoMode}=useAuth();
+ const sourceProfile=route?.params?.profile ? {...profile,...route.params.profile} : profile;
  const projectUrl=Constants.expoConfig?.extra?.avaturnProjectUrl||'https://demo.avaturn.dev';
  const [ready,setReady]=useState(false);
  const [error,setError]=useState('');
@@ -41,10 +45,14 @@ export default function RealisticAvatarStudioScreen({navigation}){
   if(message.type==='EXPORT'){
    try{
     const realisticAvatar=realisticAvatarFromExport(message.payload);
-    const next={...profile,realisticAvatar,avatarConfiguredAt:profile.avatarConfiguredAt||new Date().toISOString(),avatarEngine:'avaturn-realistic-v1'};
+    const configuredAt=sourceProfile.avatarConfiguredAt||new Date().toISOString();
+    const next={...sourceProfile,realisticAvatar,avatarConfiguredAt:configuredAt,avatarEngine:'avaturn-realistic-v1'};
+    if(!demoMode&&token){
+     await api('/profile',{token,method:'PUT',body:{realisticAvatar,avatarConfiguredAt:configuredAt,avatarEngine:'avaturn-realistic-v1'}});
+    }
     setProfile(next);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(()=>{});
-    Alert.alert('Avatar realista salvo','Seu modelo foi vinculado ao IMPAR Outfit e passa a ser a representação principal.',[{text:'VER NO PERFIL',onPress:()=>navigation.goBack()}]);
+    Alert.alert('Avatar realista salvo',demoMode?'Seu modelo foi vinculado ao IMPAR Outfit e passa a ser a representação principal.':'Seu avatar realista foi salvo no seu perfil conectado.',[{text:'VER NO PERFIL',onPress:()=>navigation.goBack()}]);
    }catch(caught){setError(caught.message);}
   }
  }

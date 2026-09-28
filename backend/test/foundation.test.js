@@ -152,6 +152,30 @@ test('store requests require submission and institutional authority; suspension 
   await request(app).get('/api/stores/'+sid).expect(404);
   assert.equal((await auth('get','/auth/me',A)).body.contexts.length,0);
 });
+test('profile persists private parametric and realistic avatar configuration without leaking across persons',async()=>{
+  const payload={
+    avatarEngine:'avaturn-realistic-v1',
+    avatarConfiguredAt:'2026-09-28T15:00:00.000Z',
+    avatarControls:{
+      body:{presentation:'feminine',weight:0.48,shoulders:0.55},
+      face:{shape:'oval',width:0.5,jaw:0.45},
+      appearance:{skinTone:'#D79B76',eyeColor:'#4E382D',hairStyle:'parted',hairColor:'#3B271E'}
+    },
+    realisticAvatar:{provider:'AVATURN',url:'https://example.com/private-avatar.glb',avatarId:'synthetic-avatar',bodyId:'synthetic-body',supportsFaceAnimations:false,exportedAt:'2026-09-28T15:00:00.000Z',version:1}
+  };
+  const updated=(await auth('put','/profile',A).send(payload).expect(200)).body;
+  assert.equal(updated.avatarEngine,'avaturn-realistic-v1');
+  assert.equal(updated.realisticAvatar.provider,'AVATURN');
+  assert.equal(updated.avatarControls.appearance.hairStyle,'parted');
+  const persisted=(await auth('get','/profile',A).expect(200)).body;
+  assert.equal(persisted.realisticAvatar.avatarId,'synthetic-avatar');
+  const other=(await auth('get','/profile',B).expect(200)).body;
+  assert.equal(other.realisticAvatar,null);
+  const cleared=(await auth('put','/profile',A).send({realisticAvatar:null,avatarEngine:'makehuman-parametric-v1'}).expect(200)).body;
+  assert.equal(cleared.realisticAvatar,null);
+  assert.equal(cleared.avatarEngine,'makehuman-parametric-v1');
+});
+
 test('B: person/customer and store membership coexist; account claim contains no global role authority',async()=>{
   assert.ok(storeA.user.person_id);
   assert.ok(storeA.user.contexts[0].capabilities.includes('catalog.write'));

@@ -34,6 +34,7 @@ const WardrobeStackNav = createNativeStackNavigator();
 const DaniStackNav = createNativeStackNavigator();
 const ProfileStackNav = createNativeStackNavigator();
 const BrandStackNav = createNativeStackNavigator();
+const ConnectedStackNav = createNativeStackNavigator();
 const BrandTab = createBottomTabNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -112,6 +113,16 @@ function ProfileStack() {
   );
 }
 
+function ConnectedUniverseStack() {
+  return (
+    <ConnectedStackNav.Navigator screenOptions={stackOptions}>
+      <ConnectedStackNav.Screen name="Universo principal" component={ApiFoundationScreen} options={{headerShown:false}} />
+      <ConnectedStackNav.Screen name="Avatar Studio" component={AvatarStudioScreen} options={{headerShown:false}} />
+      <ConnectedStackNav.Screen name="Avatar Realista" component={RealisticAvatarStudioScreen} options={{headerShown:false}} />
+    </ConnectedStackNav.Navigator>
+  );
+}
+
 function ConnectedExperience() {
   return (
     <Tab.Navigator
@@ -131,7 +142,7 @@ function ConnectedExperience() {
         ),
       })}
     >
-      <Tab.Screen name="Universo" component={ApiFoundationScreen} />
+      <Tab.Screen name="Universo" component={ConnectedUniverseStack} />
       <Tab.Screen name="Análise ÍMPAR" component={DaniRicoScreen} />
     </Tab.Navigator>
   );

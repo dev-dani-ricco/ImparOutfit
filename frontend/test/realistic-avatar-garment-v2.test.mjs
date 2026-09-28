@@ -19,6 +19,19 @@ test('realistic studio requires explicit consent before mounting provider WebVie
  assert.match(source,/Fotos faciais\/corporais/);
 });
 
+test('connected avatar studios persist through authenticated profile API and are reachable from connected universe',()=>{
+ const parametric=fs.readFileSync(new URL('../src/screens/AvatarStudioScreen.js',import.meta.url),'utf8');
+ const realistic=fs.readFileSync(new URL('../src/screens/RealisticAvatarStudioScreen.js',import.meta.url),'utf8');
+ const universe=fs.readFileSync(new URL('../src/screens/ApiFoundationScreen.js',import.meta.url),'utf8');
+ const navigation=fs.readFileSync(new URL('../src/navigation/RootNavigator.js',import.meta.url),'utf8');
+ assert.match(parametric,/api\('\/profile'.*method:\s*'PUT'/s);
+ assert.match(realistic,/api\('\/profile'.*method:'PUT'/s);
+ assert.match(universe,/navigation\.navigate\('Avatar Studio'/);
+ assert.match(universe,/navigation\.navigate\('Avatar Realista'/);
+ assert.match(navigation,/function ConnectedUniverseStack\(\)/);
+ assert.match(navigation,/component=\{ConnectedUniverseStack\}/);
+});
+
 test('garment fit v2 reacts to body measurements by category',()=>{
  const base={heightCm:168,measurements:{bust:94,waist:76,hips:104},body:{shoulders:.5}};
  const top=garmentFitProfile('TOP',base);

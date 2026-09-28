@@ -1026,6 +1026,19 @@ components:
           nullable: true
         avatarConfig:
           type: object
+        avatarControls:
+          type: object
+          nullable: true
+        realisticAvatar:
+          type: object
+          nullable: true
+        avatarEngine:
+          type: string
+          nullable: true
+        avatarConfiguredAt:
+          type: string
+          format: date-time
+          nullable: true
     ProfileInput:
       type: object
       properties:
@@ -1087,6 +1100,41 @@ components:
           nullable: true
           minimum: 80
           maximum: 250
+        avatarControls:
+          type: object
+          nullable: true
+        realisticAvatar:
+          type: object
+          nullable: true
+          properties:
+            provider:
+              type: string
+              enum: [AVATURN]
+            url:
+              type: string
+              format: uri
+            avatarId:
+              type: string
+              nullable: true
+            bodyId:
+              type: string
+              nullable: true
+            sessionId:
+              type: string
+              nullable: true
+            exportedAt:
+              type: string
+              format: date-time
+            version:
+              type: integer
+        avatarEngine:
+          type: string
+          nullable: true
+          enum: [makehuman-parametric-v1, avaturn-realistic-v1, PARAMETRIC, AVATURN, null]
+        avatarConfiguredAt:
+          type: string
+          format: date-time
+          nullable: true
     Capacity:
       type: object
       properties:

@@ -12,16 +12,20 @@ import {
   normalizeAvatarSpec,
 } from '../avatar/avatarSpec.mjs';
 import { useDemo } from '../contexts/DemoContext';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../api/client';
 import { colors } from '../theme/colors';
 
 const SECTIONS = ['CORPO', 'ROSTO', 'CABELO'];
 
-export default function AvatarStudioScreen({ navigation }) {
+export default function AvatarStudioScreen({ navigation, route }) {
   const { profile, setProfile } = useDemo();
-  const [spec, setSpec] = useState(() => normalizeAvatarSpec(profile));
+  const { token, demoMode } = useAuth();
+  const sourceProfile = route?.params?.profile ? { ...profile, ...route.params.profile } : profile;
+  const [spec, setSpec] = useState(() => normalizeAvatarSpec(sourceProfile));
   const [section, setSection] = useState('CORPO');
 
-  const liveProfile = useMemo(() => avatarSpecToProfile(profile, spec), [profile, spec]);
+  const liveProfile = useMemo(() => avatarSpecToProfile(sourceProfile, spec), [sourceProfile, spec]);
 
   const updateBody = (key, value) => setSpec((current) => ({ ...current, body: { ...current.body, [key]: value } }));
   const updateFace = (key, value) => setSpec((current) => ({ ...current, face: { ...current.face, [key]: value } }));
@@ -34,11 +38,26 @@ export default function AvatarStudioScreen({ navigation }) {
   }
 
   async function save() {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    const next = avatarSpecToProfile(profile, spec);
-    setProfile(next);
-    Alert.alert('Avatar atualizado', 'Rosto, corpo, cabelo e medidas foram salvos.');
-    navigation.goBack();
+    const next = avatarSpecToProfile(sourceProfile, spec);
+    try {
+      if (!demoMode && token) {
+        await api('/profile', { token, method: 'PUT', body: {
+          height: Number(next.height),
+          bust: Number(next.bust),
+          waist: Number(next.waist),
+          hips: Number(next.hips),
+          avatarControls: next.avatarControls,
+          avatarEngine: 'makehuman-parametric-v1',
+          avatarConfiguredAt: next.avatarConfiguredAt,
+        }});
+      }
+      setProfile(next);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Alert.alert('Avatar atualizado', demoMode ? 'Rosto, corpo, cabelo e medidas foram salvos.' : 'Seu avatar foi salvo no seu perfil conectado.');
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert('Não foi possível salvar', error.message || 'Tente novamente.');
+    }
   }
 
   return (
