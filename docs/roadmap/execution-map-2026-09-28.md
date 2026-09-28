@@ -33,7 +33,7 @@ Entregas: gates automatizados, smoke físico, consentimento Avaturn, Android/iOS
 Critério de aceite: usuário consegue abrir e utilizar o runtime validado sem regressão conhecida.
 
 ### P1 — Avatar conectado
-Status: EM EXECUÇÃO.
+Status: CONCLUÍDO.
 
 Resultado esperado: avatar deixa de depender apenas de estado local e passa a acompanhar a conta autenticada.
 
@@ -50,9 +50,16 @@ Critério de aceite: logout/login em outro ciclo recupera o mesmo avatar da cont
 Risco principal: URL externa do modelo Avaturn expirar ou mudar. Próxima evolução é copiar o GLB aprovado para storage privado controlado pela aplicação.
 
 ### P2 — Backend distribuído de produção
-Status: PRÓXIMO BLOQUEADOR.
+Status: EM EXECUÇÃO.
 
 Resultado esperado: retirar a dependência de `localhost` e permitir app conectado real.
+
+Já concluído nesta etapa:
+- backend containerizável com `Dockerfile` e healthcheck;
+- bind externo seguro por padrão em produção (`0.0.0.0`);
+- guard de produção bloqueando DB loopback, PGlite, CORS HTTP/local, JWT fraco, storage relativo e proxy ausente;
+- suíte automatizada para o guard;
+- health/readiness já existentes preservados.
 
 Entregas:
 - subir API HTTPS em host controlado;
