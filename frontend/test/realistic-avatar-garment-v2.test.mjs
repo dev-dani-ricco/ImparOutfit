@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 import {realisticAvatarFromExport,avatarEngine,AVATAR_PROVIDERS} from '../src/avatar/avatarProvider.mjs';
 import {garmentFitProfile} from '../src/reconstruction/garmentFitV2.mjs';
@@ -8,6 +9,14 @@ test('realistic avatar export becomes the preferred engine',()=>{
  assert.equal(realistic.provider,AVATAR_PROVIDERS.AVATURN);
  assert.equal(avatarEngine({realisticAvatar:realistic}),AVATAR_PROVIDERS.AVATURN);
  assert.equal(avatarEngine({}),AVATAR_PROVIDERS.PARAMETRIC);
+});
+
+test('realistic studio requires explicit consent before mounting provider WebView',()=>{
+ const source=fs.readFileSync(new URL('../src/screens/RealisticAvatarStudioScreen.js',import.meta.url),'utf8');
+ assert.match(source,/const \[consented,setConsented\]=useState\(false\)/);
+ assert.match(source,/!consented \? <View style=\{styles\.consent\}>/);
+ assert.match(source,/ENTENDO E QUERO CONTINUAR/);
+ assert.match(source,/Fotos faciais\/corporais/);
 });
 
 test('garment fit v2 reacts to body measurements by category',()=>{

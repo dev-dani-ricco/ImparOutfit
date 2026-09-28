@@ -30,6 +30,7 @@ export default function RealisticAvatarStudioScreen({navigation}){
  const projectUrl=Constants.expoConfig?.extra?.avaturnProjectUrl||'https://demo.avaturn.dev';
  const [ready,setReady]=useState(false);
  const [error,setError]=useState('');
+ const [consented,setConsented]=useState(false);
  const source=useMemo(()=>({html:html(projectUrl),baseUrl:'https://app.imparoutfit.local'}),[projectUrl]);
 
  async function onMessage(event){
@@ -58,18 +59,27 @@ export default function RealisticAvatarStudioScreen({navigation}){
    <Text style={styles.noticeTitle}>FOTO → ROSTO → CORPO → CABELO → AVATAR 3D</Text>
    <Text style={styles.noticeCopy}>Use fotos nítidas e iluminação uniforme. O resultado é uma representação digital, não medição biométrica nem garantia de caimento físico.</Text>
   </View>
-  {error?<View style={styles.error}><Text style={styles.errorText}>{error}</Text></View>:null}
-  <WebView
-   source={source}
-   style={styles.web}
-   originWhitelist={['https://*']}
-   javaScriptEnabled
-   domStorageEnabled
-   allowsInlineMediaPlayback
-   mediaPlaybackRequiresUserAction={false}
-   onMessage={onMessage}
-   onError={(e)=>setError(e.nativeEvent.description||'Falha ao abrir o Avatar Studio.')}
-  />
+  {!consented ? <View style={styles.consent}>
+   <Text style={styles.consentTag}>PRIVACIDADE ANTES DA CAPTURA</Text>
+   <Text style={styles.consentTitle}>Suas fotos serão processadas por um provedor externo.</Text>
+   <Text style={styles.consentCopy}>Ao continuar, você abrirá o estúdio Avaturn. Fotos faciais/corporais e dados necessários à criação do avatar poderão ser processados por esse provedor. Esta integração é de protótipo; não use dados de terceiros sem autorização.</Text>
+   <Pressable style={styles.consentButton} onPress={()=>setConsented(true)} accessibilityRole="button">
+    <Text style={styles.consentButtonText}>ENTENDO E QUERO CONTINUAR →</Text>
+   </Pressable>
+  </View> : <>
+   {error?<View style={styles.error}><Text style={styles.errorText}>{error}</Text></View>:null}
+   <WebView
+    source={source}
+    style={styles.web}
+    originWhitelist={['https://*']}
+    javaScriptEnabled
+    domStorageEnabled
+    allowsInlineMediaPlayback
+    mediaPlaybackRequiresUserAction={false}
+    onMessage={onMessage}
+    onError={(e)=>setError(e.nativeEvent.description||'Falha ao abrir o Avatar Studio.')}
+   />
+  </>}
  </SafeAreaView>;
 }
 const styles=StyleSheet.create({
@@ -79,6 +89,7 @@ const styles=StyleSheet.create({
  headCopy:{flex:1},kicker:{color:colors.gold,fontSize:6,fontWeight:'900',letterSpacing:1.4},title:{color:'#FFF',fontFamily:'serif',fontSize:23,marginTop:2},
  status:{flexDirection:'row',alignItems:'center',gap:5,borderWidth:1,borderColor:'#514943',paddingHorizontal:7,paddingVertical:5},dot:{width:5,height:5,borderRadius:3,backgroundColor:'#67A978'},dotError:{backgroundColor:'#CC5A5A'},statusText:{color:'#FFF',fontSize:6,fontWeight:'900'},
  notice:{paddingHorizontal:16,paddingVertical:10,backgroundColor:'#EDE5DC'},noticeTitle:{color:colors.accent,fontSize:7,fontWeight:'900',letterSpacing:1},noticeCopy:{color:'#665E57',fontSize:9,lineHeight:14,marginTop:3},
+ consent:{margin:16,padding:18,borderWidth:1,borderColor:'#CDBFAF',backgroundColor:'#FBF8F4'},consentTag:{color:colors.gold,fontSize:7,fontWeight:'900',letterSpacing:1.1},consentTitle:{color:'#211B18',fontFamily:'serif',fontSize:24,lineHeight:29,marginTop:7},consentCopy:{color:'#665E57',fontSize:10,lineHeight:16,marginTop:8},consentButton:{marginTop:16,backgroundColor:colors.accent,padding:14,alignItems:'center'},consentButtonText:{color:'#FFF',fontSize:8,fontWeight:'900',letterSpacing:.8},
  error:{padding:10,backgroundColor:'#F5DFDF'},errorText:{color:'#922',fontSize:10},
  web:{flex:1,backgroundColor:'#E6DED6'}
 });
