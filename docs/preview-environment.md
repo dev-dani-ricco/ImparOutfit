@@ -4,12 +4,12 @@
 Project: @poshaze1/imparoutfit
 Project ID: 2251ff12-7ff9-4567-b27c-fd5f26c33fc6
 
-The Dell workstation runs a dedicated scheduled task:
+The canonical PC NewBio workstation runs a dedicated scheduled task:
 
 IMPAR Outfit Expo Preview
 
 It starts the preview from:
-C:\Users\user\ImparOutfit-runtime\frontend
+C:\Users\NewBio Digital\ImparOutfit\frontend
 
 Environment:
 - EXPO_PUBLIC_DEMO_MODE=true
@@ -19,9 +19,9 @@ Environment:
 - tunnel mode: Expo/exp.direct
 
 Current stable development URL:
-exp://8t_ysow-poshaze1-8480.exp.direct
+exp://1sd3dca-poshaze1-8480.exp.direct
 
-The URL has remained stable across authenticated restarts on the same account/project/port, but it is still a development tunnel. Availability depends on the Dell workstation, the logged-in user session, network connectivity and Expo/ngrok infrastructure.
+The URL has remained stable across authenticated restarts on the same account/project/port, but it is still a development tunnel. Availability depends on the canonical PC NewBio workstation, the logged-in user session, network connectivity and Expo/ngrok infrastructure.
 
 A Windows scheduled task restarts the server automatically at user logon and the wrapper restarts Expo if the process exits.
 

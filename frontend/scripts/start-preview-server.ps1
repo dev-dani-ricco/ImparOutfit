@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Continue'
-$repo = Join-Path $env:USERPROFILE 'ImparOutfit-runtime\frontend'
+$repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $logRoot = Join-Path $env:LOCALAPPDATA 'IMPAR-Outfit-Preview'
 $logFile = Join-Path $logRoot 'expo-preview.log'
 
