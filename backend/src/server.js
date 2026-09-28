@@ -2,13 +2,14 @@ import { createApp } from './app.js';
 import { assertAuthConfig } from './middleware/auth.js';
 import { connectRedis } from './config/redis.js';
 import { startAnalysisSupervisor } from './imparAnalysis/supervisor.js';
+import { assertProductionConfig } from './config/productionGuard.js';
 
 assertAuthConfig();
-if(process.env.NODE_ENV==='production' && !process.env.MEDIA_ROOT) throw new Error('Production requires explicit durable MEDIA_ROOT');
+assertProductionConfig();
 await connectRedis();
 
 const app=createApp();
-const host=process.env.HOST||'127.0.0.1';
+const host=process.env.HOST||(process.env.NODE_ENV==='production'?'0.0.0.0':'127.0.0.1');
 const port=Number.parseInt(process.env.PORT||'4000',10);
 const server=app.listen(port,host,()=>console.log(`API started on ${host}:${port}`));
 server.requestTimeout=30_000;

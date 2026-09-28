@@ -11,6 +11,7 @@
     "migrate:adopt": "node src/db/migrate.js --adopt-legacy",
     "migrate:down": "node src/db/migrate.js --down",
     "readiness": "node scripts/readiness.js",
+    "guard:production-config": "node scripts/check-production-config.js",
     "bootstrap:local": "node scripts/bootstrap-local-runtime.js",
     "smoke:analysis": "node scripts/smoke-analysis-e2e.js",
     "probe:omniroute": "node scripts/probe-omniroute-http.js",
