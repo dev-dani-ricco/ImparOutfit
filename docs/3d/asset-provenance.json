@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "path": "frontend/assets/models/impar-human-cc0.glb",
+      "status": "APPROVED_COMPILED_BASE",
+      "license": "CC0-1.0",
+      "provider": "MAKEHUMAN_CC0",
+      "productionAllowed": true,
+      "source": "Vendored MakeHuman/MPFB hm08 basemesh and approved targets",
+      "provenancePath": "frontend/assets/models/impar-human-cc0.glb.provenance.json"
+    },
+    {
+      "path": "tools/avatar-compiler/quarantine/michelle.glb",
+      "status": "QUARANTINED_UNVERIFIED",
+      "license": "UNKNOWN",
+      "productionAllowed": false,
+      "note": "Preserved for historical comparison only; excluded from the active mobile asset directory."
+    },
+    {
+      "family": "MAKEHUMAN_CORE",
+      "status": "APPROVED_SOURCE_FAMILY",
+      "license": "CC0",
+      "productionAllowed": true,
+      "note": "Only core/system CC0 assets or separately reviewed assets may be promoted."
+    }
+  ]
+}

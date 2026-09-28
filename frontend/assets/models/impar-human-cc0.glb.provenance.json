@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "provider": "MAKEHUMAN_CC0",
+  "compilerVersion": "1.0.0",
+  "source": "makehumancommunity/mpfb2 hm08 basemesh + approved targets",
+  "license": "CC0-1.0",
+  "profileSha256": "f0ac0fe4f2d9a2b81d749aacb2138753b9d77f84e58f784da4bd4488e20ef85a",
+  "outputSha256": "dfbc703a43913a3b8f3e53c56a080b0dc4b83570a3e994c99f0cec83975542c9",
+  "targets": [
+    {
+      "target": "head-oval.target.gz",
+      "weight": 0.7
+    }
+  ],
+  "productionAllowed": true
+}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Model3DPreview from '../components/Model3DPreview';
+import Garment3DPreview from '../components/Garment3DPreview';
 import { useDemo } from '../contexts/DemoContext';
 import { colors } from '../theme/colors';
 
@@ -24,7 +24,7 @@ export default function WardrobeItemScreen({ route }) {
           <Text style={[styles.switchText, mode === '2d' && styles.activeText]}>FOTO 2D</Text>
         </Pressable>
         <Pressable style={[styles.switchButton, mode === '3d' && styles.active]} onPress={() => setMode('3d')}>
-          <Text style={[styles.switchText, mode === '3d' && styles.activeText]}>PRÉVIA VISUAL</Text>
+          <Text style={[styles.switchText, mode === '3d' && styles.activeText]}>VOLUME 3D</Text>
         </Pressable>
       </View>
       {mode === '2d' ? (
@@ -33,7 +33,7 @@ export default function WardrobeItemScreen({ route }) {
           <Text style={styles.modeBadge}>VISUALIZAÇÃO 2D ✓</Text>
         </View>
       ) : (
-        <Model3DPreview image={item.image} model={item.model3d} />
+        <Garment3DPreview category={item.category || item.subcategory} reconstructed={item.model3d?.status === 'READY'} />
       )}
       <View style={styles.data}>
         <Data label="Categoria" value={item.category} />
@@ -46,7 +46,7 @@ export default function WardrobeItemScreen({ route }) {
       </View>
       <View style={styles.required}>
         <Text style={styles.requiredTitle}>PADRÃO DO ARMÁRIO INTELIGENTE</Text>
-        <Text style={styles.requiredText}>Captura e prévia visual. Reconstrução 3D ainda não disponível.</Text>
+        <Text style={styles.requiredText}>O proxy 3D mostra volume aproximado por categoria. Quando a reconstrução real for aprovada pelo quality gate, o GLB privado substitui o proxy.</Text>
       </View>
     </ScrollView>
   );

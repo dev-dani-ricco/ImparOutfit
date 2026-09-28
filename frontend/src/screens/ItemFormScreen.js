@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import Model3DPreview from '../components/Model3DPreview';
+import Garment3DPreview from '../components/Garment3DPreview';
 import { useAuth } from '../contexts/AuthContext';
 import { useDemo } from '../contexts/DemoContext';
 import { demoImages, wardrobeCategories } from '../demo/data';
@@ -247,9 +247,9 @@ export default function ItemFormScreen({ navigation, route }) {
         </Pressable>
         {demoCapture && image && completedAngles === 4 ? (
           <View style={styles.demoPreview}>
-            <Text style={styles.demoPreviewTag}>PRÉVIA VISUAL • FOTO ANIMADA</Text>
-            <Model3DPreview image={image} model={{ angles: 4, status: 'CAPTURE_ONLY' }} compact />
-            <Text style={styles.demoPreviewCopy}>As fotos estão registradas. Reconstrução de malha 3D ainda não disponível.</Text>
+            <Text style={styles.demoPreviewTag}>PROXY 3D • VOLUME POR CATEGORIA</Text>
+            <Garment3DPreview category={category?.label} compact />
+            <Text style={styles.demoPreviewCopy}>Este proxy volumétrico não é a peça reconstruída. Após o processamento e o quality gate, o GLB privado substitui automaticamente esta aproximação.</Text>
           </View>
         ) : null}
       </Step>

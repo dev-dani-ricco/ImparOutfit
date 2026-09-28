@@ -1,0 +1,19 @@
+{
+  "avatarProvider": "MAKEHUMAN_CC0",
+  "avatarVersion": "2.0.0",
+  "faceShape": "round",
+  "skinTone": "tan",
+  "hairStyleId": "curls",
+  "hairColor": "auburn",
+  "bust": 104,
+  "waist": 84,
+  "hips": 116,
+  "height": 180,
+  "shoulders": 18,
+  "torso": 12,
+  "thighs": 15,
+  "headWidth": 15,
+  "jaw": 12,
+  "chin": -8,
+  "faceDepth": 10
+}

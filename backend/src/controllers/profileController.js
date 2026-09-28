@@ -9,6 +9,20 @@ const profileSchema = Joi.object({
   profession: Joi.string().max(160).allow('', null),
   bodyShape: Joi.string().valid('Ampulheta', 'Triângulo', 'Triângulo invertido', 'Retângulo', 'Oval').allow(null),
   hairStyle: Joi.string().valid('Curto', 'Longo', 'Cacheado', 'Coque').allow(null),
+  bodyPreset: Joi.string().valid('balanced', 'soft', 'athletic', 'petite').allow(null),
+  faceShape: Joi.string().valid('oval', 'round', 'heart', 'square', 'long').allow(null),
+  skinTone: Joi.string().valid('porcelain', 'light', 'medium', 'tan', 'deep', 'rich').allow(null),
+  hairStyleId: Joi.string().valid('short', 'bob', 'long', 'waves', 'curls', 'bun', 'ponytail').allow(null),
+  hairColor: Joi.string().valid('black', 'dark-brown', 'brown', 'auburn', 'blonde', 'platinum').allow(null),
+  shoulders: Joi.number().min(-50).max(50).allow(null),
+  torso: Joi.number().min(-50).max(50).allow(null),
+  thighs: Joi.number().min(-50).max(50).allow(null),
+  headWidth: Joi.number().min(-50).max(50).allow(null),
+  jaw: Joi.number().min(-50).max(50).allow(null),
+  chin: Joi.number().min(-50).max(50).allow(null),
+  faceDepth: Joi.number().min(-50).max(50).allow(null),
+  avatarProvider: Joi.string().valid('PARAMETRIC_LOCAL_V2', 'MAKEHUMAN_CC0', 'AVATURN').allow(null),
+  avatarVersion: Joi.string().max(30).allow(null),
   mannequinTop: Joi.string().max(30).allow('', null),
   mannequinBottom: Joi.string().max(30).allow('', null),
   bust: Joi.number().positive().max(300).allow(null),
@@ -27,6 +41,20 @@ const toProfile = (row) => ({
   profession: row.profession,
   bodyShape: row.body_shape,
   hairStyle: row.avatar_config?.hairStyle || 'Coque',
+  bodyPreset: row.avatar_config?.bodyPreset || 'balanced',
+  faceShape: row.avatar_config?.faceShape || 'oval',
+  skinTone: row.avatar_config?.skinTone || 'medium',
+  hairStyleId: row.avatar_config?.hairStyleId || 'bun',
+  hairColor: row.avatar_config?.hairColor || 'dark-brown',
+  shoulders: row.avatar_config?.shoulders ?? 0,
+  torso: row.avatar_config?.torso ?? 0,
+  thighs: row.avatar_config?.thighs ?? 0,
+  headWidth: row.avatar_config?.headWidth ?? 0,
+  jaw: row.avatar_config?.jaw ?? 0,
+  chin: row.avatar_config?.chin ?? 0,
+  faceDepth: row.avatar_config?.faceDepth ?? 0,
+  avatarProvider: row.avatar_config?.avatarProvider || 'PARAMETRIC_LOCAL_V2',
+  avatarVersion: row.avatar_config?.avatarVersion || '2.0.0',
   mannequinTop: row.mannequin_top,
   mannequinBottom: row.mannequin_bottom,
   bust: row.bust_cm,
@@ -59,6 +87,21 @@ export async function updateProfile(req, res) {
   const { value, error } = profileSchema.validate(req.body, { stripUnknown: true });
   if (error) throw new HttpError(400, error.message);
 
+  const avatarKeys = [
+    'hairStyle', 'bodyPreset', 'faceShape', 'skinTone', 'hairStyleId', 'hairColor',
+    'shoulders', 'torso', 'thighs', 'headWidth', 'jaw', 'chin', 'faceDepth',
+    'avatarProvider', 'avatarVersion',
+  ];
+  const avatarConfigPatch = Object.fromEntries(
+    avatarKeys
+      .filter((key) => Object.hasOwn(value, key) && value[key] !== null)
+      .map((key) => [key, value[key]])
+  );
+  if (Object.keys(avatarConfigPatch).length) {
+    avatarConfigPatch.renderer = 'human-parametric-v2';
+    avatarConfigPatch.updatedAt = new Date().toISOString();
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -72,7 +115,7 @@ export async function updateProfile(req, res) {
         bust_cm, waist_cm, hips_cm, height_cm, avatar_config, updated_at
       ) VALUES(
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-        jsonb_strip_nulls(jsonb_build_object('renderer','human-glb-v1','hairStyle',$11::text)),now()
+        $11::jsonb,now()
       )
       ON CONFLICT(user_id) DO UPDATE SET
         age=COALESCE(EXCLUDED.age,customer_profiles.age),
@@ -97,7 +140,7 @@ export async function updateProfile(req, res) {
         value.waist ?? null,
         value.hips ?? null,
         value.height ?? null,
-        value.hairStyle ?? null,
+        JSON.stringify(avatarConfigPatch),
       ]
     );
     const clearable = {"age":"age","profession":"profession","bodyShape":"body_shape","mannequinTop":"mannequin_top","mannequinBottom":"mannequin_bottom","bust":"bust_cm","waist":"waist_cm","hips":"hips_cm","height":"height_cm"};

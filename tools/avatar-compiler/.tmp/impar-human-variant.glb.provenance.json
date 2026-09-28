@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "provider": "MAKEHUMAN_CC0",
+  "compilerVersion": "1.0.0",
+  "source": "makehumancommunity/mpfb2 hm08 basemesh + approved targets",
+  "license": "CC0-1.0",
+  "profileSha256": "e25a1d55cc577b21dc1034ae5bea335af0622f7a5ccd57a74fb467822d883172",
+  "outputSha256": "f64049b3b0feb5d94f1353741557dc2cf09f069556e25db9305679a11ee2c549",
+  "targets": [
+    {
+      "target": "measure-bust-circ-incr.target.gz",
+      "weight": 0.2857
+    },
+    {
+      "target": "measure-waist-circ-incr.target.gz",
+      "weight": 0.2286
+    },
+    {
+      "target": "measure-hips-circ-incr.target.gz",
+      "weight": 0.3
+    },
+    {
+      "target": "measure-shoulder-dist-incr.target.gz",
+      "weight": 0.36
+    },
+    {
+      "target": "torso-scale-horiz-incr.target.gz",
+      "weight": 0.24
+    },
+    {
+      "target": "measure-thigh-circ-incr.target.gz",
+      "weight": 0.3
+    },
+    {
+      "target": "head-scale-horiz-incr.target.gz",
+      "weight": 0.3
+    },
+    {
+      "target": "head-scale-depth-incr.target.gz",
+      "weight": 0.2
+    },
+    {
+      "target": "chin-width-incr.target.gz",
+      "weight": 0.24
+    },
+    {
+      "target": "chin-height-decr.target.gz",
+      "weight": 0.16
+    },
+    {
+      "target": "female-young-averagemuscle-averageweight-maxheight.target.gz",
+      "weight": 0.4
+    },
+    {
+      "target": "head-round.target.gz",
+      "weight": 0.7
+    }
+  ],
+  "productionAllowed": true
+}

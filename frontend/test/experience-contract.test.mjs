@@ -46,3 +46,39 @@ test('commercial UX dependencies stay Expo-Go compatible', () => {
   assert.ok(pkg.dependencies['expo-image']);
   assert.ok(pkg.dependencies['expo-haptics']);
 });
+
+
+test('professional avatar v2 exposes body, face, skin and hair controls', () => {
+  const avatar = read('src/components/BodyAvatar3D.native.js');
+  const profile = read('src/screens/ProfileScreen.js');
+  const domain = read('src/avatar/avatarProfile.js');
+
+  for (const token of ['Shoulders', 'Torso', 'Thighs', 'HeadWidth', 'Jaw', 'Chin', 'FaceDepth']) {
+    assert.match(avatar, new RegExp(token));
+  }
+  for (const token of ['BODY_PRESETS', 'FACE_SHAPES', 'SKIN_TONES', 'HAIR_STYLES', 'HAIR_COLORS']) {
+    assert.match(profile, new RegExp(token));
+    assert.match(domain, new RegExp(token));
+  }
+  assert.match(avatar, /AVATAR PARAMÉTRICO V2/);
+  assert.match(domain, /PARAMETRIC_LOCAL_V2/);
+});
+
+test('garment preview distinguishes proxy geometry from reconstructed GLB', () => {
+  const garment = read('src/components/Garment3DPreview.native.js');
+  const form = read('src/screens/ItemFormScreen.js');
+  const item = read('src/screens/WardrobeItemScreen.js');
+
+  assert.match(garment, /PROXY 3D PARAMÉTRICO/);
+  assert.match(garment, /GLB VALIDADO/);
+  assert.match(form, /quality gate/);
+  assert.match(item, /Garment3DPreview/);
+});
+
+test('3D asset provenance blocks unknown human mesh from production', () => {
+  const provenance = JSON.parse(read('../docs/3d/asset-provenance.json'));
+  const michelle = provenance.assets.find((asset) => asset.path?.endsWith('michelle.glb'));
+  assert.equal(michelle?.productionAllowed, false);
+  assert.equal(michelle?.status, 'DEV_ONLY_UNVERIFIED');
+  assert.equal(provenance.assets.find((asset) => asset.family === 'MAKEHUMAN_CORE')?.license, 'CC0');
+});

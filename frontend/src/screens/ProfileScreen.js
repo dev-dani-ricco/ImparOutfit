@@ -5,19 +5,17 @@ import BodyAvatar3D from '../components/BodyAvatar3D';
 import { useAuth } from '../contexts/AuthContext';
 import { useDemo } from '../contexts/DemoContext';
 import { colors } from '../theme/colors';
-
-const bodyShapes = ['Ampulheta', 'Triângulo', 'Triângulo invertido', 'Retângulo', 'Oval'];
-const hairStyles = ['Curto', 'Longo', 'Cacheado', 'Coque'];
+import { BODY_PRESETS, FACE_SHAPES, HAIR_COLORS, HAIR_STYLES, SKIN_TONES, withProfessionalAvatarDefaults } from '../avatar/avatarProfile';
 
 export default function ProfileScreen({ navigation, route }) {
   const { logout, user, switchContext } = useAuth();
   const { profile, resetDemo, setProfile, wardrobe, wardrobeCapacity } = useDemo();
-  const [draft, setDraft] = useState(profile);
+  const [draft, setDraft] = useState(() => withProfessionalAvatarDefaults(profile));
   const [editing, setEditing] = useState(false);
   const firstName = String(draft.name || 'Cliente').split(' ')[0];
 
   useEffect(() => {
-    setDraft(profile);
+    setDraft(withProfessionalAvatarDefaults(profile));
   }, [profile]);
 
   useEffect(() => {
@@ -42,8 +40,11 @@ export default function ProfileScreen({ navigation, route }) {
 
   function save() {
     const nextProfile = {
-      ...draft,
+      ...withProfessionalAvatarDefaults(draft),
+      avatarProvider: 'PARAMETRIC_LOCAL_V2',
+      avatarVersion: '2.0.0',
       avatarConfiguredAt: draft.avatarConfiguredAt || new Date().toISOString(),
+      avatarUpdatedAt: new Date().toISOString(),
     };
     setDraft(nextProfile);
     setProfile(nextProfile);
@@ -52,7 +53,7 @@ export default function ProfileScreen({ navigation, route }) {
   }
 
   function cancelEditing() {
-    setDraft(profile);
+    setDraft(withProfessionalAvatarDefaults(profile));
     setEditing(false);
   }
 
@@ -149,34 +150,53 @@ export default function ProfileScreen({ navigation, route }) {
             </View>
           </Section>
 
-          <Section title="Formato do corpo" description="Complementa as proporções informadas nas medidas.">
-            <View style={styles.shapes}>
-              {bodyShapes.map((shape) => (
-                <Pressable
-                  key={shape}
-                  style={[styles.shape, draft.bodyShape === shape && styles.shapeActive]}
-                  onPress={() => update('bodyShape', shape)}
-                >
-                  <View style={[styles.silhouette, draft.bodyShape === shape && styles.silhouetteActive]} />
-                  <Text style={[styles.shapeText, draft.bodyShape === shape && styles.shapeTextActive]}>{shape}</Text>
-                </Pressable>
-              ))}
+          <Section title="Base corporal" description="Escolha uma base e refine com suas medidas reais. A base não substitui busto, cintura, quadril e altura.">
+            <OptionGrid
+              items={BODY_PRESETS}
+              value={draft.bodyPreset}
+              onChange={(value) => update('bodyPreset', value)}
+            />
+            <View style={styles.measureGrid}>
+              <Measure label="OMBROS" value={draft.shoulders} onChangeText={(value) => update('shoulders', value)} suffix="%" />
+              <Measure label="TRONCO" value={draft.torso} onChangeText={(value) => update('torso', value)} suffix="%" />
+              <Measure label="COXAS" value={draft.thighs} onChangeText={(value) => update('thighs', value)} suffix="%" />
+            </View>
+            <Text style={styles.adjustHint}>Use valores entre -50 e +50 para refinamento visual. O zero mantém a base escolhida.</Text>
+          </Section>
+
+          <Section title="Rosto paramétrico" description="Ajuste a geometria do rosto sem transformar sua foto em textura pública.">
+            <OptionGrid
+              items={FACE_SHAPES}
+              value={draft.faceShape}
+              onChange={(value) => update('faceShape', value)}
+            />
+            <View style={styles.measureGrid}>
+              <Measure label="LARGURA" value={draft.headWidth} onChangeText={(value) => update('headWidth', value)} suffix="%" />
+              <Measure label="MANDÍBULA" value={draft.jaw} onChangeText={(value) => update('jaw', value)} suffix="%" />
+              <Measure label="QUEIXO" value={draft.chin} onChangeText={(value) => update('chin', value)} suffix="%" />
+              <Measure label="PROFUNDIDADE" value={draft.faceDepth} onChangeText={(value) => update('faceDepth', value)} suffix="%" />
             </View>
           </Section>
 
-          <Section title="Cabelo do avatar" description="Escolha uma forma neutra para representar o cabelo no modelo 3D.">
-            <View style={styles.hairStyles}>
-              {hairStyles.map((hair) => (
-                <Pressable
-                  key={hair}
-                  style={[styles.hairStyle, (draft.hairStyle || 'Coque') === hair && styles.hairStyleActive]}
-                  onPress={() => update('hairStyle', hair)}
-                >
-                  <View style={[styles.hairPreview, styles[`hair${hair}`]]} />
-                  <Text style={[styles.hairText, (draft.hairStyle || 'Coque') === hair && styles.hairTextActive]}>{hair}</Text>
-                </Pressable>
-              ))}
-            </View>
+          <Section title="Tom de pele" description="Escolha a aproximação visual usada no renderer 3D.">
+            <ColorGrid
+              items={SKIN_TONES}
+              value={draft.skinTone}
+              onChange={(value) => update('skinTone', value)}
+            />
+          </Section>
+
+          <Section title="Cabelo" description="Forma e cor são independentes para permitir uma representação mais próxima da cliente.">
+            <OptionGrid
+              items={HAIR_STYLES}
+              value={draft.hairStyleId}
+              onChange={(value) => update('hairStyleId', value)}
+            />
+            <ColorGrid
+              items={HAIR_COLORS}
+              value={draft.hairColor}
+              onChange={(value) => update('hairColor', value)}
+            />
           </Section>
 
           <Section title="Manequim" description="Numeração usual para partes superior e inferior.">
@@ -264,21 +284,52 @@ function Field({ label, suffix, ...props }) {
   );
 }
 
-function Measure({ label, value, onChangeText }) {
+function Measure({ label, value, onChangeText, suffix = 'cm' }) {
   return (
     <View style={styles.measure}>
       <Text style={styles.measureLabel}>{label}</Text>
       <View style={styles.measureInputRow}>
         <TextInput
           style={styles.measureInput}
-          value={value}
+          value={String(value ?? '')}
           onChangeText={onChangeText}
-          keyboardType="numeric"
-          placeholder="—"
+          keyboardType="numbers-and-punctuation"
+          placeholder="0"
           placeholderTextColor={colors.muted}
         />
-        <Text style={styles.cm}>cm</Text>
+        <Text style={styles.cm}>{suffix}</Text>
       </View>
+    </View>
+  );
+}
+
+function OptionGrid({ items, value, onChange }) {
+  return (
+    <View style={styles.optionGrid}>
+      {items.map((item) => {
+        const active = item.id === value;
+        return (
+          <Pressable key={item.id} style={[styles.option, active && styles.optionActive]} onPress={() => onChange(item.id)}>
+            <Text style={[styles.optionText, active && styles.optionTextActive]}>{item.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function ColorGrid({ items, value, onChange }) {
+  return (
+    <View style={styles.colorGrid}>
+      {items.map((item) => {
+        const active = item.id === value;
+        return (
+          <Pressable key={item.id} style={[styles.colorOption, active && styles.colorOptionActive]} onPress={() => onChange(item.id)}>
+            <View style={[styles.colorSwatch, { backgroundColor: item.color }]} />
+            <Text style={[styles.colorLabel, active && styles.colorLabelActive]}>{item.label}</Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -350,6 +401,18 @@ const styles = StyleSheet.create({
   hairCoque: { height: 29, borderTopLeftRadius: 17, borderTopRightRadius: 17 },
   hairText: { color: colors.muted, fontSize: 7, fontWeight: '800', marginTop: 6 },
   hairTextActive: { color: colors.accent },
+  optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  option: { minWidth: '30%', flexGrow: 1, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 10, paddingVertical: 11, alignItems: 'center', backgroundColor: colors.bg },
+  optionActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  optionText: { color: colors.text, fontSize: 8, fontWeight: '800', textAlign: 'center' },
+  optionTextActive: { color: '#FFFFFF' },
+  colorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 2 },
+  colorOption: { width: '31%', borderWidth: 1, borderColor: colors.line, padding: 8, alignItems: 'center', backgroundColor: colors.bg },
+  colorOptionActive: { borderColor: colors.accent, borderWidth: 2 },
+  colorSwatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)' },
+  colorLabel: { color: colors.muted, fontSize: 7, fontWeight: '800', textAlign: 'center', marginTop: 6 },
+  colorLabelActive: { color: colors.accent },
+  adjustHint: { color: colors.muted, fontSize: 8, lineHeight: 13, marginTop: 8 },
   measureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   measure: { width: '48%', backgroundColor: colors.surface, padding: 13 },
   measureLabel: { color: colors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1.1 },

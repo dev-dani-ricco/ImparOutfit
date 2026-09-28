@@ -1859,3 +1859,41 @@ test('customer can cancel an unaccepted Analysis request without institutional a
   const replay=(await auth('post','/impar-analyses/'+fixture.analysis.id+'/request/cancel',customer).send({}).expect(200)).body;
   assert.equal(replay.state,'CANCELLED');
 });
+
+
+test('AvatarProfile V2 persists parametric body, face and appearance controls in private profile config',async()=>{
+  const payload={
+    bodyPreset:'athletic',
+    faceShape:'heart',
+    skinTone:'tan',
+    hairStyleId:'waves',
+    hairColor:'auburn',
+    shoulders:18,
+    torso:-8,
+    thighs:12,
+    headWidth:9,
+    jaw:-11,
+    chin:7,
+    faceDepth:4,
+    avatarProvider:'PARAMETRIC_LOCAL_V2',
+    avatarVersion:'2.0.0',
+    bust:96,
+    waist:74,
+    hips:103,
+    height:171
+  };
+  const response=await auth('put','/profile',A).send(payload).expect(200);
+  for(const [key,value] of Object.entries(payload)) {
+    if (['bust','waist','hips','height'].includes(key)) assert.equal(Number(response.body[key]),value);
+    else assert.equal(response.body[key],value);
+  }
+  const persisted=(await db.query('SELECT avatar_config FROM customer_profiles WHERE user_id=$1',[A.user.id])).rows[0].avatar_config;
+  assert.equal(persisted.renderer,'human-parametric-v2');
+  assert.equal(persisted.avatarProvider,'PARAMETRIC_LOCAL_V2');
+  assert.equal(persisted.faceShape,'heart');
+  assert.equal(persisted.hairStyleId,'waves');
+  assert.equal(persisted.skinTone,'tan');
+  assert.ok(persisted.updatedAt);
+  await auth('put','/profile',A).send({shoulders:51}).expect(400);
+  await auth('put','/profile',A).send({avatarProvider:'UNTRUSTED_PROVIDER'}).expect(400);
+});
