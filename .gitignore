@@ -149,6 +149,7 @@ web-build/
 
 # Artefatos locais da demo
 frontend/.expo-demo-check/
+frontend/.expo-demo-check-ios/
 frontend/.tmp/
 frontend/src/contexts/AuthContext - Copia.js
 
