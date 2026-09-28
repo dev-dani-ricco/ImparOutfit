@@ -1897,3 +1897,27 @@ test('AvatarProfile V2 persists parametric body, face and appearance controls in
   await auth('put','/profile',A).send({shoulders:51}).expect(400);
   await auth('put','/profile',A).send({avatarProvider:'UNTRUSTED_PROVIDER'}).expect(400);
 });
+
+test('AvatarProfile V3 persists MakeHuman controls and secure realistic provider metadata',async()=>{
+  const controls={
+    face:{shape:'diamond',width:.72,jaw:.61,noseWidth:.35,eyesSize:.66,lipFullness:.58},
+    body:{presentation:'feminine',weight:.55,muscle:.44,shoulders:.62,waist:.42,hips:.68,legsLength:.56},
+    appearance:{skinTone:'#D79B76',eyeColor:'#4E382D',hairStyle:'long',hairColor:'#3B271E'}
+  };
+  let response=await auth('put','/profile',A).send({
+    avatarProvider:'MAKEHUMAN_CC0',avatarVersion:'3.0.0',avatarEngine:'makehuman-parametric-v3',
+    avatarControls:controls,bust:98,waist:73,hips:108,height:174
+  }).expect(200);
+  assert.equal(response.body.avatarProvider,'MAKEHUMAN_CC0');
+  assert.equal(response.body.avatarControls.face.shape,'diamond');
+  let persisted=(await db.query('SELECT avatar_config FROM customer_profiles WHERE user_id=$1',[A.user.id])).rows[0].avatar_config;
+  assert.equal(persisted.renderer,'human-parametric-v3');
+
+  const realisticAvatar={provider:'AVATURN',url:'https://cdn.example.com/avatar.glb',urlType:'httpURL',avatarId:'a1',sessionId:null,bodyId:'b1',gender:'female',supportsFaceAnimations:true,exportedAt:new Date().toISOString(),version:1};
+  response=await auth('put','/profile',A).send({avatarProvider:'AVATURN',avatarVersion:'1',avatarEngine:'avaturn-realistic-v1',realisticAvatar}).expect(200);
+  assert.equal(response.body.realisticAvatar.url,realisticAvatar.url);
+  persisted=(await db.query('SELECT avatar_config FROM customer_profiles WHERE user_id=$1',[A.user.id])).rows[0].avatar_config;
+  assert.equal(persisted.renderer,'realistic-provider-v1');
+  assert.equal(persisted.realisticAvatar.provider,'AVATURN');
+  await auth('put','/profile',A).send({realisticAvatar:{...realisticAvatar,url:'http://insecure.example/avatar.glb'}}).expect(400);
+});

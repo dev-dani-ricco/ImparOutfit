@@ -3,12 +3,46 @@ import { pool, query } from '../config/db.js';
 import { withMedia } from '../services/imageService.js';
 import { HttpError } from '../utils/http.js';
 
+const avatarControlsSchema = Joi.object({
+  face: Joi.object({
+    shape: Joi.string().valid('oval', 'round', 'square', 'diamond', 'triangular'),
+    width: Joi.number().min(0).max(1), jaw: Joi.number().min(0).max(1), chin: Joi.number().min(0).max(1),
+    cheek: Joi.number().min(0).max(1), forehead: Joi.number().min(0).max(1),
+    noseWidth: Joi.number().min(0).max(1), noseLength: Joi.number().min(0).max(1), noseProjection: Joi.number().min(0).max(1),
+    eyesSize: Joi.number().min(0).max(1), eyesSpacing: Joi.number().min(0).max(1),
+    mouthWidth: Joi.number().min(0).max(1), lipFullness: Joi.number().min(0).max(1),
+  }).unknown(false),
+  body: Joi.object({
+    presentation: Joi.string().valid('feminine', 'neutral', 'masculine'),
+    weight: Joi.number().min(0).max(1), muscle: Joi.number().min(0).max(1), shoulders: Joi.number().min(0).max(1),
+    chest: Joi.number().min(0).max(1), waist: Joi.number().min(0).max(1), hips: Joi.number().min(0).max(1),
+    belly: Joi.number().min(0).max(1), arms: Joi.number().min(0).max(1), thighs: Joi.number().min(0).max(1), legsLength: Joi.number().min(0).max(1),
+  }).unknown(false),
+  appearance: Joi.object({
+    skinTone: Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/), eyeColor: Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/),
+    hairStyle: Joi.string().valid('buzzed', 'parted', 'long', 'buns'), hairColor: Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/),
+  }).unknown(false),
+}).unknown(false);
+
+const realisticAvatarSchema = Joi.object({
+  provider: Joi.string().valid('AVATURN').required(),
+  url: Joi.string().uri({ scheme: ['https'] }).max(2048).required(),
+  urlType: Joi.string().max(40).allow(null),
+  avatarId: Joi.string().max(160).allow(null),
+  sessionId: Joi.string().max(160).allow(null),
+  bodyId: Joi.string().max(160).allow(null),
+  gender: Joi.string().max(40).allow(null),
+  supportsFaceAnimations: Joi.boolean(),
+  exportedAt: Joi.date().iso().allow(null),
+  version: Joi.number().integer().min(1).max(100),
+}).unknown(false);
+
 const profileSchema = Joi.object({
   name: Joi.string().min(2).max(120),
   age: Joi.number().integer().min(13).max(120).allow(null),
   profession: Joi.string().max(160).allow('', null),
   bodyShape: Joi.string().valid('Ampulheta', 'Triângulo', 'Triângulo invertido', 'Retângulo', 'Oval').allow(null),
-  hairStyle: Joi.string().valid('Curto', 'Longo', 'Cacheado', 'Coque').allow(null),
+  hairStyle: Joi.string().valid('Curto', 'Partido', 'Longo', 'Cacheado', 'Coque', 'Coques').allow(null),
   bodyPreset: Joi.string().valid('balanced', 'soft', 'athletic', 'petite').allow(null),
   faceShape: Joi.string().valid('oval', 'round', 'heart', 'square', 'long').allow(null),
   skinTone: Joi.string().valid('porcelain', 'light', 'medium', 'tan', 'deep', 'rich').allow(null),
@@ -23,6 +57,11 @@ const profileSchema = Joi.object({
   faceDepth: Joi.number().min(-50).max(50).allow(null),
   avatarProvider: Joi.string().valid('PARAMETRIC_LOCAL_V2', 'MAKEHUMAN_CC0', 'AVATURN').allow(null),
   avatarVersion: Joi.string().max(30).allow(null),
+  avatarEngine: Joi.string().max(64).allow(null),
+  avatarConfiguredAt: Joi.date().iso().allow(null),
+  avatarUpdatedAt: Joi.date().iso().allow(null),
+  avatarControls: avatarControlsSchema.allow(null),
+  realisticAvatar: realisticAvatarSchema.allow(null),
   mannequinTop: Joi.string().max(30).allow('', null),
   mannequinBottom: Joi.string().max(30).allow('', null),
   bust: Joi.number().positive().max(300).allow(null),
@@ -53,8 +92,13 @@ const toProfile = (row) => ({
   jaw: row.avatar_config?.jaw ?? 0,
   chin: row.avatar_config?.chin ?? 0,
   faceDepth: row.avatar_config?.faceDepth ?? 0,
-  avatarProvider: row.avatar_config?.avatarProvider || 'PARAMETRIC_LOCAL_V2',
-  avatarVersion: row.avatar_config?.avatarVersion || '2.0.0',
+  avatarProvider: row.avatar_config?.avatarProvider || 'MAKEHUMAN_CC0',
+  avatarVersion: row.avatar_config?.avatarVersion || '3.0.0',
+  avatarEngine: row.avatar_config?.avatarEngine || 'makehuman-parametric-v3',
+  avatarConfiguredAt: row.avatar_config?.avatarConfiguredAt || null,
+  avatarUpdatedAt: row.avatar_config?.avatarUpdatedAt || null,
+  avatarControls: row.avatar_config?.avatarControls || null,
+  realisticAvatar: row.avatar_config?.realisticAvatar || null,
   mannequinTop: row.mannequin_top,
   mannequinBottom: row.mannequin_bottom,
   bust: row.bust_cm,
@@ -90,7 +134,7 @@ export async function updateProfile(req, res) {
   const avatarKeys = [
     'hairStyle', 'bodyPreset', 'faceShape', 'skinTone', 'hairStyleId', 'hairColor',
     'shoulders', 'torso', 'thighs', 'headWidth', 'jaw', 'chin', 'faceDepth',
-    'avatarProvider', 'avatarVersion',
+    'avatarProvider', 'avatarVersion', 'avatarEngine', 'avatarConfiguredAt', 'avatarUpdatedAt', 'avatarControls', 'realisticAvatar',
   ];
   const avatarConfigPatch = Object.fromEntries(
     avatarKeys
@@ -98,7 +142,11 @@ export async function updateProfile(req, res) {
       .map((key) => [key, value[key]])
   );
   if (Object.keys(avatarConfigPatch).length) {
-    avatarConfigPatch.renderer = 'human-parametric-v2';
+    avatarConfigPatch.renderer = value.realisticAvatar?.url
+      ? 'realistic-provider-v1'
+      : value.avatarProvider === 'MAKEHUMAN_CC0' || String(value.avatarEngine || '').includes('parametric-v3')
+        ? 'human-parametric-v3'
+        : 'human-parametric-v2';
     avatarConfigPatch.updatedAt = new Date().toISOString();
   }
 

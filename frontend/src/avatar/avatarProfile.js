@@ -78,8 +78,8 @@ export function getAvatarParameters(profile = {}) {
 export function withProfessionalAvatarDefaults(profile = {}) {
   return {
     ...profile,
-    avatarProvider: profile.avatarProvider || 'PARAMETRIC_LOCAL_V2',
-    avatarVersion: '2.0.0',
+    avatarProvider: profile.avatarProvider || 'MAKEHUMAN_CC0',
+    avatarVersion: profile.avatarVersion || '3.0.0',
     faceShape: profile.faceShape || 'oval',
     bodyPreset: profile.bodyPreset || 'balanced',
     skinTone: profile.skinTone || 'medium',
