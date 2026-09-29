@@ -7,13 +7,21 @@ const files = readdirSync(testDir)
   .filter((name) => name.endsWith('.test.js'))
   .sort();
 
+const testEnv = {
+  ...process.env,
+  NODE_ENV: 'test',
+  // Keep tests isolated from the persistent local PGlite runtime. Node 24 +
+  // nodefs-backed PGlite can abort during teardown even after assertions pass.
+  PGLITE_DATA_DIR: 'memory://',
+};
+
 for (const name of files) {
   const file = join('test', name);
   console.log('\n=== ' + file + ' ===');
   const result = spawnSync(process.execPath, ['--test', file], {
     cwd: process.cwd(),
     stdio: 'inherit',
-    env: process.env,
+    env: testEnv,
   });
   if (result.error) {
     console.error(result.error);
