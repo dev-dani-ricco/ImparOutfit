@@ -172,7 +172,13 @@ Evidências automáticas:
 - /health, /ready, /stores, /products e /showcases HTTP 200;
 - Expo Preview task Running, porta 8480 Listening e túnel externo HTTP 200.
 
-Gate restante: abrir no Expo Go e validar login real -> Home PERSON real -> troca de abas/contexto sem erro visual/runtime.
+Smoke físico inicial em iPhone encontrou e corrigiu:
+- Metro chegou a manter grafo antigo após a inclusão do ConnectedDataContext; preview agora reinicia com --clear.
+- Login real ainda pré-preenchia demo@impar.com/demo; credenciais demonstrativas foram removidas do modo real.
+- preview Expo Go agora fixa EXPO_PUBLIC_API_URL=https://impar-outfit-api.vercel.app/api.
+- tela real identifica HOMOLOGAÇÃO e direciona explicitamente para criação de conta de homologação.
+
+Gate restante: reabrir no Expo Go após o restart limpo e validar criação/login de conta real -> Home PERSON -> abas conectadas sem erro visual/runtime.
 
 ### CICLO M2 — PERSON Core
 Objetivo: Perfil/Avatar -> Armário -> peça -> Look -> Análise usando persistência real.

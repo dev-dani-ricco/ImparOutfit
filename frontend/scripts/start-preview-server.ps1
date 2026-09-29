@@ -8,13 +8,14 @@ Set-Location $repo
 
 $env:EXPO_PUBLIC_DEMO_MODE = 'true'
 $env:EXPO_PUBLIC_DEMO_AUTO_RESUME = 'false'
+$env:EXPO_PUBLIC_API_URL = 'https://impar-outfit-api.vercel.app/api'
 $env:CI = '1'
 
 while ($true) {
   $stamp = Get-Date -Format o
   Add-Content -Path $logFile -Value "[$stamp] starting Expo Go preview on port 8480"
   try {
-    & npx expo start --go --tunnel --port 8480 *>> $logFile
+    & npx expo start --go --tunnel --port 8480 --clear *>> $logFile
     $exitCode = $LASTEXITCODE
   } catch {
     $exitCode = 1

@@ -29,8 +29,15 @@ test('presentation exposes distinct client and merchant journeys', () => {
 test('demo preview requires explicit journey selection by default', () => {
   const auth = read('src/contexts/AuthContext.js');
   const config = read('app.config.js');
+  const login = read('src/screens/LoginScreen.js');
+  const preview = read('scripts/start-preview-server.ps1');
   assert.match(auth, /configuredDemoAutoResume/);
   assert.match(config, /EXPO_PUBLIC_DEMO_AUTO_RESUME/);
+  assert.doesNotMatch(login, /demo@impar\.com/);
+  assert.doesNotMatch(login, /useState\('demo'\)/);
+  assert.match(preview, /EXPO_PUBLIC_API_URL/);
+  assert.match(preview, /impar-outfit-api\.vercel\.app\/api/);
+  assert.match(preview, /--clear/);
 });
 
 test('connected mode uses the real product shell without DemoContext as its data source', () => {

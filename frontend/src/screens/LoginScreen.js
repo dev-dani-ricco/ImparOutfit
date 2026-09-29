@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -15,10 +15,16 @@ import * as Haptics from 'expo-haptics';
 
 export default function LoginScreen({ navigation }) {
   const { demoMode, login, loginDemo, setDemoMode } = useAuth();
-  const [email, setEmail] = useState('demo@impar.com');
-  const [password, setPassword] = useState('demo');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loadingRole, setLoadingRole] = useState(null);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setEmail('');
+    setPassword('');
+    setError('');
+  }, [demoMode]);
 
   async function enterPresentation(role) {
     setError('');
@@ -48,8 +54,8 @@ export default function LoginScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-        <Pressable onPress={()=>{setEmail('');setPassword('');setDemoMode(!demoMode);}}>
-          <Text style={{color:colors.accent,padding:12}}>{demoMode?'ACESSAR POC COM CONTA REAL':'VOLTAR À SHOWCASE'}</Text>
+        <Pressable onPress={()=>setDemoMode(!demoMode)}>
+          <Text style={{color:colors.accent,padding:12}}>{demoMode?'TESTAR COM CONTA REAL':'VOLTAR À SHOWCASE'}</Text>
         </Pressable>
         <View style={styles.brandRow}>
           <View>
@@ -111,7 +117,8 @@ export default function LoginScreen({ navigation }) {
           </View>
         ) : (
           <View style={styles.form}>
-            <Text style={styles.sectionLabel}>ACESSE SUA CONTA</Text>
+            <Text style={styles.sectionLabel}>HOMOLOGAÇÃO · CONTA REAL</Text>
+            <Text style={styles.realModeNote}>Use uma conta criada neste ambiente ou crie uma nova abaixo. Credenciais da Showcase não funcionam aqui.</Text>
             <TextInput
               style={styles.input}
               placeholder="E-mail"
@@ -139,7 +146,7 @@ export default function LoginScreen({ navigation }) {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Pressable onPress={() => navigation.navigate('Cadastro')}>
-          <Text style={styles.registerLink}>Criar uma nova conta</Text>
+          <Text style={styles.registerLink}>{demoMode ? 'Criar uma nova conta' : 'CRIAR CONTA DE HOMOLOGAÇÃO →'}</Text>
         </Pressable>
         <Text style={styles.version}>IMPAR OUTFIT · EXPERIENCE PREVIEW 1.0</Text>
       </ScrollView>
@@ -179,6 +186,7 @@ const styles = StyleSheet.create({
   demoNoteTitle: { color: colors.gold, fontSize: 7, fontWeight: '900', letterSpacing: 1.2 },
   demoNoteCopy: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: 4 },
   form: { gap: 8 },
+  realModeNote: { color: colors.muted, fontSize: 11, lineHeight: 17, marginBottom: 4 },
   input: { borderBottomWidth: 1, borderColor: colors.line, paddingVertical: 14, color: colors.text, fontSize: 16 },
   loginButton: { backgroundColor: colors.primary, padding: 18, marginTop: 15, alignItems: 'center' },
   loginText: { color: colors.bg, fontWeight: '800', letterSpacing: 2, fontSize: 10 },
