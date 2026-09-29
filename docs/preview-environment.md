@@ -47,31 +47,37 @@ Git release -> QA gates -> PostgreSQL-backed HTTPS API -> EAS preview environmen
 
 This removes the dependency on an always-on development machine. A preview/development build is required when the native runtime differs from Expo Go or when a stable app-specific scheme/update channel is needed.
 
-### Current EAS blocker — 2026-09-28
+### Persistent preview status — 2026-09-28
 Validated on PC NewBio:
 - Expo/EAS account authenticated as @poshaze1;
-- project ID confirmed;
-- no EAS builds exist yet;
-- the EAS preview environment currently has no variables;
-- EXPO_PUBLIC_API_URL is not configured;
-- the preview build profile intentionally requires a distributed API and the guard rejects loopback/missing URLs.
+- project ID confirmed: 2251ff12-7ff9-4567-b27c-fd5f26c33fc6;
+- preview environment defines EXPO_PUBLIC_API_URL=https://impar-outfit-api.vercel.app/api;
+- distributed API guard passes with REQUIRE_DISTRIBUTED_API=true;
+- Android internal build finished successfully on channel preview;
+- build ID: 9bbf5625-a1a2-4f2c-bf2f-8924b931ba40;
+- runtime version: 1.0.0;
+- APK artifact responds HTTP 200 and is independent from the NewBio Metro process;
+- production API passes registration, Neon persistence, private media upload, signed media access and signed media read end to end.
 
-Do not bypass this guard for a product preview. First expose the PostgreSQL-backed API through a stable HTTPS endpoint, then configure EXPO_PUBLIC_API_URL in the EAS preview environment and generate the first internal build.
+The EAS preview path is now the persistent stakeholder distribution path. Expo Go remains a faster development/demo fallback, but is no longer the only route available.
 
 ## Release procedure
 1. Run product/tech/security review.
-2. Run frontend tests.
-3. Run expo-doctor.
-4. Run Android bundle guard.
-5. Smoke PERSON journey.
-6. Smoke ORGANIZATION journey.
+2. Run frontend and backend test gates.
+3. Run Expo Doctor.
+4. Run distributed API config + Android bundle guard.
+5. Run npm run smoke:production-media against the public API.
+6. Smoke PERSON and ORGANIZATION journeys on real devices.
 7. Commit/push the release branch.
-8. Restart the Expo Go scheduled task for immediate presentation testing.
-9. Publish to the EAS preview channel after the preview build path is available.
+8. Use the EAS preview build for persistent Android stakeholder testing.
+9. Keep Expo Go as the fast development fallback.
 10. Record release notes and rollback commit.
 
+## iOS boundary
+The preview environment and API configuration are valid for iOS, but the internal EAS build cannot be generated non-interactively until Apple provisioning credentials / a registered device are configured. EAS explicitly returned that no suitable internal-distribution credentials are available.
+
 ## Important boundary
-Expo Go remains useful for fast stakeholder demos because the client already knows the workflow. It is not the final production distribution architecture.
+Expo Go remains useful for fast stakeholder demos. The Android EAS preview is the first independent persistent build; iOS persistent distribution still depends on Apple provisioning.
 
 
 ## Published preview baseline — 2026-09-26

@@ -164,16 +164,19 @@ Banco e storage devem manter separação Person x Organization.
 Frontend:
 - npm test: 25/25 PASS;
 - Expo Doctor: 21/21 PASS;
-- API config guard: PASS;
+- API config guard local: PASS;
+- API config guard distribuído com REQUIRE_DISTRIBUTED_API=true: PASS;
 - Android export/bundle: PASS;
 - bundle contém avatar paramétrico, cabelos e seis GLBs de roupas;
 - Avatar Studio agora possui presets corporais e modo avançado recolhido para corpo/rosto sem remover controles finos.
 
 Backend:
-- suíte completa: ALL_TEST_FILES=PASS;
+- suíte completa na branch integrada: ALL_TEST_FILES=PASS;
 - avatarProvider.test.js: 3/3 PASS;
 - foundation.test.js: 75/75 PASS sem falha pós-suite;
-- runner de testes força NODE_ENV=test + PGLITE_DATA_DIR=memory:// para isolar testes do runtime persistente.
+- productionConfig: 3/3 PASS;
+- runner de testes força NODE_ENV=test + PGLITE_DATA_DIR=memory:// para isolar testes do runtime persistente;
+- produção Vercel + Neon + storage privado: smoke E2E PASS.
 
 Diagnóstico PGlite:
 - o teardown da suíte foi resolvido sem mascarar erro;
@@ -217,15 +220,25 @@ Git -> QA gates -> EAS preview -> stakeholder preview build.
 Objetivo:
 parar de depender de Metro/PC ligado para apresentação ao cliente.
 
-Ainda é necessário gerar/validar o primeiro build de preview compatível com o runtime atual para essa rota virar o canal canônico do cliente.
-
-Validação feita em 2026-09-28:
+Estado concluído em 2026-09-28:
 - EAS autenticado como @poshaze1;
-- Project ID confirmado;
-- build:list retornou zero builds;
-- ambiente EAS preview não possui variáveis;
-- EXPO_PUBLIC_API_URL distribuída ainda não está configurada;
-- o guard de build bloqueia corretamente preview sem API pública HTTPS, portanto nenhum build remoto quebrado foi disparado.
+- Project ID confirmado: 2251ff12-7ff9-4567-b27c-fd5f26c33fc6;
+- ambiente preview define EXPO_PUBLIC_API_URL=https://impar-outfit-api.vercel.app/api;
+- guard distribuído passa com REQUIRE_DISTRIBUTED_API=true;
+- primeiro build Android interno concluído no canal preview;
+- EAS build ID: 9bbf5625-a1a2-4f2c-bf2f-8924b931ba40;
+- runtime: 1.0.0;
+- APK disponível e validado por HTTP 200;
+- o APK não depende do Metro/PC NewBio para iniciar.
+
+Backend distribuído:
+- Vercel project: impar-outfit-api;
+- endpoint público canônico: https://impar-outfit-api.vercel.app/api;
+- Neon/PostgreSQL com 34 migrations aplicadas até 034_impar_analysis_requests.sql;
+- storage privado S3-compatible ativo;
+- smoke E2E PASS: cadastro -> identidade Neon -> upload privado -> URL assinada -> leitura WebP;
+- rota serverless aninhada /api/:path* corrigida e validada;
+- erros 5xx possuem logging sanitizado por requestId, sem payload/secrets.
 ## 11. Commits de referência
 
 Linha principal desta frente:
@@ -236,13 +249,19 @@ Linha principal desta frente:
 - 7740909 — evolve professional avatars and garment 3d;
 - 3c8443e — restrict realistic avatar provider session hosts;
 - 35c410b — isolate PGlite test teardown harness;
-- 449bd45 — simplify Avatar Studio with body presets and progressive advanced editing.
+- 449bd45 — simplify Avatar Studio with body presets and progressive advanced editing;
+- 9d419bd — harden distributed production API readiness;
+- 7aa2427 — connect production API to Neon private storage;
+- 77a3e5f — harden distributed API release gates;
+- 0861277 — route nested API paths on Vercel;
+- 5ebc6f2 — add sanitized server-side error observability.
 
 Baseline UX anterior:
 - 27b736f — separate client and merchant preview journeys;
 - a8c35fb — stakeholder preview runbook.
 
-Branch atual deve continuar sendo tratada como experimental/preview até passar os gates restantes.
+Branch de integração/release candidate atual: ops/e2e-preview-20260928.
+O Android preview distribuído e o backend público estão aprovados para stakeholder preview. Produção pública/comercial continua condicionada aos gates físicos/provider descritos abaixo.
 ## 12. Próximos passos por papel
 
 PO / Project Lead:
@@ -251,10 +270,13 @@ PO / Project Lead:
 - definir critérios de aceite para demonstração ao cliente.
 
 Tech Lead / Arquitetura:
-- manter testes PGlite isolados em memória e não promover PGlite nodefs/Node 24 como runtime de produção;
-- fechar estratégia de preview build/EAS conectando uma API PostgreSQL pública HTTPS;
-- validar provider abstraction e fallback;
-- consolidar storage privado para GLBs reais.
+- testes PGlite isolados em memória: CONCLUÍDO;
+- runtime distribuído PostgreSQL/Neon: CONCLUÍDO;
+- API pública HTTPS em Vercel: CONCLUÍDO;
+- EAS Preview Android independente do Metro: CONCLUÍDO;
+- storage privado S3-compatible: CONCLUÍDO e validado em smoke E2E;
+- manter PGlite nodefs/Node 24 fora do runtime de produção;
+- validar provider abstraction/fallback quando o provider real for contratado/configurado.
 
 UX / Product Design:
 - presets corporais + modo avançado de corpo/rosto: IMPLEMENTADO;
@@ -268,10 +290,11 @@ Mobile:
 - manter Expo SDK 57 compatível.
 
 Backend / Data:
-- conectar provider real somente com segredo server-side;
-- versionar provider/engine no avatar_config;
-- persistir apenas metadados seguros;
-- validar storage e autorização dos outputs 3D.
+- Neon/PostgreSQL conectado e migrations 001-034 aplicadas: CONCLUÍDO;
+- storage privado e autorização de mídia: CONCLUÍDO e validado E2E;
+- smoke versionado: npm run smoke:production-media;
+- conectar provider real somente com segredo server-side quando houver credencial comercial;
+- manter provider/engine versionado no avatar_config e persistir apenas metadados seguros.
 
 3D / Reconstruction:
 - calibrar morphs com amostras de corpos distintos;
@@ -285,24 +308,32 @@ Security / Privacy:
 - garantir menor privilégio nos endpoints 3D.
 
 QA / Release:
-- manter 25/25 frontend como baseline mínimo;
-- manter 21/21 Expo Doctor;
-- bundle Android/iOS;
-- smoke PERSON e ORGANIZATION;
-- smoke avatar paramétrico;
-- smoke garment proxy;
-- smoke private READY GLB;
-- E2E provider quando token existir;
-- rollback commit registrado.
+- frontend 25/25: PASS;
+- Expo Doctor 21/21: PASS;
+- Android distributed export/bundle: PASS;
+- Android EAS internal preview build: FINISHED;
+- APK artifact: HTTP 200;
+- public API + Neon + private storage smoke: PASS;
+- iOS internal build: BLOCKED EXTERNAMENTE por provisioning/credencial Apple interativa;
+- smoke físico PERSON/ORGANIZATION em aparelhos reais permanece necessário;
+- smoke private READY GLB e E2E provider permanecem condicionados a output/provider real;
+- rollback continua disponível pelo histórico Git/Vercel.
 ## 13. Pendências críticas
 
-P0 antes de produção:
-1. substituir/evitar PGlite persistente nodefs no runtime Node 24; testes já estão isolados e limpos;
-2. smoke real em iOS e Android;
-3. disponibilizar backend PostgreSQL + storage privado em endpoint público HTTPS;
-4. configurar EXPO_PUBLIC_API_URL no ambiente EAS preview e gerar o primeiro preview build independente do Metro;
-5. validar Avaturn E2E se a rota premium for mantida;
-6. revisar desempenho do GLB paramétrico em aparelhos intermediários.
+P0 antes de produção pública/comercial:
+1. smoke físico em iOS e Android;
+2. provisionar credencial/dispositivo Apple para build iOS interno ou definir distribuição TestFlight;
+3. validar Avaturn E2E se a rota premium for mantida;
+4. revisar FPS/memória do GLB paramétrico em aparelhos intermediários;
+5. executar smoke de um private READY GLB real quando houver reconstrução real aprovada.
+
+Concluídos neste ciclo:
+- PGlite removido do caminho de produção;
+- backend PostgreSQL/Neon público HTTPS;
+- storage privado;
+- rota serverless aninhada;
+- EXPO_PUBLIC_API_URL no EAS preview;
+- primeiro Android EAS preview independente do Metro.
 
 P1:
 - presets corporais/faciais sem substituir controles finos: IMPLEMENTADO no Avatar Studio;
