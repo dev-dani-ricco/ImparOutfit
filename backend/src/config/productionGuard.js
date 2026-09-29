@@ -21,8 +21,11 @@ export function productionConfigErrors(env=process.env){
 
   if(!env.JWT_SECRET || String(env.JWT_SECRET).length<32 || placeholder(env.JWT_SECRET)) errors.push('JWT_SECRET_WEAK_OR_MISSING');
 
-  if(!env.MEDIA_ROOT) errors.push('MEDIA_ROOT_REQUIRED');
-  else if(!isAbsolute(env.MEDIA_ROOT)) errors.push('MEDIA_ROOT_MUST_BE_ABSOLUTE');
+  const externalStorage=Boolean(env.MEDIA_BUCKET&&env.AWS_ENDPOINT_URL_S3&&env.AWS_REGION&&env.AWS_ACCESS_KEY_ID&&env.AWS_SECRET_ACCESS_KEY);
+  if(!externalStorage){
+    if(!env.MEDIA_ROOT) errors.push('DURABLE_MEDIA_STORAGE_REQUIRED');
+    else if(!isAbsolute(env.MEDIA_ROOT)) errors.push('MEDIA_ROOT_MUST_BE_ABSOLUTE');
+  }
 
   const origins=String(env.CORS_ORIGIN||'').split(',').map(v=>v.trim()).filter(Boolean);
   if(!origins.length) errors.push('CORS_ORIGIN_REQUIRED');
