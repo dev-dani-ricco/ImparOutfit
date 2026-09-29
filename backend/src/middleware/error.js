@@ -21,5 +21,12 @@ export function errorHandler(err, req, res, _next) {
   else if (err.type === 'entity.parse.failed' || ['22P02','23502','23514'].includes(err.code)) { status=400;code='VALIDATION_ERROR'; }
   else if (err.code === '23505') { status=409;code='DUPLICATE_RESOURCE'; }
   else if (err.code === '23503') { status=404;code='RESOURCE_NOT_FOUND'; }
+  if(status>=500){
+    console.error(JSON.stringify({
+      event:'api_error',requestId:req.requestId,code,
+      errorName:err?.name||'Error',dbCode:typeof err?.code==='string'?err.code:null,
+      constraint:typeof err?.constraint==='string'?err.constraint:null
+    }));
+  }
   res.status(status).json(envelope(req,status,code,details));
 }
