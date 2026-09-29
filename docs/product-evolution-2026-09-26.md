@@ -1,5 +1,7 @@
 # IMPAR Outfit — Product Evolution Plan — 2026-09-26
 
+> HISTÓRICO. A fonte operacional vigente de maturação e MVP é `EXECUTION-MAP-IMPAR-OUTFIT-MVP.md`.
+
 ## Product diagnosis
 The backend/domain foundation has evolved faster than the visible mobile experience. The next cycle must turn those capabilities into a coherent commercial product, not add more hidden infrastructure.
 

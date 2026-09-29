@@ -1,5 +1,7 @@
 # Roadmap após CICLO 1
 
+> HISTÓRICO. A fonte operacional vigente de prioridades e próximos ciclos é `EXECUTION-MAP-IMPAR-OUTFIT-MVP.md`.
+
 CICLO 1 estabelece identidade Person/Account, memberships, capabilities, mídia privada,
 migrations, separação de posse e referências comerciais, e demo isolada por identidade.
 Consulte architecture.md e cycle1-validation.md para a entrega comprovada e seus limites.

@@ -1,5 +1,7 @@
 # Caminho de produção 3D
 
+> REFERÊNCIA HISTÓRICA DE 3D. Estado e prioridade atuais estão consolidados em `EXECUTION-MAP-IMPAR-OUTFIT-MVP.md` e no handoff V4.
+
 | Estágio | Solução atual | Limitação | Próximo gatilho |
 | --- | --- | --- | --- |
 | Captura | Fotos multivista autenticadas | Sem validação visual em tempo real | Dados de recaptura mostrarem baixa cobertura/foco recorrente |

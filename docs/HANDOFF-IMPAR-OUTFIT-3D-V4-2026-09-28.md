@@ -8,6 +8,8 @@ Remote: https://github.com/dev-dani-ricco/ImparOutfit.git
 
 ## 1. Objetivo do handoff
 
+Fonte operacional de maturação/MVP: `docs/EXECUTION-MAP-IMPAR-OUTFIT-MVP.md`. Este handoff preserva o detalhe técnico da frente 3D/infra.
+
 Este documento consolida o estado atual do IMPAR Outfit após:
 - separação explícita CLIENTE FINAL x LOJISTA;
 - evolução da experiência móvel;
