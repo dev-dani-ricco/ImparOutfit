@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { avatarMorphWeights, garmentFitScale, normalizeAvatarSpec } from '../src/avatar/avatarSpec.mjs';
+import { applyBodyPreset, avatarMorphWeights, garmentFitScale, normalizeAvatarSpec } from '../src/avatar/avatarSpec.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -57,6 +57,18 @@ test('avatar controls map to bounded real morph target names', () => {
   }
 });
 
+test('body presets provide fast starting points without changing measurements or presentation', () => {
+  const base = normalizeAvatarSpec({ height: '171', bust: '96', waist: '75', hips: '106', avatarControls: { body: { presentation: 'neutral' } } });
+  const athletic = applyBodyPreset(base, 'athletic');
+  assert.equal(athletic.body.presentation, 'neutral');
+  assert.deepEqual(athletic.measurements, base.measurements);
+  assert.equal(athletic.heightCm, base.heightCm);
+  assert.ok(athletic.body.muscle > base.body.muscle);
+  assert.ok(athletic.body.shoulders > base.body.shoulders);
+  assert.notEqual(athletic, base);
+  assert.deepEqual(applyBodyPreset(base, 'missing-preset'), base);
+});
+
 test('garment proportional fit reacts by category while staying bounded', () => {
   const base = normalizeAvatarSpec({ height: '168', bust: '94', waist: '76', hips: '104' });
   const curvy = normalizeAvatarSpec({ height: '178', bust: '112', waist: '82', hips: '124' });
@@ -76,6 +88,9 @@ test('mobile implementation exposes studio and proportional garment fit', () => 
   assert.match(avatar, /arrayBuffer\(\)/);
   assert.match(avatar, /morphTargetInfluences/);
   for (const tab of ['CORPO','ROSTO','CABELO']) assert.match(studio, new RegExp(tab));
+  assert.match(studio, /BASE CORPORAL/);
+  assert.match(studio, /AJUSTES AVANÇADOS DO CORPO/);
+  assert.match(studio, /AJUSTES AVANÇADOS DO ROSTO/);
   assert.match(composition, /garmentFitProfile/);
   assert.match(composition, /Aplicar ajuste corporal/);
   assert.match(composition, /makehuman-parametric-base\.glb/);

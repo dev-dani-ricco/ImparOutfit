@@ -4,11 +4,13 @@ import Slider from '@react-native-community/slider';
 import * as Haptics from 'expo-haptics';
 import ParametricAvatar3D from '../components/ParametricAvatar3D';
 import {
+  BODY_PRESETS,
   FACE_SHAPES,
   EYE_COLORS,
   HAIR_COLORS,
   HAIR_STYLES,
   SKIN_TONES,
+  applyBodyPreset,
   avatarSpecToProfile,
   normalizeAvatarSpec,
 } from '../avatar/avatarSpec.mjs';
@@ -24,10 +26,16 @@ export default function AvatarStudioScreen({ navigation }) {
   const { token, demoMode } = useAuth();
   const [spec, setSpec] = useState(() => normalizeAvatarSpec(profile));
   const [section, setSection] = useState('CORPO');
+  const [bodyPreset, setBodyPreset] = useState(null);
+  const [advancedBody, setAdvancedBody] = useState(false);
+  const [advancedFace, setAdvancedFace] = useState(false);
 
   const liveProfile = useMemo(() => avatarSpecToProfile(profile, spec), [profile, spec]);
 
-  const updateBody = (key, value) => setSpec((current) => ({ ...current, body: { ...current.body, [key]: value } }));
+  const updateBody = (key, value) => {
+    setBodyPreset(null);
+    setSpec((current) => ({ ...current, body: { ...current.body, [key]: value } }));
+  };
   const updateFace = (key, value) => setSpec((current) => ({ ...current, face: { ...current.face, [key]: value } }));
   const updateAppearance = (key, value) => setSpec((current) => ({ ...current, appearance: { ...current.appearance, [key]: value } }));
   const updateMeasurement = (key, value) => setSpec((current) => ({ ...current, measurements: { ...current.measurements, [key]: value } }));
@@ -35,6 +43,12 @@ export default function AvatarStudioScreen({ navigation }) {
   async function chooseSection(next) {
     await Haptics.selectionAsync().catch(() => {});
     setSection(next);
+  }
+
+  async function chooseBodyPreset(presetId) {
+    await Haptics.selectionAsync().catch(() => {});
+    setSpec((current) => applyBodyPreset(current, presetId));
+    setBodyPreset(presetId);
   }
 
   async function save() {
@@ -84,7 +98,7 @@ export default function AvatarStudioScreen({ navigation }) {
         {section === 'CORPO' ? (
           <View style={styles.panel}>
             <Text style={styles.panelTitle}>Proporções corporais</Text>
-            <Text style={styles.panelCopy}>Ajustes anatômicos em morph targets; não são apenas escala visual do objeto.</Text>
+            <Text style={styles.panelCopy}>Comece por uma base visual, confirme suas medidas e refine somente o que fizer sentido.</Text>
 
             <ChoiceRow
               label="APRESENTAÇÃO CORPORAL"
@@ -96,52 +110,63 @@ export default function AvatarStudioScreen({ navigation }) {
               value={spec.body.presentation}
               onChange={(value) => updateBody('presentation', value)}
             />
+            <ChoiceRow label="BASE CORPORAL" options={BODY_PRESETS} value={bodyPreset} onChange={chooseBodyPreset} />
 
             <NumericControl label="ALTURA" value={spec.heightCm} min={145} max={195} step={1} suffix=" cm" onChange={(value) => setSpec((current) => ({ ...current, heightCm: value }))} />
             <NumericControl label="BUSTO" value={spec.measurements.bust} min={70} max={130} step={1} suffix=" cm" onChange={(value) => updateMeasurement('bust', value)} />
             <NumericControl label="CINTURA" value={spec.measurements.waist} min={55} max={120} step={1} suffix=" cm" onChange={(value) => updateMeasurement('waist', value)} />
             <NumericControl label="QUADRIL" value={spec.measurements.hips} min={75} max={140} step={1} suffix=" cm" onChange={(value) => updateMeasurement('hips', value)} />
 
-            <MorphControl label="PESO VISUAL" value={spec.body.weight} left="Mais enxuto" right="Mais volume" onChange={(value) => updateBody('weight', value)} />
-            <MorphControl label="MUSCULATURA" value={spec.body.muscle} left="Suave" right="Definida" onChange={(value) => updateBody('muscle', value)} />
-            <MorphControl label="OMBROS" value={spec.body.shoulders} left="Estreitos" right="Largos" onChange={(value) => updateBody('shoulders', value)} />
-            <MorphControl label="TÓRAX" value={spec.body.chest} left="Estreito" right="Profundo" onChange={(value) => updateBody('chest', value)} />
-            <MorphControl label="CINTURA 3D" value={spec.body.waist} left="Marcada" right="Ampla" onChange={(value) => updateBody('waist', value)} />
-            <MorphControl label="QUADRIL 3D" value={spec.body.hips} left="Estreito" right="Amplo" onChange={(value) => updateBody('hips', value)} />
-            <MorphControl label="ABDÔMEN" value={spec.body.belly} left="Definido" right="Mais volume" onChange={(value) => updateBody('belly', value)} />
-            <MorphControl label="BRAÇOS" value={spec.body.arms} left="Finos" right="Volumosos" onChange={(value) => updateBody('arms', value)} />
-            <MorphControl label="COMPRIMENTO DOS BRAÇOS" value={spec.body.armsLength} left="Curtos" right="Longos" onChange={(value) => updateBody('armsLength', value)} />
-            <MorphControl label="COXAS" value={spec.body.thighs} left="Finas" right="Volumosas" onChange={(value) => updateBody('thighs', value)} />
-            <MorphControl label="PANTURRILHAS" value={spec.body.calves} left="Finas" right="Volumosas" onChange={(value) => updateBody('calves', value)} />
-            <MorphControl label="GLÚTEOS" value={spec.body.glutes} left="Discretos" right="Projetados" onChange={(value) => updateBody('glutes', value)} />
-            <MorphControl label="COMPRIMENTO DAS PERNAS" value={spec.body.legsLength} left="Curtas" right="Longas" onChange={(value) => updateBody('legsLength', value)} />
+            <AdvancedToggle expanded={advancedBody} onPress={() => setAdvancedBody((value) => !value)} label="AJUSTES AVANÇADOS DO CORPO" />
+            {advancedBody ? (
+              <View>
+                <MorphControl label="PESO VISUAL" value={spec.body.weight} left="Mais enxuto" right="Mais volume" onChange={(value) => updateBody('weight', value)} />
+                <MorphControl label="MUSCULATURA" value={spec.body.muscle} left="Suave" right="Definida" onChange={(value) => updateBody('muscle', value)} />
+                <MorphControl label="OMBROS" value={spec.body.shoulders} left="Estreitos" right="Largos" onChange={(value) => updateBody('shoulders', value)} />
+                <MorphControl label="TÓRAX" value={spec.body.chest} left="Estreito" right="Profundo" onChange={(value) => updateBody('chest', value)} />
+                <MorphControl label="CINTURA 3D" value={spec.body.waist} left="Marcada" right="Ampla" onChange={(value) => updateBody('waist', value)} />
+                <MorphControl label="QUADRIL 3D" value={spec.body.hips} left="Estreito" right="Amplo" onChange={(value) => updateBody('hips', value)} />
+                <MorphControl label="ABDÔMEN" value={spec.body.belly} left="Definido" right="Mais volume" onChange={(value) => updateBody('belly', value)} />
+                <MorphControl label="BRAÇOS" value={spec.body.arms} left="Finos" right="Volumosos" onChange={(value) => updateBody('arms', value)} />
+                <MorphControl label="COMPRIMENTO DOS BRAÇOS" value={spec.body.armsLength} left="Curtos" right="Longos" onChange={(value) => updateBody('armsLength', value)} />
+                <MorphControl label="COXAS" value={spec.body.thighs} left="Finas" right="Volumosas" onChange={(value) => updateBody('thighs', value)} />
+                <MorphControl label="PANTURRILHAS" value={spec.body.calves} left="Finas" right="Volumosas" onChange={(value) => updateBody('calves', value)} />
+                <MorphControl label="GLÚTEOS" value={spec.body.glutes} left="Discretos" right="Projetados" onChange={(value) => updateBody('glutes', value)} />
+                <MorphControl label="COMPRIMENTO DAS PERNAS" value={spec.body.legsLength} left="Curtas" right="Longas" onChange={(value) => updateBody('legsLength', value)} />
+              </View>
+            ) : null}
           </View>
         ) : null}
 
         {section === 'ROSTO' ? (
           <View style={styles.panel}>
             <Text style={styles.panelTitle}>Estrutura do rosto</Text>
-            <Text style={styles.panelCopy}>Formato craniano, mandíbula, nariz, olhos, maçãs e lábios são morphs reais do mesh.</Text>
+            <Text style={styles.panelCopy}>Escolha uma forma-base e aparência primeiro. Os ajustes anatômicos finos ficam disponíveis quando você quiser refinar.</Text>
 
-            <ChoiceRow label="FORMATO" options={FACE_SHAPES} value={spec.face.shape} onChange={(value) => updateFace('shape', value)} />
-            <MorphControl label="LARGURA DO ROSTO" value={spec.face.width} left="Estreito" right="Largo" onChange={(value) => updateFace('width', value)} />
-            <MorphControl label="MANDÍBULA" value={spec.face.jaw} left="Delicada" right="Marcada" onChange={(value) => updateFace('jaw', value)} />
-            <MorphControl label="QUEIXO" value={spec.face.chin} left="Curto" right="Longo" onChange={(value) => updateFace('chin', value)} />
-            <MorphControl label="PROJEÇÃO DO QUEIXO" value={spec.face.chinProjection} left="Recuado" right="Projetado" onChange={(value) => updateFace('chinProjection', value)} />
-            <MorphControl label="MAÇÃS DO ROSTO" value={spec.face.cheek} left="Definidas" right="Cheias" onChange={(value) => updateFace('cheek', value)} />
-            <MorphControl label="TESTA" value={spec.face.forehead} left="Baixa" right="Alta" onChange={(value) => updateFace('forehead', value)} />
-            <MorphControl label="PONTE DO NARIZ" value={spec.face.noseBridge} left="Estreita" right="Larga" onChange={(value) => updateFace('noseBridge', value)} />
-            <MorphControl label="LARGURA DO NARIZ" value={spec.face.noseWidth} left="Estreito" right="Largo" onChange={(value) => updateFace('noseWidth', value)} />
-            <MorphControl label="COMPRIMENTO DO NARIZ" value={spec.face.noseLength} left="Curto" right="Longo" onChange={(value) => updateFace('noseLength', value)} />
-            <MorphControl label="PROJEÇÃO DO NARIZ" value={spec.face.noseProjection} left="Recuado" right="Projetado" onChange={(value) => updateFace('noseProjection', value)} />
-            <MorphControl label="TAMANHO DOS OLHOS" value={spec.face.eyesSize} left="Pequenos" right="Grandes" onChange={(value) => updateFace('eyesSize', value)} />
-            <MorphControl label="ESPAÇAMENTO DOS OLHOS" value={spec.face.eyesSpacing} left="Próximos" right="Afastados" onChange={(value) => updateFace('eyesSpacing', value)} />
-            <MorphControl label="ALTURA DOS OLHOS" value={spec.face.eyesHeight} left="Baixos" right="Altos" onChange={(value) => updateFace('eyesHeight', value)} />
-            <MorphControl label="LARGURA DA BOCA" value={spec.face.mouthWidth} left="Estreita" right="Larga" onChange={(value) => updateFace('mouthWidth', value)} />
-            <MorphControl label="VOLUME DOS LÁBIOS" value={spec.face.lipFullness} left="Finos" right="Volumosos" onChange={(value) => updateFace('lipFullness', value)} />
-
+            <ChoiceRow label="FORMATO-BASE" options={FACE_SHAPES} value={spec.face.shape} onChange={(value) => updateFace('shape', value)} />
             <ColorRow label="TOM DE PELE" colors={SKIN_TONES} value={spec.appearance.skinTone} onChange={(value) => updateAppearance('skinTone', value)} />
             <ColorRow label="COR DOS OLHOS" colors={EYE_COLORS} value={spec.appearance.eyeColor} onChange={(value) => updateAppearance('eyeColor', value)} />
+
+            <AdvancedToggle expanded={advancedFace} onPress={() => setAdvancedFace((value) => !value)} label="AJUSTES AVANÇADOS DO ROSTO" />
+            {advancedFace ? (
+              <View>
+                <MorphControl label="LARGURA DO ROSTO" value={spec.face.width} left="Estreito" right="Largo" onChange={(value) => updateFace('width', value)} />
+                <MorphControl label="MANDÍBULA" value={spec.face.jaw} left="Delicada" right="Marcada" onChange={(value) => updateFace('jaw', value)} />
+                <MorphControl label="QUEIXO" value={spec.face.chin} left="Curto" right="Longo" onChange={(value) => updateFace('chin', value)} />
+                <MorphControl label="PROJEÇÃO DO QUEIXO" value={spec.face.chinProjection} left="Recuado" right="Projetado" onChange={(value) => updateFace('chinProjection', value)} />
+                <MorphControl label="MAÇÃS DO ROSTO" value={spec.face.cheek} left="Definidas" right="Cheias" onChange={(value) => updateFace('cheek', value)} />
+                <MorphControl label="TESTA" value={spec.face.forehead} left="Baixa" right="Alta" onChange={(value) => updateFace('forehead', value)} />
+                <MorphControl label="PONTE DO NARIZ" value={spec.face.noseBridge} left="Estreita" right="Larga" onChange={(value) => updateFace('noseBridge', value)} />
+                <MorphControl label="LARGURA DO NARIZ" value={spec.face.noseWidth} left="Estreito" right="Largo" onChange={(value) => updateFace('noseWidth', value)} />
+                <MorphControl label="COMPRIMENTO DO NARIZ" value={spec.face.noseLength} left="Curto" right="Longo" onChange={(value) => updateFace('noseLength', value)} />
+                <MorphControl label="PROJEÇÃO DO NARIZ" value={spec.face.noseProjection} left="Recuado" right="Projetado" onChange={(value) => updateFace('noseProjection', value)} />
+                <MorphControl label="TAMANHO DOS OLHOS" value={spec.face.eyesSize} left="Pequenos" right="Grandes" onChange={(value) => updateFace('eyesSize', value)} />
+                <MorphControl label="ESPAÇAMENTO DOS OLHOS" value={spec.face.eyesSpacing} left="Próximos" right="Afastados" onChange={(value) => updateFace('eyesSpacing', value)} />
+                <MorphControl label="ALTURA DOS OLHOS" value={spec.face.eyesHeight} left="Baixos" right="Altos" onChange={(value) => updateFace('eyesHeight', value)} />
+                <MorphControl label="LARGURA DA BOCA" value={spec.face.mouthWidth} left="Estreita" right="Larga" onChange={(value) => updateFace('mouthWidth', value)} />
+                <MorphControl label="VOLUME DOS LÁBIOS" value={spec.face.lipFullness} left="Finos" right="Volumosos" onChange={(value) => updateFace('lipFullness', value)} />
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -209,6 +234,18 @@ function ChoiceRow({ label, options, value, onChange }) {
   );
 }
 
+function AdvancedToggle({ expanded, label, onPress }) {
+  return (
+    <Pressable style={styles.advancedToggle} onPress={onPress}>
+      <View>
+        <Text style={styles.advancedToggleLabel}>{label}</Text>
+        <Text style={styles.advancedToggleCopy}>{expanded ? 'Ocultar refinamentos' : 'Abrir refinamentos anatômicos'}</Text>
+      </View>
+      <Text style={styles.advancedToggleIcon}>{expanded ? '−' : '+'}</Text>
+    </Pressable>
+  );
+}
+
 function NumericControl({ label, value, min, max, step, suffix, onChange }) {
   return (
     <View style={styles.control}>
@@ -270,6 +307,10 @@ const styles = StyleSheet.create({
   choiceActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   choiceText: { color: '#5F5750', fontSize: 8, fontWeight: '800' },
   choiceTextActive: { color: '#FFFFFF' },
+  advancedToggle: { marginTop: 18, borderWidth: 1, borderColor: '#D8CEC5', backgroundColor: '#F8F4EF', paddingHorizontal: 12, paddingVertical: 11, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  advancedToggleLabel: { color: '#38332F', fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },
+  advancedToggleCopy: { color: '#8A8078', fontSize: 8, marginTop: 3 },
+  advancedToggleIcon: { color: colors.accent, fontSize: 20, fontWeight: '500' },
   colorRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
   colorOuter: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: 'transparent', padding: 3 },
   colorOuterActive: { borderColor: colors.accent },

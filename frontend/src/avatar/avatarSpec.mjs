@@ -17,6 +17,19 @@ export const SKIN_TONES = ['#F4D7C4','#E8BDA2','#D79B76','#B97855','#875139','#4
 export const HAIR_COLORS = ['#1F1714','#3B271E','#6A452D','#A56C3F','#D5B17A','#7B2C23'];
 export const EYE_COLORS = ['#2E211B','#4E382D','#6C5439','#6A7652','#4B6975','#718CA3'];
 
+export const BODY_PRESETS = [
+  { id: 'balanced', label: 'Equilibrado', values: { weight: 0.48, muscle: 0.42, shoulders: 0.5, chest: 0.5, waist: 0.45, hips: 0.55, belly: 0.42, arms: 0.48, thighs: 0.5, calves: 0.5, glutes: 0.5 } },
+  { id: 'soft-curves', label: 'Curvas suaves', values: { weight: 0.58, muscle: 0.32, shoulders: 0.44, chest: 0.56, waist: 0.38, hips: 0.68, belly: 0.5, arms: 0.5, thighs: 0.62, calves: 0.54, glutes: 0.62 } },
+  { id: 'athletic', label: 'Atlético', values: { weight: 0.46, muscle: 0.72, shoulders: 0.68, chest: 0.58, waist: 0.42, hips: 0.52, belly: 0.28, arms: 0.62, thighs: 0.62, calves: 0.6, glutes: 0.56 } },
+  { id: 'slender', label: 'Longilíneo', values: { weight: 0.3, muscle: 0.38, shoulders: 0.44, chest: 0.4, waist: 0.4, hips: 0.44, belly: 0.34, arms: 0.34, thighs: 0.36, calves: 0.36, glutes: 0.4 } },
+];
+
+export function applyBodyPreset(spec, presetId) {
+  const preset = BODY_PRESETS.find((item) => item.id === presetId);
+  if (!preset) return spec;
+  return { ...spec, body: { ...spec.body, ...preset.values } };
+}
+
 const clamp01 = (value) => Math.min(1, Math.max(0, Number.isFinite(Number(value)) ? Number(value) : 0.5));
 const numberFrom = (value, fallback) => {
   const parsed = Number(String(value ?? '').replace(',', '.'));
