@@ -150,15 +150,29 @@ Status: CONCLUÍDO.
 Entregas: Execution Map, estado factual, definição de MVP, prioridades e processo.
 
 ### CICLO M1 — Connected Product Shell
-Status: ATIVO.
+Status: IMPLEMENTADO / AGUARDANDO VALIDAÇÃO FÍSICA NO EXPO GO.
 Objetivo: usuário autenticado real deve entrar na arquitetura visual correta PERSON/ORGANIZATION, sem cair numa superfície técnica paralela.
-Entregas:
-- camada de dados conectada com contratos normalizados;
-- shell/context switch real;
-- Home PERSON conectada;
-- estados de carregamento/erro;
-- nenhuma regressão do modo demo.
-Gate: login real -> Home PERSON real pelo Expo Go.
+
+Entregue:
+- ConnectedDataContext separado do DemoContext;
+- Home, Armário, Descobrir e Perfil conectados a dados reais;
+- Painel, Catálogo, Campanhas/showcases e Conta do LOJISTA usando dados reais;
+- RootNavigator removeu a antiga ConnectedExperience técnica de duas abas;
+- troca PERSON/ORGANIZATION usa o contexto real da conta;
+- Descobrir salva/remove referência comercial pela API sem criar posse;
+- Avatar Studio conectado lê perfil real e atualiza a API;
+- loading, empty, error e retry básicos;
+- teste de contrato impede ConnectedProductScreens de importar DemoContext.
+
+Evidências automáticas:
+- frontend 26/26 PASS;
+- Expo Doctor 21/21 PASS;
+- Android export/Metro PASS;
+- API guard PASS;
+- /health, /ready, /stores, /products e /showcases HTTP 200;
+- Expo Preview task Running, porta 8480 Listening e túnel externo HTTP 200.
+
+Gate restante: abrir no Expo Go e validar login real -> Home PERSON real -> troca de abas/contexto sem erro visual/runtime.
 
 ### CICLO M2 — PERSON Core
 Objetivo: Perfil/Avatar -> Armário -> peça -> Look -> Análise usando persistência real.

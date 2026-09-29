@@ -17,13 +17,16 @@ import {
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useDemo } from '../contexts/DemoContext';
+import { useConnectedData } from '../contexts/ConnectedDataContext';
 import { colors } from '../theme/colors';
 
 const SECTIONS = ['CORPO', 'ROSTO', 'CABELO'];
 
 export default function AvatarStudioScreen({ navigation }) {
-  const { profile, setProfile } = useDemo();
+  const demo = useDemo();
+  const connected = useConnectedData();
   const { token, demoMode } = useAuth();
+  const profile = demoMode ? demo.profile : (connected.personal.profile || {});
   const [spec, setSpec] = useState(() => normalizeAvatarSpec(profile));
   const [section, setSection] = useState('CORPO');
   const [bodyPreset, setBodyPreset] = useState(null);
@@ -69,7 +72,8 @@ export default function AvatarStudioScreen({ navigation }) {
         avatarControls: next.avatarControls,
       } });
     }
-    setProfile(next);
+    if (demoMode) demo.setProfile(next);
+    else connected.refresh();
     Alert.alert('Avatar atualizado', 'Rosto, corpo, cabelo e medidas foram salvos.');
     navigation.goBack();
   }

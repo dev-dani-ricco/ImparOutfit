@@ -21,6 +21,19 @@ function isLoopback(url){
 
 export const API_URL=configuredApiUrl() || (__DEV__ ? 'http://127.0.0.1:4000/api' : '');
 
+export function apiAssetUrl(path){
+  if(!path)return null;
+  if(/^https?:\/\//i.test(path))return path;
+  const base=assertApiConfiguration();
+  const origin=base.replace(/\/api\/?$/i,'');
+  return origin+(String(path).startsWith('/')?'':'/')+path;
+}
+
+export function authenticatedMediaSource(path,token){
+  const uri=apiAssetUrl(path);
+  return uri ? {uri,headers:token?{Authorization:`Bearer ${token}`}:{}} : null;
+}
+
 export function assertApiConfiguration(){
   if(!API_URL)throw Object.assign(new Error('API não configurada para este ambiente.'),{code:'API_NOT_CONFIGURED'});
   if(!__DEV__&&isLoopback(API_URL)){

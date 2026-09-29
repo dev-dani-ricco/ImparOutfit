@@ -33,6 +33,23 @@ test('demo preview requires explicit journey selection by default', () => {
   assert.match(config, /EXPO_PUBLIC_DEMO_AUTO_RESUME/);
 });
 
+test('connected mode uses the real product shell without DemoContext as its data source', () => {
+  const app = read('App.js');
+  const nav = read('src/navigation/RootNavigator.js');
+  const connected = read('src/screens/ConnectedProductScreens.js');
+  const data = read('src/contexts/ConnectedDataContext.js');
+
+  assert.match(app, /ConnectedDataProvider/);
+  assert.match(nav, /ConnectedPersonExperience/);
+  assert.match(nav, /ConnectedBrandExperience/);
+  assert.doesNotMatch(nav, /function ConnectedExperience\(/);
+  assert.doesNotMatch(connected, /DemoContext/);
+
+  for (const endpoint of ['/profile', '/wardrobe/items', '/commercial-saves', '/looks', '/stores', '/products']) {
+    assert.match(data, new RegExp(endpoint.replaceAll('/', '\\/')));
+  }
+});
+
 test('native avatar loader reads the GLB as binary before parsing', () => {
   const avatar = read('src/components/BodyAvatar3D.native.js');
   assert.match(avatar, /new File\(modelUri\)/);

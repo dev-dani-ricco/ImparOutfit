@@ -1,5 +1,14 @@
-import ApiFoundationScreen from '../screens/ApiFoundationScreen';
 import AvatarStudioScreen from '../screens/AvatarStudioScreen';
+import {
+  ConnectedDiscoveryScreen,
+  ConnectedHomeScreen,
+  ConnectedProfileScreen,
+  ConnectedStoreAccountScreen,
+  ConnectedStoreCampaignScreen,
+  ConnectedStoreCatalogScreen,
+  ConnectedStoreDashboardScreen,
+  ConnectedWardrobeScreen,
+} from '../screens/ConnectedProductScreens';
 import RealisticAvatarStudioScreen from '../screens/RealisticAvatarStudioScreen';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -33,8 +42,11 @@ const StoreStackNav = createNativeStackNavigator();
 const WardrobeStackNav = createNativeStackNavigator();
 const DaniStackNav = createNativeStackNavigator();
 const ProfileStackNav = createNativeStackNavigator();
+const ConnectedProfileStackNav = createNativeStackNavigator();
 const BrandStackNav = createNativeStackNavigator();
 const BrandTab = createBottomTabNavigator();
+const ConnectedBrandTab = createBottomTabNavigator();
+const ConnectedTab = createBottomTabNavigator();
 const Tab = createBottomTabNavigator();
 
 const icons = {
@@ -112,28 +124,67 @@ function ProfileStack() {
   );
 }
 
-function ConnectedExperience() {
+function ConnectedProfileStack() {
   return (
-    <Tab.Navigator
-      initialRouteName="Universo"
+    <ConnectedProfileStackNav.Navigator screenOptions={stackOptions}>
+      <ConnectedProfileStackNav.Screen name="Perfil conectado" component={ConnectedProfileScreen} options={{ headerShown: false }} />
+      <ConnectedProfileStackNav.Screen name="Avatar Studio Conectado" component={AvatarStudioScreen} options={{ headerShown: false }} />
+    </ConnectedProfileStackNav.Navigator>
+  );
+}
+
+function ConnectedPersonExperience() {
+  return (
+    <ConnectedTab.Navigator
+      initialRouteName="Início"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarHideOnKeyboard: true,
-        tabBarActiveTintColor: colors.bg,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarActiveBackgroundColor: colors.accent,
-        tabBarInactiveBackgroundColor: colors.bg,
-        tabBarStyle: { height: 72, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
-        tabBarItemStyle: { paddingTop: 7, paddingBottom: 7 },
+        tabBarActiveTintColor: '#FFFFFF',
+        tabBarInactiveTintColor: '#8F8983',
+        tabBarActiveBackgroundColor: '#171719',
+        tabBarInactiveBackgroundColor: '#0B0B0C',
+        tabBarStyle: { height: 74, backgroundColor: '#0B0B0C', borderTopWidth: 0, paddingTop: 4 },
+        tabBarItemStyle: { paddingTop: 6, paddingBottom: 8 },
         tabBarLabelStyle: { fontSize: 8, fontWeight: '900', letterSpacing: 0.4 },
         tabBarIcon: ({ color, focused }) => (
-          <Text style={{ color, fontSize: focused ? 21 : 17, fontWeight: '900' }}>{icons[route.name]}</Text>
+          <Text style={{ color: focused ? colors.gold : color, fontSize: focused ? 20 : 16, fontWeight: '900' }}>{icons[route.name]}</Text>
         ),
       })}
     >
-      <Tab.Screen name="Universo" component={ApiFoundationScreen} />
-      <Tab.Screen name="Análise ÍMPAR" component={DaniRicoScreen} />
-    </Tab.Navigator>
+      <ConnectedTab.Screen name="Início" component={ConnectedHomeScreen} />
+      <ConnectedTab.Screen name="Armário" component={ConnectedWardrobeScreen} />
+      <ConnectedTab.Screen name="Descobrir" component={ConnectedDiscoveryScreen} />
+      <ConnectedTab.Screen name="Análise" component={DaniRicoScreen} />
+      <ConnectedTab.Screen name="Perfil" component={ConnectedProfileStack} />
+    </ConnectedTab.Navigator>
+  );
+}
+
+function ConnectedBrandExperience() {
+  return (
+    <ConnectedBrandTab.Navigator
+      initialRouteName="Painel"
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarHideOnKeyboard: true,
+        tabBarActiveTintColor: '#FFFFFF',
+        tabBarInactiveTintColor: '#8F8983',
+        tabBarActiveBackgroundColor: '#171719',
+        tabBarInactiveBackgroundColor: '#0B0B0C',
+        tabBarStyle: { height: 74, backgroundColor: '#0B0B0C', borderTopWidth: 0, paddingTop: 4 },
+        tabBarItemStyle: { paddingTop: 6, paddingBottom: 8 },
+        tabBarLabelStyle: { fontSize: 8, fontWeight: '900', letterSpacing: 0.4 },
+        tabBarIcon: ({ color, focused }) => (
+          <Text style={{ color: focused ? colors.gold : color, fontSize: route.name === 'Campanhas' ? 11 : focused ? 20 : 16, fontWeight: '900' }}>{icons[route.name]}</Text>
+        ),
+      })}
+    >
+      <ConnectedBrandTab.Screen name="Painel" component={ConnectedStoreDashboardScreen} />
+      <ConnectedBrandTab.Screen name="Catálogo" component={ConnectedStoreCatalogScreen} />
+      <ConnectedBrandTab.Screen name="Campanhas" component={ConnectedStoreCampaignScreen} />
+      <ConnectedBrandTab.Screen name="Conta" component={ConnectedStoreAccountScreen} />
+    </ConnectedBrandTab.Navigator>
   );
 }
 
@@ -222,7 +273,10 @@ export default function RootNavigator() {
   const { isReady, token, user, activeContext, demoMode } = useAuth();
 
   if (!isReady) return <Splash />;
-  if(token && !demoMode)return <ConnectedExperience />;
+  if (token && !demoMode) {
+    const organizationActive = activeContext !== 'personal' && user?.contexts?.some((context) => context.organization_id === activeContext);
+    return organizationActive ? <ConnectedBrandExperience /> : <ConnectedPersonExperience />;
+  }
 
   return (
     <RootStack.Navigator screenOptions={stackOptions}>
