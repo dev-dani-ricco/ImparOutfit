@@ -25,7 +25,7 @@ export function createApp() {
   app.use(express.json({limit:'128kb'}));
   app.get(['/health','/api/health'],(_req,res)=>res.json({ok:true,name:'UNIVERSO ÍMPAR API'}));
   app.get(['/ready','/api/ready'],async(_req,res,next)=>{
-    try { await query("SELECT 1 FROM schema_migrations WHERE version='009_reconstruction.sql'").then(r=>{if(!r.rows.length)throw new Error('schema');}); res.json({ok:true}); }
+    try { await query("SELECT 1 FROM schema_migrations WHERE version='034_impar_analysis_requests.sql'").then(r=>{if(!r.rows.length)throw new Error('schema');}); res.json({ok:true}); }
     catch { next(new HttpError(503,'Service unavailable')); }
   });
   app.use('/api',(req,res,next)=>{ if(req.headers.authorization)res.set('Cache-Control','private, no-store'); next(); },routes);
