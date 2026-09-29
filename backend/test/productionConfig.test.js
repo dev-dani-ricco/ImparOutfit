@@ -17,6 +17,11 @@ test('production config accepts explicit distributed settings',()=>{
   assert.equal(assertProductionConfig(valid),true);
 });
 
+test('production config accepts Neon-compatible private S3 storage',()=>{
+  const external={...valid,MEDIA_ROOT:undefined,MEDIA_BUCKET:'impar-media',AWS_ENDPOINT_URL_S3:'https://storage.example.com',AWS_REGION:'us-east-2',AWS_ACCESS_KEY_ID:'key',AWS_SECRET_ACCESS_KEY:'secret-value'};
+  assert.deepEqual(productionConfigErrors(external),[]);
+});
+
 test('production config rejects local, weak or unsafe fallbacks',()=>{
   const errors=productionConfigErrors({
     ...valid,

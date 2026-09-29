@@ -1,11 +1,10 @@
 import { randomUUID, createHash } from 'node:crypto';
-import { resolve } from 'node:path';
-import { LocalStorage } from '../storage/localStorage.js';
+import { createStorage } from '../storage/index.js';
 import { pool, query } from '../config/db.js';
 import { HttpError } from '../utils/http.js';
 import { authorizePersonal, authorizeCapability } from './authorizationService.js';
 
-export const storage = new LocalStorage(process.env.MEDIA_ROOT || resolve('private/media'));
+export const storage = createStorage();
 export async function withMedia(files, auth, purpose, organizationId, work) {
   const prepared = [];
   const client = await pool.connect();
@@ -14,7 +13,7 @@ export async function withMedia(files, auth, purpose, organizationId, work) {
       if (!file.normalized) throw new Error('Upload was not validated');
       const id = randomUUID();
       const asset = { id, key: id + '.webp', ...file.normalized };
-      await storage.put(asset.key, asset.buffer);
+      await storage.put(asset.key, asset.buffer, asset.mime);
       prepared.push(asset);
     }
     await client.query('BEGIN');
