@@ -173,12 +173,20 @@ Evidências automáticas:
 - Expo Preview task Running, porta 8480 Listening e túnel externo HTTP 200.
 
 Smoke físico inicial em iPhone encontrou e corrigiu:
-- Metro chegou a manter grafo antigo após a inclusão do ConnectedDataContext; preview agora reinicia com --clear.
+- Metro chegou a manter grafo antigo após a inclusão do ConnectedDataContext; preview agora reinicia com --clear e encerra listener Expo órfão da porta 8480.
 - Login real ainda pré-preenchia demo@impar.com/demo; credenciais demonstrativas foram removidas do modo real.
-- preview Expo Go agora fixa EXPO_PUBLIC_API_URL=https://impar-outfit-api.vercel.app/api.
+- preview Expo Go fixa EXPO_PUBLIC_API_URL=https://impar-outfit-api.vercel.app/api.
 - tela real identifica HOMOLOGAÇÃO e direciona explicitamente para criação de conta de homologação.
+- Avatar Studio invadia a safe area/status bar do iOS; header agora usa safe-area inset e reserva espaço para o controle de desenvolvimento no Expo Go.
+- quatro GLBs Quaternius estavam usando um único scale/origin e não encaixavam corretamente na cabeça MakeHuman; foram medidos e receberam fit presets individuais de escala/posição.
+- Avatar Realista aparecia como opção mesmo sem provider Avaturn disponível; a rota premium agora fica oculta por feature flag e permanece desligada no preview atual.
 
-Gate restante: reabrir no Expo Go após o restart limpo e validar criação/login de conta real -> Home PERSON -> abas conectadas sem erro visual/runtime.
+Evidências após as correções físicas:
+- frontend 28/28 PASS;
+- Expo Doctor 21/21 PASS;
+- export iOS/Metro PASS com 68 assets.
+
+Gate restante: reabrir no Expo Go após o restart limpo e revalidar Avatar Studio/cabelos + criação/login de conta real -> Home PERSON -> abas conectadas sem erro visual/runtime.
 
 ### CICLO M2 — PERSON Core
 Objetivo: Perfil/Avatar -> Armário -> peça -> Look -> Análise usando persistência real.

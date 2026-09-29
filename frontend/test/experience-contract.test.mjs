@@ -37,7 +37,19 @@ test('demo preview requires explicit journey selection by default', () => {
   assert.doesNotMatch(login, /useState\('demo'\)/);
   assert.match(preview, /EXPO_PUBLIC_API_URL/);
   assert.match(preview, /impar-outfit-api\.vercel\.app\/api/);
+  assert.match(preview, /EXPO_PUBLIC_REALISTIC_AVATAR_ENABLED = 'false'/);
   assert.match(preview, /--clear/);
+});
+
+test('avatar studio respects iOS safe area and hides external realistic route unless explicitly enabled', () => {
+  const studio = read('src/screens/AvatarStudioScreen.js');
+  const profile = read('src/screens/ProfileScreen.js');
+  const features = read('src/config/features.js');
+  assert.match(studio, /useSafeAreaInsets/);
+  assert.match(studio, /paddingTop: insets\.top \+ 10/);
+  assert.match(studio, /REALISTIC_AVATAR_ENABLED/);
+  assert.match(profile, /REALISTIC_AVATAR_ENABLED/);
+  assert.match(features, /realisticAvatarEnabled === true/);
 });
 
 test('connected mode uses the real product shell without DemoContext as its data source', () => {

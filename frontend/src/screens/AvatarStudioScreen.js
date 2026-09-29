@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import * as Haptics from 'expo-haptics';
 import ParametricAvatar3D from '../components/ParametricAvatar3D';
@@ -19,10 +20,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { useDemo } from '../contexts/DemoContext';
 import { useConnectedData } from '../contexts/ConnectedDataContext';
 import { colors } from '../theme/colors';
+import { REALISTIC_AVATAR_ENABLED } from '../config/features';
 
 const SECTIONS = ['CORPO', 'ROSTO', 'CABELO'];
 
 export default function AvatarStudioScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const demo = useDemo();
   const connected = useConnectedData();
   const { token, demoMode } = useAuth();
@@ -80,7 +83,7 @@ export default function AvatarStudioScreen({ navigation }) {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.top}>
+      <View style={[styles.top, { paddingTop: insets.top + 10, paddingRight: __DEV__ ? 78 : 18 }]}>
         <View>
           <Text style={styles.kicker}>IMPAR DIGITAL ATELIER</Text>
           <Text style={styles.title}>Avatar Studio</Text>
@@ -195,16 +198,18 @@ export default function AvatarStudioScreen({ navigation }) {
           </View>
         ) : null}
 
-        <View style={styles.realisticCard}>
-          <View style={styles.realisticCopy}>
-            <Text style={styles.realisticTag}>ROTA PREMIUM · FOTOS</Text>
-            <Text style={styles.realisticTitle}>Quer mais semelhança facial?</Text>
-            <Text style={styles.realisticText}>Use o Avatar Realista para gerar uma identidade 3D a partir de fotos com provedor especializado. O avatar paramétrico continua sendo o modo controlável e sem lock-in.</Text>
+        {REALISTIC_AVATAR_ENABLED ? (
+          <View style={styles.realisticCard}>
+            <View style={styles.realisticCopy}>
+              <Text style={styles.realisticTag}>ROTA PREMIUM · FOTOS</Text>
+              <Text style={styles.realisticTitle}>Quer mais semelhança facial?</Text>
+              <Text style={styles.realisticText}>Use o Avatar Realista para gerar uma identidade 3D a partir de fotos com provedor especializado. O avatar paramétrico continua sendo o modo controlável e sem lock-in.</Text>
+            </View>
+            <Pressable style={styles.realisticButton} onPress={() => navigation.navigate('Avatar Realista')}>
+              <Text style={styles.realisticButtonText}>ABRIR AVATAR REALISTA →</Text>
+            </Pressable>
           </View>
-          <Pressable style={styles.realisticButton} onPress={() => navigation.navigate('Avatar Realista')}>
-            <Text style={styles.realisticButtonText}>ABRIR AVATAR REALISTA →</Text>
-          </Pressable>
-        </View>
+        ) : null}
 
         <View style={styles.quality}>
           <Text style={styles.qualityTag}>QUALIDADE E LIMITES</Text>

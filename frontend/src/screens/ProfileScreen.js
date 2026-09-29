@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useDemo } from '../contexts/DemoContext';
 import { colors } from '../theme/colors';
 import { BODY_PRESETS, FACE_SHAPES, HAIR_COLORS, HAIR_STYLES, SKIN_TONES, withProfessionalAvatarDefaults } from '../avatar/avatarProfile';
+import { REALISTIC_AVATAR_ENABLED } from '../config/features';
 
 export default function ProfileScreen({ navigation, route }) {
   const { logout, user, switchContext } = useAuth();
@@ -96,9 +97,11 @@ export default function ProfileScreen({ navigation, route }) {
           <Pressable style={styles.editButton} onPress={() => navigation.navigate('Avatar Studio')}>
             <Text style={styles.editButtonText}>AJUSTAR AVATAR PARAMÉTRICO →</Text>
           </Pressable>
-          <Pressable style={styles.realisticButton} onPress={() => navigation.navigate('Avatar Realista')}>
-            <Text style={styles.realisticButtonText}>{draft.realisticAvatar?.url ? 'ATUALIZAR AVATAR REALISTA →' : 'CRIAR AVATAR REALISTA POR FOTOS →'}</Text>
-          </Pressable>
+          {REALISTIC_AVATAR_ENABLED ? (
+            <Pressable style={styles.realisticButton} onPress={() => navigation.navigate('Avatar Realista')}>
+              <Text style={styles.realisticButtonText}>{draft.realisticAvatar?.url ? 'ATUALIZAR AVATAR REALISTA →' : 'CRIAR AVATAR REALISTA POR FOTOS →'}</Text>
+            </Pressable>
+          ) : null}
         </View>
         <Text style={styles.avatarNote}>
           {draft.realisticAvatar?.url

@@ -16,6 +16,12 @@ const HAIR_ASSETS = {
   buns: require('../../assets/models/hair/Hair_Buns.glb'),
 };
 const HAIR_KEYS = ['buzzed', 'parted', 'long', 'buns'];
+const HAIR_FIT = {
+  buzzed: { scale: 0.93, position: [0, 0, 0.075] },
+  parted: { scale: 0.93, position: [0, 0, 0.08] },
+  long: { scale: 0.90, position: [0, 0.11, 0.09] },
+  buns: { scale: 0.88, position: [0, 0.18, 0.08] },
+};
 const ALL_ASSETS = [BODY_MODEL, ...HAIR_KEYS.map((key) => HAIR_ASSETS[key])];
 
 function useLocalGltf(uri) {
@@ -123,7 +129,7 @@ function ParametricHuman({ bodyGltf, hairGltf, spec, angle }) {
 
   const baseHeight = Math.max(prepared.size.y, 0.001);
   const displayScale = 4.25 / baseHeight;
-  const hairScale = 0.93;
+  const hairFit = HAIR_FIT[spec.appearance.hairStyle] || HAIR_FIT.buzzed;
 
   return (
     <group
@@ -136,7 +142,13 @@ function ParametricHuman({ bodyGltf, hairGltf, spec, angle }) {
       ]}
     >
       <primitive object={prepared.body} />
-      {hair ? <primitive object={hair} scale={[hairScale, hairScale, hairScale]} /> : null}
+      {hair ? (
+        <primitive
+          object={hair}
+          scale={[hairFit.scale, hairFit.scale, hairFit.scale]}
+          position={hairFit.position}
+        />
+      ) : null}
     </group>
   );
 }
@@ -197,7 +209,7 @@ export default function ParametricAvatar3D({ profile, spec: providedSpec, compac
     },
   }), []);
 
-  const error = assetError || bodyError;
+  const error = assetError || bodyError || hairError;
   const ready = Boolean(bodyGltf);
   const stageHeight = compact ? 330 : 470;
 

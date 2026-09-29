@@ -8,6 +8,7 @@ Set-Location $repo
 
 $env:EXPO_PUBLIC_DEMO_MODE = 'true'
 $env:EXPO_PUBLIC_DEMO_AUTO_RESUME = 'false'
+$env:EXPO_PUBLIC_REALISTIC_AVATAR_ENABLED = 'false'
 $env:EXPO_PUBLIC_API_URL = 'https://impar-outfit-api.vercel.app/api'
 $env:CI = '1'
 

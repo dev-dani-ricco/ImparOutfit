@@ -42,6 +42,14 @@ test('bundled hair assets are self-contained GLB files', () => {
   }
 });
 
+test('modular hair uses calibrated fit presets instead of one generic origin scale', () => {
+  const avatar = read('src/components/ParametricAvatar3D.native.js');
+  assert.match(avatar, /const HAIR_FIT =/);
+  for (const style of ['buzzed', 'parted', 'long', 'buns']) assert.match(avatar, new RegExp(style + ': \\{ scale:'));
+  assert.match(avatar, /position=\{hairFit\.position\}/);
+  assert.doesNotMatch(avatar, /const hairScale = 0\.93/);
+});
+
 test('avatar controls map to bounded real morph target names', () => {
   const spec = normalizeAvatarSpec({
     height: '178', bust: '106', waist: '69', hips: '112',
