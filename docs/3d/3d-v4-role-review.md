@@ -28,12 +28,15 @@ No framework rewrite was introduced.
 Implemented:
 - task-aware camera: full body / face close-up / hair close-up;
 - additional anatomy controls;
+- body presets for faster first configuration;
+- progressive disclosure: essential body/face choices first, fine anatomical controls in advanced mode;
 - explicit premium photo-realistic route inside Avatar Studio;
 - explicit labels for tailored proxy vs quality-gated private GLB;
 - garment material response by fabric class.
 
 Next visual cycle:
 - real-device visual QA on multiple skin tones and face/body extremes;
+- validate preset language and first-layer hierarchy on real phones;
 - refine lighting/background after device screenshots;
 - expand curated hair library only with approved provenance.
 
@@ -77,19 +80,23 @@ Implemented:
 
 ## QA / Release
 PASS:
-- frontend tests: 24/24;
+- frontend tests: 25/25;
 - Expo Doctor: 21/21;
 - Android bundle: PASS;
 - six garment GLBs: valid GLB 2.0, self-contained;
 - avatar provider unit tests: 3/3;
 - OpenAPI route coverage: PASS;
-- core backend foundation assertions: 75 functional assertions passed before a known PGlite/Node teardown RuntimeError after suite completion.
+- backend full test runner: ALL_TEST_FILES=PASS;
+- core backend foundation assertions: 75/75 PASS without post-suite teardown failure.
 
-Known environment issue:
-- current Node/PGlite combination can emit an asynchronous Aborted() teardown error after all foundation assertions complete. This is not treated as a product pass; it remains a QA/toolchain issue to isolate before production release.
+Environment boundary:
+- the test runner now forces an isolated in-memory PGlite database, preventing the local persistent database from contaminating tests;
+- persistent nodefs-backed PGlite 0.5.8 still reproduces RuntimeError: Aborted() on Node 24.18.0 outside the test harness;
+- production remains PostgreSQL-backed; persistent PGlite/Node 24 is not approved as a production runtime.
 
-External dependency:
-- AVATURN_API_TOKEN is not configured in the current backend environment. The route and UI are implemented, but a real provider session cannot be validated until a paid Avaturn API project/token is connected.
+External dependencies:
+- AVATURN_API_TOKEN is not configured in the current backend environment. The route and UI are implemented, but a real provider session cannot be validated until a paid Avaturn API project/token is connected;
+- EAS preview has no build yet and no EXPO_PUBLIC_API_URL configured. A public HTTPS PostgreSQL-backed API is required before the first independent stakeholder build is generated.
 
 ## Release decision
 Approved for stakeholder preview of:

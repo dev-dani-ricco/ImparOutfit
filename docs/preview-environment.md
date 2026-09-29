@@ -43,9 +43,20 @@ Channels:
 - production
 
 The intended stakeholder architecture is:
-Git release -> QA gates -> EAS preview update -> stakeholder preview build.
+Git release -> QA gates -> PostgreSQL-backed HTTPS API -> EAS preview environment -> stakeholder preview build.
 
 This removes the dependency on an always-on development machine. A preview/development build is required when the native runtime differs from Expo Go or when a stable app-specific scheme/update channel is needed.
+
+### Current EAS blocker — 2026-09-28
+Validated on PC NewBio:
+- Expo/EAS account authenticated as @poshaze1;
+- project ID confirmed;
+- no EAS builds exist yet;
+- the EAS preview environment currently has no variables;
+- EXPO_PUBLIC_API_URL is not configured;
+- the preview build profile intentionally requires a distributed API and the guard rejects loopback/missing URLs.
+
+Do not bypass this guard for a product preview. First expose the PostgreSQL-backed API through a stable HTTPS endpoint, then configure EXPO_PUBLIC_API_URL in the EAS preview environment and generate the first internal build.
 
 ## Release procedure
 1. Run product/tech/security review.

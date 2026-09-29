@@ -162,22 +162,24 @@ Banco e storage devem manter separação Person x Organization.
 ## 8. QA executado no PC NewBio em 2026-09-28
 
 Frontend:
-- npm test: 24/24 PASS;
+- npm test: 25/25 PASS;
 - Expo Doctor: 21/21 PASS;
 - API config guard: PASS;
 - Android export/bundle: PASS;
-- bundle contém avatar paramétrico, cabelos e seis GLBs de roupas.
+- bundle contém avatar paramétrico, cabelos e seis GLBs de roupas;
+- Avatar Studio agora possui presets corporais e modo avançado recolhido para corpo/rosto sem remover controles finos.
 
 Backend:
+- suíte completa: ALL_TEST_FILES=PASS;
 - avatarProvider.test.js: 3/3 PASS;
-- foundation.test.js: 75 assertions funcionais PASS;
-- suite reporta 1 falha de teardown assíncrono do PGlite/Node após os testes.
+- foundation.test.js: 75/75 PASS sem falha pós-suite;
+- runner de testes força NODE_ENV=test + PGLITE_DATA_DIR=memory:// para isolar testes do runtime persistente.
 
-A falha conhecida é:
-RuntimeError: Aborted() após encerramento do foundation test.
-
-Não tratar esse teardown como produto aprovado.
-Isolar a combinação Node/PGlite antes de release de produção.
+Diagnóstico PGlite:
+- o teardown da suíte foi resolvido sem mascarar erro;
+- @electric-sql/pglite 0.5.8 é a versão latest consultada;
+- PGlite persistente nodefs em Node 24.18.0 ainda reproduz RuntimeError: Aborted() fora do harness;
+- produção continua devendo usar PostgreSQL; PGlite persistente não deve ser promovido como backend de produção.
 ## 9. Preview atual
 
 Workstation que hospeda o Metro:
@@ -186,7 +188,7 @@ PCNewBioDigital.
 Scheduled Task:
 IMPAR Outfit Expo Preview.
 
-Status validado no handoff:
+Status revalidado após a evolução do Avatar Studio:
 - task Running;
 - porta 8480 Listening;
 - Expo SDK 57.0.0;
@@ -216,6 +218,14 @@ Objetivo:
 parar de depender de Metro/PC ligado para apresentação ao cliente.
 
 Ainda é necessário gerar/validar o primeiro build de preview compatível com o runtime atual para essa rota virar o canal canônico do cliente.
+
+Validação feita em 2026-09-28:
+- EAS autenticado como @poshaze1;
+- Project ID confirmado;
+- build:list retornou zero builds;
+- ambiente EAS preview não possui variáveis;
+- EXPO_PUBLIC_API_URL distribuída ainda não está configurada;
+- o guard de build bloqueia corretamente preview sem API pública HTTPS, portanto nenhum build remoto quebrado foi disparado.
 ## 11. Commits de referência
 
 Linha principal desta frente:
@@ -224,7 +234,9 @@ Linha principal desta frente:
 - 529e411 — bind preview server to canonical workspace;
 - 413be77 — checkpoint avatar provider and garment fit v3 wip;
 - 7740909 — evolve professional avatars and garment 3d;
-- 3c8443e — restrict realistic avatar provider session hosts.
+- 3c8443e — restrict realistic avatar provider session hosts;
+- 35c410b — isolate PGlite test teardown harness;
+- 449bd45 — simplify Avatar Studio with body presets and progressive advanced editing.
 
 Baseline UX anterior:
 - 27b736f — separate client and merchant preview journeys;
@@ -239,16 +251,16 @@ PO / Project Lead:
 - definir critérios de aceite para demonstração ao cliente.
 
 Tech Lead / Arquitetura:
-- resolver teardown PGlite;
-- fechar estratégia de preview build/EAS;
+- manter testes PGlite isolados em memória e não promover PGlite nodefs/Node 24 como runtime de produção;
+- fechar estratégia de preview build/EAS conectando uma API PostgreSQL pública HTTPS;
 - validar provider abstraction e fallback;
 - consolidar storage privado para GLBs reais.
 
 UX / Product Design:
+- presets corporais + modo avançado de corpo/rosto: IMPLEMENTADO;
 - QA visual em iPhone/Android;
 - revisar extremos de corpo/rosto e tons de pele;
-- evoluir Avatar Studio sem excesso de controles na primeira camada;
-- organizar presets + modo avançado.
+- validar linguagem e hierarquia da nova primeira camada do Avatar Studio em dispositivo real.
 Mobile:
 - smoke do Avatar Studio em dispositivos reais;
 - medir FPS/memória com GLB paramétrico;
@@ -273,7 +285,7 @@ Security / Privacy:
 - garantir menor privilégio nos endpoints 3D.
 
 QA / Release:
-- manter 24/24 frontend como baseline mínimo;
+- manter 25/25 frontend como baseline mínimo;
 - manter 21/21 Expo Doctor;
 - bundle Android/iOS;
 - smoke PERSON e ORGANIZATION;
@@ -285,15 +297,15 @@ QA / Release:
 ## 13. Pendências críticas
 
 P0 antes de produção:
-1. resolver PGlite teardown;
+1. substituir/evitar PGlite persistente nodefs no runtime Node 24; testes já estão isolados e limpos;
 2. smoke real em iOS e Android;
-3. criar preview build independente do Metro;
-4. validar backend conectado e storage privado;
+3. disponibilizar backend PostgreSQL + storage privado em endpoint público HTTPS;
+4. configurar EXPO_PUBLIC_API_URL no ambiente EAS preview e gerar o primeiro preview build independente do Metro;
 5. validar Avaturn E2E se a rota premium for mantida;
 6. revisar desempenho do GLB paramétrico em aparelhos intermediários.
 
 P1:
-- presets corporais/faciais sem substituir controles finos;
+- presets corporais/faciais sem substituir controles finos: IMPLEMENTADO no Avatar Studio;
 - mais cabelos licenciados;
 - melhor iluminação e framing;
 - instrumentação de performance;
